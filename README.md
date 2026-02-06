@@ -15,7 +15,25 @@ Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensible
 2. **Code beschaffen:** Klonen oder laden Sie das Repository mit dem App-Code.
 3. **Abhängigkeiten installieren:** Führen Sie im Projektverzeichnis `pip install -r requirements.txt` aus, um alle benötigten Python-Pakete zu installieren.
    - Alternativ können Sie ein virtuelles Environment nutzen (empfohlen) und darin die Installation vornehmen.
+   - Optionale CV-Erweiterung (Gesichtserkennung) nur bei ausreichenden Ressourcen installieren: `pip install -r requirements-cv.txt`.
 4. **Streamlit vorbereiten:** Stellen Sie sicher, dass Streamlit lauffähig ist (`streamlit hello` zum Testen).
+
+### Deployment-Hinweis für Streamlit Cloud (dlib/face_recognition)
+
+Für Debian-basierte Build-Umgebungen liegt im Repo eine `packages.txt` mit minimalen nativen Build-Abhängigkeiten für `dlib`:
+
+- `cmake`
+- `build-essential`
+- `libopenblas-dev`
+- `liblapack-dev`
+- `libjpeg-dev`
+- `zlib1g-dev`
+- `libpng-dev`
+
+Wichtig:
+- Die Kern-App bleibt ohne CV-Abhängigkeiten lauffähig (Gesichtserkennung ist optional).
+- Wenn Builds in der Cloud wegen Zeit-/RAM-Limits instabil sind, lassen Sie `requirements-cv.txt` in der Cloud-Installation weg.
+- In diesem Fall zeigt die App einen Hinweis an und deaktiviert automatisch die Gesichtserkennung.
 
 ## Konfiguration der APIs und Dienste
 
@@ -52,4 +70,3 @@ Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüsse
   Falls `firebase-admin` im Laufzeitumfeld nicht verfügbar ist, startet die App jetzt weiterhin, zeigt aber für Stammdaten eine Hinweis-Meldung an, bis Firebase korrekt eingerichtet ist.
 - **`ModuleNotFoundError: No module named 'face_recognition'`**  
   Die Gesichtserkennung ist optional. Die App startet und der Foto-Upload funktioniert weiterhin; es erscheint ein Hinweis, dass automatische Gesichtserkennung in dieser Bereitstellung deaktiviert ist.
-

@@ -4,6 +4,7 @@ from typing import Any
 
 import streamlit as st
 
+from config import get_app_config
 from storage import DriveAgent, init_firebase
 
 try:
@@ -58,7 +59,7 @@ class StammdatenManager:
         folder_id: str | None = None
         try:
             drive_agent = DriveAgent()
-            main_folder = st.secrets.get("gcp", {}).get("photos_folder_id")
+            main_folder = get_app_config().google.photos_folder_id
             folder_id = drive_agent.create_folder(name, parent_folder_id=main_folder)
         except Exception as exc:
             print("Fehler beim Anlegen des Drive-Ordners:", exc)
@@ -76,7 +77,11 @@ class StammdatenManager:
         if not self.db:
             return None
 
-        query = self.db.collection("children").where("parent_email", "==", parent_email).stream()
+        query = (
+            self.db.collection("children")
+            .where("parent_email", "==", parent_email)
+            .stream()
+        )
         for doc in query:
             data = doc.to_dict()
             data["id"] = doc.id

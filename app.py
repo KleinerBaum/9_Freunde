@@ -7,9 +7,14 @@ from documents import DocumentAgent
 from photo import PhotoAgent
 from storage import DriveAgent
 from calendar import CalendarAgent
+from config import validate_config_or_stop
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
+
+
+# Validate required secrets early and fail with clear UI guidance
+validate_config_or_stop()
 
 # Initialize agents (ensure single instance per session)
 if "auth_agent" not in st.session_state:

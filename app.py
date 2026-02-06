@@ -1,7 +1,6 @@
 
 ## app.py
 
-```python
 import streamlit as st
 from auth import AuthAgent
 from stammdaten import StammdatenManager

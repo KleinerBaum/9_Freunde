@@ -2,6 +2,7 @@ import io
 from typing import Any
 
 import streamlit as st
+from config import get_app_config
 from storage import DriveAgent
 
 try:
@@ -55,7 +56,7 @@ class PhotoAgent:
 
         # Datei in Drive hochladen
         drive_agent = DriveAgent()
-        target_folder = folder_id or st.secrets.get("gcp", {}).get("photos_folder_id")
+        target_folder = folder_id or get_app_config().google.photos_folder_id
         if not target_folder:
             raise RuntimeError("Kein Zielordner für Fotos definiert.")
 

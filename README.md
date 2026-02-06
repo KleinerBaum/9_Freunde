@@ -84,11 +84,34 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 ### OpenAI API (Textgenerierung)
 Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüssel:
 1. Legen Sie einen Account bei OpenAI an und erzeugen Sie einen persönlichen API Key im Dashboard.
-2. Tragen Sie diesen Key in die Konfiguration ein, z. B.:
-   ```toml
-   [openai]
-   api_key = "sk-XXXX...IhrOpenAIKey...XXXX"
+2. Tragen Sie diesen Key in die Konfiguration ein.
 
+### Beispiel für das finale `secrets.toml`
+Die App validiert beim Start zentral folgende Pflichtstruktur:
+
+```toml
+[gcp_service_account]
+type = "service_account"
+project_id = "my-project-id"
+private_key_id = "abc123..."
+private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+client_email = "service-account@my-project-id.iam.gserviceaccount.com"
+client_id = "123456789012345678901"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/service-account%40my-project-id.iam.gserviceaccount.com"
+universe_domain = "googleapis.com"
+
+[gcp]
+calendar_id = "kita-kalender@group.calendar.google.com"
+photos_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+
+[openai]
+api_key = "sk-XXXX...IhrOpenAIKey...XXXX"
+```
+
+Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.
 
 ## Fehlerbehebung
 

@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Firestore-Prüfskript `scripts/check_firestore_prerequisites.py` ergänzt, das Native-Mode, IAM-Rollen (Least Privilege) und die Nutzung desselben `gcp_service_account` durch `init_firebase()` validiert.
 - Optionalen Admin-Healthcheck in `app.py` ergänzt: Sidebar-Button „Google-Verbindung prüfen / Check Google connection“ testet Drive-Listing und Calendar-Event-Lesen mit verständlichen DE/EN-Fehlermeldungen.
 - README um eine exakte Setup-Checkliste für Freigaben erweitert (Service-Account als Editor auf Drive-Ordner, Kalenderfreigabe für `calendar_id`) sowie um die Beschreibung des Laufzeit-Healthchecks.
 - `packages.txt` im Repository-Root ergänzt, damit Debian-basierte Deployments die nativen Build-Abhängigkeiten für `dlib` installieren können (`cmake`, `build-essential`, BLAS/LAPACK- sowie JPEG/PNG/Zlib-Header).
@@ -10,6 +11,7 @@
 - README um Deployment-Hinweise für stabile Cloud-Builds (optionaler CV-Stack, Umgang mit RAM-/Zeitlimits) erweitert.
 
 ### Changed
+- README um den Abschnitt **Firestore prerequisites** ergänzt (Aktivierung im Native Mode, IAM-Rollen für Service Account, `init_firebase()`-Verifikation sowie typische Fehlermeldungen mit Lösung).
 - Zentrale Secret-Validierung in `config.py` ergänzt: Pflichtschema mit `[gcp_service_account]` und `[gcp]` wird beim App-Start geprüft und einheitlich bereitgestellt.
 - Google-Integrationen (`calendar.py`, `storage.py`, `stammdaten.py`, `photo.py`, `services/google_clients.py`) auf zentrale Konfigurationsquelle umgestellt.
 - README um ein vollständiges Beispiel für das finale `secrets.toml` erweitert.

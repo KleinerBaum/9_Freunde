@@ -1,0 +1,8 @@
+streamlit
+firebase-admin
+openai
+google-api-python-client
+python-docx
+PyPDF2
+Pillow
+face-recognition

@@ -50,3 +50,6 @@ Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüsse
 - **`ModuleNotFoundError: No module named 'firebase_admin'`**  
   Installieren Sie die Abhängigkeiten mit `pip install -r requirements.txt`.
   Falls `firebase-admin` im Laufzeitumfeld nicht verfügbar ist, startet die App jetzt weiterhin, zeigt aber für Stammdaten eine Hinweis-Meldung an, bis Firebase korrekt eingerichtet ist.
+- **`ModuleNotFoundError: No module named 'face_recognition'`**  
+  Die Gesichtserkennung ist optional. Die App startet und der Foto-Upload funktioniert weiterhin; es erscheint ein Hinweis, dass automatische Gesichtserkennung in dieser Bereitstellung deaktiviert ist.
+

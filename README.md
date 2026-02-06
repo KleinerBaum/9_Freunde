@@ -11,12 +11,39 @@ Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensible
 
 ## Installation und Voraussetzungen
 
+Es gibt **zwei Installationsmodi**:
+
+### 1) Core-Installation (Cloud/Deployment-sicher)
+Für Streamlit Cloud und andere ressourcenbegrenzte Umgebungen:
+
+```bash
+pip install -r requirements.txt
+```
+
+Enthalten sind nur die Kernabhängigkeiten:
+- Streamlit
+- Firebase Admin SDK
+- OpenAI SDK
+- Google API Client
+- Dokument-Bibliotheken (`python-docx`, `PyPDF2`)
+- Pillow
+
+### 2) CV-Installation (lokal / Full Environment)
+Für lokale Setups mit optionaler Gesichtserkennung:
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-cv.txt
+```
+
+`requirements-cv.txt` enthält die optionalen Computer-Vision-Pakete (u. a. `face-recognition` und kompatibles `dlib`).
+
+### Allgemeine Voraussetzungen
+
 1. **Python installieren:** Stellen Sie sicher, dass Python 3.11+ installiert ist.
 2. **Code beschaffen:** Klonen oder laden Sie das Repository mit dem App-Code.
-3. **Abhängigkeiten installieren:** Führen Sie im Projektverzeichnis `pip install -r requirements.txt` aus, um alle benötigten Python-Pakete zu installieren.
-   - Alternativ können Sie ein virtuelles Environment nutzen (empfohlen) und darin die Installation vornehmen.
-   - Optionale CV-Erweiterung (Gesichtserkennung) nur bei ausreichenden Ressourcen installieren: `pip install -r requirements-cv.txt`.
-4. **Streamlit vorbereiten:** Stellen Sie sicher, dass Streamlit lauffähig ist (`streamlit hello` zum Testen).
+3. **Virtuelle Umgebung:** Nutzen Sie idealerweise ein venv (`python -m venv .venv`).
+4. **Streamlit testen:** `streamlit hello` ausführen, um die lokale Laufzeit zu prüfen.
 
 ### Deployment-Hinweis für Streamlit Cloud (dlib/face_recognition)
 
@@ -32,7 +59,7 @@ Für Debian-basierte Build-Umgebungen liegt im Repo eine `packages.txt` mit mini
 
 Wichtig:
 - Die Kern-App bleibt ohne CV-Abhängigkeiten lauffähig (Gesichtserkennung ist optional).
-- Wenn Builds in der Cloud wegen Zeit-/RAM-Limits instabil sind, lassen Sie `requirements-cv.txt` in der Cloud-Installation weg.
+- Wenn Builds in der Cloud wegen Zeit-/RAM-Limits instabil sind, installieren Sie **nur** `requirements.txt`.
 - In diesem Fall zeigt die App einen Hinweis an und deaktiviert automatisch die Gesichtserkennung.
 
 ## Konfiguration der APIs und Dienste

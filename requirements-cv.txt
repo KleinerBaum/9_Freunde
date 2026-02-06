@@ -1,2 +1,4 @@
-# Optional computer-vision extras (install only where enough build resources are available)
-face-recognition
+# Optional computer-vision extras (local/full installs)
+# Keep core deployment lightweight by installing this file only when needed.
+face-recognition==1.3.0
+dlib==19.24.6

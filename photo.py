@@ -10,6 +10,11 @@ except Exception:
     face_recognition = None
 
 
+def is_face_detection_available() -> bool:
+    """Return whether optional face detection dependencies are available."""
+    return face_recognition is not None
+
+
 class PhotoAgent:
     def __init__(self) -> None:
         # Hier könnte man bekannte Gesichter (Embeddings) pro Kind laden
@@ -22,7 +27,7 @@ class PhotoAgent:
         # Bilddaten einlesen
         img_bytes = image_file.getvalue()
 
-        if face_recognition is not None:
+        if is_face_detection_available():
             # Gesichter erkennen
             try:
                 img = face_recognition.load_image_file(io.BytesIO(img_bytes))
@@ -65,3 +70,7 @@ class PhotoAgent:
         )
         drive_agent.upload_file(file_name, img_bytes, mime_type, target_folder)
         return True
+
+    def face_detection_enabled(self) -> bool:
+        """Expose whether automatic face detection is active in this runtime."""
+        return is_face_detection_available()

@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- API-Inventur in `README.md` ergänzt (aktiv genutzt: Drive/Calendar/Firestore, optional: Sheets, ungenutzt: Docs/Forms/Tasks).
+- Neues Skript `scripts/check_google_api_inventory.py` ergänzt, das die Inventur ausgibt und optionale Minimal-Healthchecks für Sheets/Docs/Forms/Tasks unterstützt.
+
+### Changed
+- README um konkrete `gcloud services disable`-Kommandos erweitert, um ungenutzte APIs (Docs/Forms/Tasks) bei fehlendem kurzfristigem Bedarf in GCP zu deaktivieren.
+- README um optionale Secrets-Sektion `[gcp_optional_apis]` erweitert, damit vorbereitete APIs mit Read-Healthchecks geprüft werden können.
+
+### Added
 - Firestore-Prüfskript `scripts/check_firestore_prerequisites.py` ergänzt, das Native-Mode, IAM-Rollen (Least Privilege) und die Nutzung desselben `gcp_service_account` durch `init_firebase()` validiert.
 - Optionalen Admin-Healthcheck in `app.py` ergänzt: Sidebar-Button „Google-Verbindung prüfen / Check Google connection“ testet Drive-Listing und Calendar-Event-Lesen mit verständlichen DE/EN-Fehlermeldungen.
 - README um eine exakte Setup-Checkliste für Freigaben erweitert (Service-Account als Editor auf Drive-Ordner, Kalenderfreigabe für `calendar_id`) sowie um die Beschreibung des Laufzeit-Healthchecks.

@@ -81,6 +81,56 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - `photos_folder_id`: die ID des in Schritt 4 erstellten Drive-Hauptordners für Fotos/Dokumente.
    - `calendar_id`: die Kalender-ID aus Schritt 4 für den Google Kalender der Einrichtung (z. B. die Kalender-E-Mail-Adresse oder die aus URL kopierte ID).
 
+### API-Inventur (Stand: aktuell im Code)
+
+| API | Status | Nachweis im Code |
+|---|---|---|
+| Google Drive API (`drive.googleapis.com`) | **aktiv genutzt** | `storage.py`, `services/drive_service.py`, `app.py` |
+| Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `calendar.py`, `app.py` |
+| Firestore API (`firestore.googleapis.com`) | **aktiv genutzt** | `stammdaten.py`, `storage.py`, `scripts/check_firestore_prerequisites.py` |
+| Google Sheets API (`sheets.googleapis.com`) | **optional/vorbereitet** | `services/google_clients.py` (`get_sheets_client`) |
+| Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
+| Google Forms API (`forms.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
+| Google Tasks API (`tasks.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
+
+#### Ungenutzte APIs in GCP deaktivieren
+
+Wenn kein kurzfristiger Bedarf besteht, deaktivieren Sie ungenutzte APIs projektweit:
+
+```bash
+gcloud services disable docs.googleapis.com --project "<PROJECT_ID>"
+gcloud services disable forms.googleapis.com --project "<PROJECT_ID>"
+gcloud services disable tasks.googleapis.com --project "<PROJECT_ID>"
+```
+
+Vorher/Nachher prüfen:
+
+```bash
+gcloud services list --enabled --project "<PROJECT_ID>" \
+  --filter="name:(drive.googleapis.com OR calendar-json.googleapis.com OR firestore.googleapis.com OR sheets.googleapis.com OR docs.googleapis.com OR forms.googleapis.com OR tasks.googleapis.com)"
+```
+
+#### Optional vorbereitete APIs: Minimal-Healthchecks & Konfiguration
+
+Wenn Sheets/Docs/Forms/Tasks bald genutzt werden sollen, kann ein minimaler Read-Healthcheck ausgeführt werden:
+
+```bash
+python scripts/check_google_api_inventory.py --secrets .streamlit/secrets.toml --run-optional-healthchecks
+```
+
+Erforderliche optionale Konfiguration in `.streamlit/secrets.toml`:
+
+```toml
+[gcp_optional_apis]
+sheets_spreadsheet_id = "<SPREADSHEET_ID>"
+docs_document_id = "<DOCUMENT_ID>"
+forms_form_id = "<FORM_ID>"
+```
+
+Hinweise:
+- Für Tasks ist kein Ressourcen-ID-Feld erforderlich; es wird ein minimaler `tasklists.list`-Read ausgeführt.
+- Fehlende optionale IDs werden als `SKIP`/`WARN` protokolliert und blockieren den App-Start nicht.
+
 
 #### Setup-Checkliste (Drive & Calendar Freigaben)
 Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
@@ -194,6 +244,11 @@ universe_domain = "googleapis.com"
 [gcp]
 calendar_id = "kita-kalender@group.calendar.google.com"
 photos_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+
+[gcp_optional_apis]
+sheets_spreadsheet_id = "<optional>"
+docs_document_id = "<optional>"
+forms_form_id = "<optional>"
 
 [openai]
 api_key = "sk-XXXX...IhrOpenAIKey...XXXX"

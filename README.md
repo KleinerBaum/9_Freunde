@@ -81,6 +81,31 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - `photos_folder_id`: die ID des in Schritt 4 erstellten Drive-Hauptordners für Fotos/Dokumente.
    - `calendar_id`: die Kalender-ID aus Schritt 4 für den Google Kalender der Einrichtung (z. B. die Kalender-E-Mail-Adresse oder die aus URL kopierte ID).
 
+
+#### Setup-Checkliste (Drive & Calendar Freigaben)
+Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
+
+1. **Service-Account-E-Mail kopieren**  
+   Öffnen Sie in GCP den Service-Account und kopieren Sie `client_email` aus der JSON (`...@...iam.gserviceaccount.com`).
+2. **Ziel-Drive-Ordner freigeben (Editor)**  
+   In Google Drive den Zielordner öffnen → **Freigeben** → Service-Account-E-Mail eintragen → Rolle **Editor** (`Bearbeiter`) setzen → speichern.
+3. **Ordner-ID übernehmen**  
+   Die Ordner-ID aus der Drive-URL in `gcp.photos_folder_id` eintragen.
+4. **Kalender mit Service-Account teilen**  
+   In Google Kalender den Einrichtungs-Kalender öffnen → **Einstellungen und Freigabe** → **Für bestimmte Personen freigeben** → Service-Account-E-Mail hinzufügen → Berechtigung mindestens **Änderungen an Terminen vornehmen** (`Make changes to events`) setzen.
+5. **Kalender-ID übernehmen**  
+   In den Kalender-Einstellungen die **Kalender-ID** kopieren und in `gcp.calendar_id` hinterlegen.
+6. **Kurztest im Google UI**  
+   Prüfen, dass der Service-Account in beiden Freigabelisten sichtbar ist (Drive-Ordner + Kalender).
+
+#### Optionaler Laufzeit-Healthcheck in der App
+Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check Google connection“** zur Verfügung. Der Check führt zwei Testaufrufe aus:
+
+- **Drive-Test:** Ein kleiner List-Aufruf gegen die Drive API.
+- **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id`.
+
+Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner oder Kalender nicht mit Service-Account geteilt).
+
 ### OpenAI API (Textgenerierung)
 Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüssel:
 1. Legen Sie einen Account bei OpenAI an und erzeugen Sie einen persönlichen API Key im Dashboard.

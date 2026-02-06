@@ -1,0 +1,2 @@
+# Optional computer-vision extras (install only where enough build resources are available)
+face-recognition

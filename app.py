@@ -1,5 +1,7 @@
 ## app.py
 
+from __future__ import annotations
+
 import streamlit as st
 from auth import AuthAgent
 from stammdaten import StammdatenManager
@@ -11,6 +13,63 @@ from config import validate_config_or_stop
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
+
+
+def _run_google_connection_check(
+    drive: DriveAgent,
+    calendar_agent: CalendarAgent,
+) -> list[tuple[str, bool, str]]:
+    """Prüft Drive- und Calendar-Verbindung mit lesenden Testaufrufen."""
+    checks: list[tuple[str, bool, str]] = []
+
+    try:
+        drive.service.files().list(pageSize=1, fields="files(id,name)").execute()
+        checks.append(
+            (
+                "Google Drive Zugriff / Google Drive access",
+                True,
+                "Drive-Liste erfolgreich gelesen. / Successfully read drive listing.",
+            )
+        )
+    except Exception as exc:  # pragma: no cover - runtime external dependency
+        checks.append(
+            (
+                "Google Drive Zugriff / Google Drive access",
+                False,
+                "Drive-Test fehlgeschlagen. Prüfen Sie, ob der Service-Account als "
+                "Editor auf dem Zielordner eingetragen ist. "
+                f"Fehler: {exc}",
+            )
+        )
+
+    try:
+        calendar_agent.service.events().list(
+            calendarId=calendar_agent.calendar_id,
+            maxResults=1,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        checks.append(
+            (
+                "Google Kalender Zugriff / Google Calendar access",
+                True,
+                "Kalender-Events erfolgreich gelesen. / Successfully read calendar events.",
+            )
+        )
+    except Exception as exc:  # pragma: no cover - runtime external dependency
+        checks.append(
+            (
+                "Google Kalender Zugriff / Google Calendar access",
+                False,
+                "Kalender-Test fehlgeschlagen. Prüfen Sie, ob die in `calendar_id` "
+                "konfigurierte Kalender-ID mit dem Service-Account geteilt ist "
+                "(mindestens "
+                '"Änderungen an Terminen vornehmen"/"Make changes to events"). '
+                f"Fehler: {exc}",
+            )
+        )
+
+    return checks
 
 
 # Validate required secrets early and fail with clear UI guidance
@@ -67,6 +126,18 @@ else:
     # Sidebar menu based on role
     st.sidebar.title("9 Freunde App")
     st.sidebar.write(f"Angemeldet als: `{user_email}`")
+    if user_role == "admin" and st.sidebar.button(
+        "Google-Verbindung prüfen / Check Google connection"
+    ):
+        with st.sidebar:
+            with st.spinner("Prüfe Drive & Kalender... / Checking drive & calendar..."):
+                check_results = _run_google_connection_check(drive_agent, cal_agent)
+            for check_title, ok, message in check_results:
+                if ok:
+                    st.success(f"{check_title}: {message}")
+                else:
+                    st.error(f"{check_title}: {message}")
+
     if user_role == "admin":
         menu = st.sidebar.radio(
             "Navigationsmenü", ("Stammdaten", "Dokumente", "Fotos", "Kalender"), index=0

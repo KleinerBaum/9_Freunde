@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Optionalen Admin-Healthcheck in `app.py` ergänzt: Sidebar-Button „Google-Verbindung prüfen / Check Google connection“ testet Drive-Listing und Calendar-Event-Lesen mit verständlichen DE/EN-Fehlermeldungen.
+- README um eine exakte Setup-Checkliste für Freigaben erweitert (Service-Account als Editor auf Drive-Ordner, Kalenderfreigabe für `calendar_id`) sowie um die Beschreibung des Laufzeit-Healthchecks.
 - `packages.txt` im Repository-Root ergänzt, damit Debian-basierte Deployments die nativen Build-Abhängigkeiten für `dlib` installieren können (`cmake`, `build-essential`, BLAS/LAPACK- sowie JPEG/PNG/Zlib-Header).
 - `requirements-cv.txt` als optionale Zusatzabhängigkeit für Gesichtserkennung eingeführt, um CV-Features bei knappen Cloud-Ressourcen gezielt deaktivieren zu können.
 - README um Deployment-Hinweise für stabile Cloud-Builds (optionaler CV-Stack, Umgang mit RAM-/Zeitlimits) erweitert.

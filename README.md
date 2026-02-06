@@ -11,7 +11,7 @@ Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensible
 
 ## Installation und Voraussetzungen
 
-1. **Python installieren:** Stellen Sie sicher, dass Python 3.10+ installiert ist.
+1. **Python installieren:** Stellen Sie sicher, dass Python 3.11+ installiert ist.
 2. **Code beschaffen:** Klonen oder laden Sie das Repository mit dem App-Code.
 3. **Abhängigkeiten installieren:** Führen Sie im Projektverzeichnis `pip install -r requirements.txt` aus, um alle benötigten Python-Pakete zu installieren.
    - Alternativ können Sie ein virtuelles Environment nutzen (empfohlen) und darin die Installation vornehmen.
@@ -43,3 +43,10 @@ Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüsse
    ```toml
    [openai]
    api_key = "sk-XXXX...IhrOpenAIKey...XXXX"
+
+
+## Fehlerbehebung
+
+- **`ModuleNotFoundError: No module named 'firebase_admin'`**  
+  Installieren Sie die Abhängigkeiten mit `pip install -r requirements.txt`.
+  Falls `firebase-admin` im Laufzeitumfeld nicht verfügbar ist, startet die App jetzt weiterhin, zeigt aber für Stammdaten eine Hinweis-Meldung an, bis Firebase korrekt eingerichtet ist.

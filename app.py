@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 from auth import AuthAgent
 from stammdaten import StammdatenManager
-from documents import DocumentAgent
+from documents import DocumentAgent, DocumentGenerationError
 from photo import PhotoAgent
 from storage import DriveAgent
 from calendar import CalendarAgent
@@ -238,6 +238,14 @@ else:
                                     st.error(
                                         "Kein Drive-Ordner für dieses Kind vorhanden."
                                     )
+                        except DocumentGenerationError as e:
+                            st.error(
+                                "Dokument konnte nicht erstellt werden. Bitte Hinweise prüfen und erneut versuchen."
+                            )
+                            st.error(
+                                "Document could not be generated. Please review the message and retry."
+                            )
+                            st.info(str(e))
                         except Exception as e:
                             st.error(f"Fehler bei der Dokumentenerstellung: {e}")
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, Mapping
 
 import streamlit as st
@@ -14,6 +15,8 @@ DEFAULT_OPENAI_MODEL_PRECISE = "o3-mini"
 DEFAULT_OPENAI_TIMEOUT_SECONDS = 30.0
 DEFAULT_OPENAI_MAX_RETRIES = 3
 DEFAULT_OPENAI_REASONING_EFFORT: Literal["low", "medium", "high"] = "medium"
+DEFAULT_STORAGE_MODE: Literal["local", "google"] = "local"
+DEFAULT_DATA_DIR = "./data"
 
 
 class ConfigError(RuntimeError):
@@ -30,10 +33,22 @@ class GoogleConfig:
 
 
 @dataclass(frozen=True)
+class LocalConfig:
+    """Lokale Speicherorte für den Prototyp-Modus."""
+
+    data_dir: Path
+    children_file: Path
+    calendar_file: Path
+    drive_root: Path
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """App-weite Konfigurationswerte."""
 
-    google: GoogleConfig
+    storage_mode: Literal["local", "google"]
+    google: GoogleConfig | None
+    local: LocalConfig
     openai: "OpenAIConfig"
 
 
@@ -81,6 +96,32 @@ def _require_string(config: Mapping[str, Any], key: str, path: str) -> str:
             "Bitte ergänzen Sie den Wert in .streamlit/secrets.toml."
         )
     return value.strip()
+
+
+def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
+    local_section_raw = secrets.get("local", {})
+    local_section = local_section_raw if isinstance(local_section_raw, Mapping) else {}
+
+    data_dir_raw = local_section.get("data_dir")
+    data_dir = (
+        Path(data_dir_raw)
+        if isinstance(data_dir_raw, str) and data_dir_raw.strip()
+        else Path(DEFAULT_DATA_DIR)
+    )
+
+    children_file = data_dir / "children.json"
+    calendar_file = data_dir / "calendar_events.json"
+    drive_root = data_dir / "drive"
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    drive_root.mkdir(parents=True, exist_ok=True)
+
+    return LocalConfig(
+        data_dir=data_dir,
+        children_file=children_file,
+        calendar_file=calendar_file,
+        drive_root=drive_root,
+    )
 
 
 def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
@@ -247,9 +288,33 @@ def _load_openai_config(secrets: Mapping[str, Any]) -> OpenAIConfig:
 @st.cache_resource(show_spinner=False)
 def get_app_config() -> AppConfig:
     """Lädt und validiert die zentrale App-Konfiguration aus ``st.secrets``."""
-    google = _load_google_config(st.secrets)
+    storage_section_raw = st.secrets.get("storage", {})
+    storage_section = (
+        storage_section_raw if isinstance(storage_section_raw, Mapping) else {}
+    )
+    storage_mode_raw = _read_secret_or_env(
+        storage_section,
+        "mode",
+        "APP_STORAGE_MODE",
+    )
+    storage_mode = (
+        storage_mode_raw.strip().lower()
+        if isinstance(storage_mode_raw, str)
+        else DEFAULT_STORAGE_MODE
+    )
+    if storage_mode not in {"local", "google"}:
+        raise ConfigError("storage.mode muss 'local' oder 'google' sein.")
+
+    local = _load_local_config(st.secrets)
+    google = _load_google_config(st.secrets) if storage_mode == "google" else None
     openai = _load_openai_config(st.secrets)
-    return AppConfig(google=google, openai=openai)
+
+    return AppConfig(
+        storage_mode=storage_mode,
+        google=google,
+        local=local,
+        openai=openai,
+    )
 
 
 def validate_config_or_stop() -> AppConfig:

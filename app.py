@@ -9,7 +9,7 @@ from documents import DocumentAgent, DocumentGenerationError
 from photo import PhotoAgent
 from storage import DriveAgent
 from calendar_agent import CalendarAgent
-from config import validate_config_or_stop
+from config import get_app_config, validate_config_or_stop
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
@@ -74,6 +74,7 @@ def _run_google_connection_check(
 
 # Validate required secrets early and fail with clear UI guidance
 validate_config_or_stop()
+app_config = get_app_config()
 
 # Initialize agents (ensure single instance per session)
 if "auth_agent" not in st.session_state:
@@ -126,8 +127,10 @@ else:
     # Sidebar menu based on role
     st.sidebar.title("9 Freunde App")
     st.sidebar.write(f"Angemeldet als: `{user_email}`")
-    if user_role == "admin" and st.sidebar.button(
-        "Google-Verbindung prüfen / Check Google connection"
+    if (
+        user_role == "admin"
+        and app_config.storage_mode == "google"
+        and st.sidebar.button("Google-Verbindung prüfen / Check Google connection")
     ):
         with st.sidebar:
             with st.spinner("Prüfe Drive & Kalender... / Checking drive & calendar..."):
@@ -184,9 +187,15 @@ else:
                         st.success(f"Kind '{name}' hinzugefügt.")
                     except Exception as e:
                         st.error(f"Fehler beim Speichern: {e}")
-            st.info(
-                "Beim Anlegen eines Kindes wird automatisch ein zugehöriger Drive-Ordner erstellt und verknüpft."
-            )
+            if app_config.storage_mode == "google":
+                st.info(
+                    "Beim Anlegen eines Kindes wird automatisch ein zugehöriger Drive-Ordner erstellt und verknüpft."
+                )
+            else:
+                st.info(
+                    "Beim Anlegen eines Kindes wird lokal ein Prototyp-Ordner erstellt. / "
+                    "A local prototype folder is created automatically."
+                )
 
         # ---- Admin: Dokumente ----
         elif menu == "Dokumente":
@@ -308,9 +317,15 @@ else:
                         )
                     except Exception as e:
                         st.error(f"Fehler beim Foto-Upload: {e}")
-                st.info(
-                    "Fotos werden sicher auf Google Drive gespeichert und nur den berechtigten Eltern angezeigt."
-                )
+                if app_config.storage_mode == "google":
+                    st.info(
+                        "Fotos werden sicher auf Google Drive gespeichert und nur den berechtigten Eltern angezeigt."
+                    )
+                else:
+                    st.info(
+                        "Fotos werden lokal im Prototyp-Speicher abgelegt. / "
+                        "Photos are stored in local prototype storage."
+                    )
 
         # ---- Admin: Kalender ----
         elif menu == "Kalender":

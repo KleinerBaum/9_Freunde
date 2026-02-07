@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- Prototyp-Betrieb auf lokale Speicherung umgestellt: neuer `storage.mode` (`local`/`google`) mit Default `local`, lokale Datenablage für Stammdaten, Kalender-Events sowie Dokumente/Fotos unter `./data`.
+- `StammdatenManager`, `DriveAgent` und `CalendarAgent` unterstützen jetzt einen lokalen Backend-Modus ohne Google/Firebase-Setup; Google-Integrationen bleiben optional per `storage.mode = "google"` erhalten.
+- `app.py` und `README.md` um Hinweise für den lokalen Prototyp-Modus ergänzt (einschließlich minimaler `secrets.toml`-Konfiguration).
+
 ### Fixed
 - Import-Kollision mit dem Python-Standardmodul `calendar` behoben: `CalendarAgent` wird nun aus `calendar_agent.py` importiert (statt `calendar.py`), damit der App-Start unter Streamlit stabil funktioniert.
 

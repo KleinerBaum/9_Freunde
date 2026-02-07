@@ -15,6 +15,18 @@ from config import get_app_config, validate_config_or_stop
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
 
 
+def _trigger_rerun() -> None:
+    """Kompatibler Rerun für verschiedene Streamlit-Versionen."""
+    rerun_fn = getattr(st, "rerun", None)
+    if callable(rerun_fn):
+        rerun_fn()
+        return
+
+    experimental_rerun_fn = getattr(st, "experimental_rerun", None)
+    if callable(experimental_rerun_fn):
+        experimental_rerun_fn()
+
+
 def _run_google_connection_check(
     drive: DriveAgent,
     calendar_agent: CalendarAgent,
@@ -116,7 +128,7 @@ if "user" not in st.session_state or st.session_state.get("user") is None:
                     st.session_state.child = child
                 else:
                     st.session_state.child = None
-            st.experimental_rerun()
+            _trigger_rerun()
         else:
             st.error("Login fehlgeschlagen. Bitte E-Mail/Passwort überprüfen.")
 else:
@@ -154,7 +166,7 @@ else:
     if st.sidebar.button("Logout"):
         # Clear session state and rerun to show login
         st.session_state.clear()
-        st.experimental_rerun()
+        _trigger_rerun()
 
     # Content area:
     st.header(menu)

@@ -8,7 +8,7 @@ from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
 from photo import PhotoAgent
 from storage import DriveAgent
-from calendar import CalendarAgent
+from calendar_agent import CalendarAgent
 from config import validate_config_or_stop
 
 # Streamlit page configuration

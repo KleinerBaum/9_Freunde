@@ -86,7 +86,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 | API | Status | Nachweis im Code |
 |---|---|---|
 | Google Drive API (`drive.googleapis.com`) | **aktiv genutzt** | `storage.py`, `services/drive_service.py`, `app.py` |
-| Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `calendar.py`, `app.py` |
+| Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `calendar_agent.py`, `app.py` |
 | Firestore API (`firestore.googleapis.com`) | **aktiv genutzt** | `stammdaten.py`, `storage.py`, `scripts/check_firestore_prerequisites.py` |
 | Google Sheets API (`sheets.googleapis.com`) | **optional/vorbereitet** | `services/google_clients.py` (`get_sheets_client`) |
 | Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |

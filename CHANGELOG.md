@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- Import-Kollision mit dem Python-Standardmodul `calendar` behoben: `CalendarAgent` wird nun aus `calendar_agent.py` importiert (statt `calendar.py`), damit der App-Start unter Streamlit stabil funktioniert.
+
+
 ### Added
 - API-Inventur in `README.md` ergänzt (aktiv genutzt: Drive/Calendar/Firestore, optional: Sheets, ungenutzt: Docs/Forms/Tasks).
 - Neues Skript `scripts/check_google_api_inventory.py` ergänzt, das die Inventur ausgibt und optionale Minimal-Healthchecks für Sheets/Docs/Forms/Tasks unterstützt.

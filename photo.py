@@ -56,9 +56,11 @@ class PhotoAgent:
 
         # Datei in Drive hochladen
         drive_agent = DriveAgent()
-        target_folder = folder_id or get_app_config().google.photos_folder_id
-        if not target_folder:
-            raise RuntimeError("Kein Zielordner für Fotos definiert.")
+        app_config = get_app_config()
+        default_folder = (
+            app_config.google.photos_folder_id if app_config.google else None
+        )
+        target_folder = folder_id or default_folder
 
         # Dateiname bestimmen
         file_name = image_file.name or f"foto_{child_id}.jpg"

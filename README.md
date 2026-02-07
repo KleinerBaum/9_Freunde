@@ -62,9 +62,45 @@ Wichtig:
 - Wenn Builds in der Cloud wegen Zeit-/RAM-Limits instabil sind, installieren Sie **nur** `requirements.txt`.
 - In diesem Fall zeigt die App einen Hinweis an und deaktiviert automatisch die Gesichtserkennung.
 
+
+## Prototyp-Modus (lokale Speicherung, einfache Konfiguration)
+
+Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben werden.
+Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
+
+- `data/children.json` für Stammdaten
+- `data/calendar_events.json` für Termine
+- `data/drive/` für Dokumente und Fotos
+
+Minimales `secrets.toml` für den Prototypen:
+
+```toml
+[storage]
+mode = "local"
+
+[local]
+data_dir = "./data"
+
+[auth]
+admin_emails = ["leitung@example.org"]
+
+[auth.users]
+leitung@example.org = "demo123"
+eltern@example.org = "demo123"
+```
+
+Optional können Sie später wieder auf Google umstellen:
+
+```toml
+[storage]
+mode = "google"
+```
+
+Dann werden die bereits dokumentierten `gcp_service_account`- und `gcp`-Einträge wieder verpflichtend.
+
 ## Konfiguration der APIs und Dienste
 
-Vor dem Start der App müssen externe Dienste (Google APIs, OpenAI, Firebase) eingerichtet und Zugangsdaten hinterlegt werden. Diese sensiblen Informationen gehören **nicht** in den Code, sondern in die Konfiguration (z. B. `.streamlit/secrets.toml`).
+Im Google-Modus müssen vor dem Start der App externe Dienste (Google APIs, OpenAI, Firebase) eingerichtet und Zugangsdaten hinterlegt werden. Im lokalen Prototyp-Modus sind Google/Firebase nicht erforderlich. Diese sensiblen Informationen gehören **nicht** in den Code, sondern in die Konfiguration (z. B. `.streamlit/secrets.toml`).
 
 ### Google Cloud / Dienstkonten (Drive & Calendar)
 Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie wie folgt vor:

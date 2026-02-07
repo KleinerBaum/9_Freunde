@@ -1,29 +1,69 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import json
+import uuid
+from datetime import date, datetime, time, timedelta
+from typing import Any
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+from config import DEFAULT_TIMEZONE, get_app_config
 
-from config import get_app_config
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    service_account = None
+    build = None
 
 
 class CalendarAgent:
     def __init__(self) -> None:
         app_config = get_app_config()
-        scopes = ["https://www.googleapis.com/auth/calendar"]
-        credentials = service_account.Credentials.from_service_account_info(
-            app_config.google.service_account,
-            scopes=scopes,
+        self.storage_mode = app_config.storage_mode
+        self.timezone = DEFAULT_TIMEZONE
+        self.local_calendar_file = app_config.local.calendar_file
+
+        if self.storage_mode == "google":
+            if service_account is None or build is None:
+                raise RuntimeError(
+                    "Google API-Pakete fehlen. Bitte requirements installieren."
+                )
+            if app_config.google is None:
+                raise RuntimeError("Google-Konfiguration fehlt.")
+            scopes = ["https://www.googleapis.com/auth/calendar"]
+            credentials = service_account.Credentials.from_service_account_info(
+                app_config.google.service_account,
+                scopes=scopes,
+            )
+            self.service = build("calendar", "v3", credentials=credentials)
+            self.calendar_id = app_config.google.calendar_id
+        else:
+            self.service = None
+            self.calendar_id = "local-calendar"
+            self.local_calendar_file.parent.mkdir(parents=True, exist_ok=True)
+            if not self.local_calendar_file.exists():
+                self.local_calendar_file.write_text("[]", encoding="utf-8")
+
+    def _read_local_events(self) -> list[dict[str, Any]]:
+        if not self.local_calendar_file.exists():
+            return []
+        data = json.loads(self.local_calendar_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_events(self, events: list[dict[str, Any]]) -> None:
+        self.local_calendar_file.write_text(
+            json.dumps(events, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
-        self.service = build("calendar", "v3", credentials=credentials)
-        self.calendar_id = app_config.google.calendar_id
-        self.timezone = "Europe/Berlin"
 
     def add_event(
-        self, title: str, date, time=None, description: str = "", all_day: bool = False
+        self,
+        title: str,
+        date: date,
+        time: time | None = None,
+        description: str = "",
+        all_day: bool = False,
     ) -> None:
-        """Fügt einen neuen Termin im Google Kalender ein."""
+        """Fügt einen neuen Termin ein."""
         if all_day or time is None:
             start_date = date.strftime("%Y-%m-%d")
             end_date = (date + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -48,23 +88,51 @@ class CalendarAgent:
                     "timeZone": self.timezone,
                 },
             }
-        self.service.events().insert(calendarId=self.calendar_id, body=event).execute()
+
+        if self.storage_mode == "google":
+            self.service.events().insert(
+                calendarId=self.calendar_id, body=event
+            ).execute()
+            return
+
+        local_event = {"id": uuid.uuid4().hex, **event}
+        events = self._read_local_events()
+        events.append(local_event)
+        self._write_local_events(events)
 
     def list_events(self, max_results: int = 10) -> list[str]:
         """Liefert eine Liste der nächsten Termine (als formatierte Strings)."""
-        now = f"{datetime.utcnow().isoformat()}Z"
-        results = (
-            self.service.events()
-            .list(
-                calendarId=self.calendar_id,
-                timeMin=now,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy="startTime",
+        if self.storage_mode == "google":
+            now = f"{datetime.utcnow().isoformat()}Z"
+            results = (
+                self.service.events()
+                .list(
+                    calendarId=self.calendar_id,
+                    timeMin=now,
+                    maxResults=max_results,
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
             )
-            .execute()
-        )
-        events = results.get("items", [])
+            events = results.get("items", [])
+        else:
+            now_date = datetime.utcnow().date().isoformat()
+            all_events = self._read_local_events()
+            events = [
+                event
+                for event in all_events
+                if event.get("start", {}).get("date", now_date) >= now_date
+                or event.get("start", {}).get("dateTime", "")
+                >= datetime.utcnow().isoformat()
+            ]
+
+            events.sort(
+                key=lambda event: event.get("start", {}).get("dateTime")
+                or event.get("start", {}).get("date", "9999-12-31")
+            )
+            events = events[:max_results]
+
         event_strings: list[str] = []
         for evt in events:
             start = evt.get("start", {})

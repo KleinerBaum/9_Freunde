@@ -7,6 +7,10 @@
 - Neues Skript `scripts/check_google_api_inventory.py` ergänzt, das die Inventur ausgibt und optionale Minimal-Healthchecks für Sheets/Docs/Forms/Tasks unterstützt.
 
 ### Changed
+- OpenAI-Integration in `documents.py` auf die aktuelle Responses API umgestellt (strukturierter JSON-Output, optional `file_search` via `VECTOR_STORE_ID`, optional `web_search_preview`).
+- OpenAI-Konfiguration in `config.py` modernisiert: Standardmodell `gpt-4o-mini`, Präzisionsmodus mit `o3-mini`, `reasoning_effort`, Timeouts, Retries und optionale `base_url`/EU-Endpunkt.
+- UI-Fehlerbehandlung in `app.py` für Dokumentgenerierung verbessert (klare zweisprachige Hinweise DE/EN bei OpenAI-Fehlern).
+- README um neue OpenAI-Konfigurationslogik (Responses API, Modelle, Präzisionsmodus, Timeout/Retry, RAG-Optionen) ergänzt.
 - README um konkrete `gcloud services disable`-Kommandos erweitert, um ungenutzte APIs (Docs/Forms/Tasks) bei fehlendem kurzfristigem Bedarf in GCP zu deaktivieren.
 - README um optionale Secrets-Sektion `[gcp_optional_apis]` erweitert, damit vorbereitete APIs mit Read-Healthchecks geprüft werden können.
 
@@ -33,4 +37,3 @@
 - App-Start robuster gemacht: fehlendes `firebase-admin` führt nicht mehr zu einem Import-Abbruch in `stammdaten.py`/`storage.py`.
 - Typing-Hints ergänzt und Fehlerbehandlung rund um Firebase-Initialisierung verbessert.
 - `face-recognition` als optionale Laufzeitabhängigkeit umgesetzt: Foto-Upload funktioniert auch ohne CV-Stack, inklusive Hinweis in der UI, wenn Gesichtserkennung deaktiviert ist.
-

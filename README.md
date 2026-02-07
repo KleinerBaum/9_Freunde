@@ -159,7 +159,14 @@ Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, fa
 ### OpenAI API (Textgenerierung)
 Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüssel:
 1. Legen Sie einen Account bei OpenAI an und erzeugen Sie einen persönlichen API Key im Dashboard.
-2. Tragen Sie diesen Key in die Konfiguration ein.
+2. Tragen Sie diesen Key in die Konfiguration ein (oder setzen Sie `OPENAI_API_KEY` als Umgebungsvariable).
+
+Die Dokumentenerstellung nutzt die **OpenAI Responses API** mit strukturiertem JSON-Output und optionalen Tools (`file_search`, `web_search_preview`).
+
+- Standardmodell (schnell/günstig): `gpt-4o-mini`
+- Präzisionsmodus: `o3-mini` (für genauere Ergebnisse)
+- Optionaler EU-Endpunkt: `https://eu.api.openai.com/v1`
+- Timeouts + automatische Wiederholversuche mit exponentiellem Backoff sind integriert.
 
 ### Firestore prerequisites
 
@@ -252,6 +259,15 @@ forms_form_id = "<optional>"
 
 [openai]
 api_key = "sk-XXXX...IhrOpenAIKey...XXXX"
+model_fast = "gpt-4o-mini"
+model_precise = "o3-mini"
+precision_mode = "fast"            # fast | precise
+reasoning_effort = "medium"        # low | medium | high
+timeout_seconds = 30
+max_retries = 3
+base_url = "https://eu.api.openai.com/v1" # optional
+vector_store_id = "vs_..."         # optional (RAG)
+enable_web_search = true            # optional
 ```
 
 Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.

@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+- Google-Service-Account-Private-Key wird beim Laden jetzt robust normalisiert: äußere Zusatz-Quotes werden entfernt, `\n`-Escapes in echte Zeilenumbrüche umgewandelt und das PEM-Format (`BEGIN/END PRIVATE KEY`) strikt validiert, bevor `from_service_account_info(...)` aufgerufen wird.
+
+### Fixed
 - Konfigurationsvalidierung verbessert: TOML-Parsing-Fehler in `.streamlit/secrets.toml` (z. B. `StreamlitSecretNotFoundError`/`TOMLDecodeError`) werden jetzt mit klaren, zweisprachigen UI-Hinweisen (DE/EN) abgefangen, statt einen unklaren Stacktrace im App-Start zu zeigen.
 
 ### Added

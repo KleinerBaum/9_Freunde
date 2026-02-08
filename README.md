@@ -4,7 +4,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
-- **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern).
+- **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache).
 - **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 
@@ -97,7 +97,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 | API | Status | Nachweis im Code |
 |---|---|---|
 | Google Drive API (`drive.googleapis.com`) | **aktiv genutzt** | `storage.py`, `services/drive_service.py`, `app.py` |
-| Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `calendar_agent.py`, `app.py` |
+| Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `services/calendar_service.py`, `app.py` |
 | Google Sheets API (`sheets.googleapis.com`) | **aktiv genutzt** | `services/google_clients.py`, `services/sheets_repo.py`, `stammdaten.py` |
 | Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
 | Google Forms API (`forms.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
@@ -162,7 +162,7 @@ Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
 Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check Google connection“** zur Verfügung. Der Check führt zwei Testaufrufe aus:
 
 - **Drive-Test:** Ein kleiner List-Aufruf gegen die Drive API.
-- **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id`.
+- **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id` (aus `st.secrets["gcp"]["calendar_id"]`).
 
 Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner oder Kalender nicht mit Service-Account geteilt).
 

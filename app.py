@@ -9,8 +9,14 @@ from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
 from photo import PhotoAgent
 from storage import DriveAgent
-from calendar_agent import CalendarAgent
 from config import get_app_config, validate_config_or_stop
+from services.calendar_service import (
+    CalendarServiceError,
+    _get_calendar_client,
+    _get_calendar_id,
+    add_event,
+    list_events,
+)
 from services.drive_service import (
     DriveServiceError,
     ensure_child_photo_folder,
@@ -44,7 +50,6 @@ def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
 
 def _run_google_connection_check(
     drive: DriveAgent,
-    calendar_agent: CalendarAgent,
 ) -> list[tuple[str, bool, str]]:
     """Prüft Drive- und Calendar-Verbindung mit lesenden Testaufrufen."""
     checks: list[tuple[str, bool, str]] = []
@@ -70,8 +75,9 @@ def _run_google_connection_check(
         )
 
     try:
-        calendar_agent.service.events().list(
-            calendarId=calendar_agent.calendar_id,
+        calendar_client = _get_calendar_client()
+        calendar_client.events().list(
+            calendarId=_get_calendar_id(),
             maxResults=1,
             singleEvents=True,
             orderBy="startTime",
@@ -112,8 +118,6 @@ if "drive_agent" not in st.session_state:
     st.session_state.drive_agent = DriveAgent()
 if "doc_agent" not in st.session_state:
     st.session_state.doc_agent = DocumentAgent()
-if "calendar_agent" not in st.session_state:
-    st.session_state.calendar_agent = CalendarAgent()
 if "photo_agent" not in st.session_state:
     st.session_state.photo_agent = PhotoAgent()
 
@@ -121,7 +125,6 @@ auth = st.session_state.auth_agent
 stammdaten_manager = st.session_state.stammdaten_manager
 drive_agent = st.session_state.drive_agent
 doc_agent = st.session_state.doc_agent
-cal_agent = st.session_state.calendar_agent
 photo_agent = st.session_state.photo_agent
 
 # Check if user is logged in
@@ -161,7 +164,7 @@ else:
     ):
         with st.sidebar:
             with st.spinner("Prüfe Drive & Kalender... / Checking drive & calendar..."):
-                check_results = _run_google_connection_check(drive_agent, cal_agent)
+                check_results = _run_google_connection_check(drive_agent)
             for check_title, ok, message in check_results:
                 if ok:
                     st.success(f"{check_title}: {message}")
@@ -565,38 +568,39 @@ else:
 
         # ---- Admin: Kalender ----
         elif menu == "Kalender":
-            st.subheader("Termine verwalten")
-            # Formular für neuen Termin
-            title = st.text_input("Titel des Termins")
-            date = st.date_input("Datum")
-            all_day = st.checkbox("Ganztägig?")
-            time = None
-            if not all_day:
-                time = st.time_input("Uhrzeit (Start)", value=None)
-            description = st.text_area("Beschreibung/Details")
-            if st.button("Termin hinzufügen"):
+            st.subheader("Neuer Termin / New event")
+            title = st.text_input("Titel / Title")
+            event_date = st.date_input("Datum / Date")
+            event_time = st.time_input("Uhrzeit (Start) / Start time")
+            description = st.text_area("Beschreibung / Description")
+            if st.button("Termin hinzufügen / Add event"):
                 if not title:
-                    st.error("Bitte einen Termin-Titel eingeben.")
+                    st.error("Bitte Titel eingeben. / Please enter a title.")
                 else:
                     try:
-                        cal_agent.add_event(
-                            title, date, time, description, all_day=all_day
+                        add_event(
+                            title=title,
+                            event_date=event_date,
+                            event_time=event_time,
+                            description=description,
                         )
-                        st.success("Termin wurde hinzugefügt.")
-                    except Exception as e:
-                        st.error(f"Fehler beim Hinzufügen des Termins: {e}")
-            # Kommende Termine anzeigen
+                        st.success("Termin wurde hinzugefügt. / Event created.")
+                    except CalendarServiceError as exc:
+                        st.error(f"Fehler beim Speichern / Failed to save event: {exc}")
+
+            st.write("**Bevorstehende Termine / Upcoming events**")
             try:
-                events = cal_agent.list_events(max_results=10)
-            except Exception as e:
+                events = list_events(max_results=10)
+            except CalendarServiceError as exc:
                 events = []
-                st.error(f"Fehler beim Laden der Termine: {e}")
+                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
             if events:
-                st.write("**Bevorstehende Termine:**")
                 for ev in events:
-                    st.write(f"- {ev}")
+                    st.write(f"- {ev['start']} · **{ev['summary']}**")
+                    if ev["description"]:
+                        st.caption(ev["description"])
             else:
-                st.write("Keine anstehenden Termine vorhanden.")
+                st.write("Keine anstehenden Termine vorhanden. / No upcoming events.")
 
     else:
         # ---- Parent/Eltern View ----
@@ -720,14 +724,18 @@ else:
             else:
                 st.write("Keine Fotos verfügbar. / No photos available.")
         elif menu == "Termine":
-            st.subheader("Anstehende Termine")
+            st.subheader("Termine / Events")
             try:
-                events = cal_agent.list_events(max_results=10)
-            except Exception as e:
+                events = list_events(max_results=10)
+            except CalendarServiceError as exc:
                 events = []
-                st.error(f"Fehler beim Laden der Termine: {e}")
+                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
             if events:
                 for ev in events:
-                    st.write(f"- {ev}")
+                    st.write(f"- {ev['start']} · **{ev['summary']}**")
+                    if ev["description"]:
+                        st.caption(ev["description"])
             else:
-                st.write("Zurzeit sind keine Termine eingetragen.")
+                st.write(
+                    "Zurzeit sind keine Termine eingetragen. / No events available right now."
+                )

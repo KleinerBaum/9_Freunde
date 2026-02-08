@@ -88,6 +88,30 @@ REQUIRED_GCP_SERVICE_ACCOUNT_KEYS = (
 )
 
 
+def _strip_outer_quotes(value: str) -> str:
+    stripped = value.strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
+        return stripped[1:-1].strip()
+    return stripped
+
+
+def _normalize_private_key(private_key: str) -> str:
+    normalized_key = _strip_outer_quotes(private_key)
+    normalized_key = normalized_key.replace("\\n", "\n")
+
+    begin_marker = "-----BEGIN PRIVATE KEY-----"
+    end_marker = "-----END PRIVATE KEY-----"
+
+    trimmed_key = normalized_key.strip()
+    if not trimmed_key.startswith(begin_marker) or not trimmed_key.endswith(end_marker):
+        raise ConfigError(
+            "Ungültiger gcp_service_account.private_key. Der Key muss mit "
+            "'-----BEGIN PRIVATE KEY-----' beginnen und mit "
+            "'-----END PRIVATE KEY-----' enden."
+        )
+    return trimmed_key + "\n"
+
+
 def _require_mapping(raw_value: Any, path: str) -> Mapping[str, Any]:
     if not isinstance(raw_value, Mapping):
         raise ConfigError(
@@ -152,6 +176,10 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
             "Der Service-Account in 'gcp_service_account' ist unvollständig. "
             f"Fehlende Felder: {missing_joined}."
         )
+
+    gcp_service_account["private_key"] = _normalize_private_key(
+        str(gcp_service_account["private_key"])
+    )
 
     gcp = _require_mapping(secrets.get("gcp"), "gcp")
 

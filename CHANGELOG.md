@@ -63,3 +63,6 @@
 - App-Start robuster gemacht: fehlendes `firebase-admin` führt nicht mehr zu einem Import-Abbruch in `stammdaten.py`/`storage.py`.
 - Typing-Hints ergänzt und Fehlerbehandlung rund um Firebase-Initialisierung verbessert.
 - `face-recognition` als optionale Laufzeitabhängigkeit umgesetzt: Foto-Upload funktioniert auch ohne CV-Stack, inklusive Hinweis in der UI, wenn Gesichtserkennung deaktiviert ist.
+- Fotoablage-MVP auf child-spezifische Drive-Ordner umgestellt: `services/drive_service.py` ergänzt um `create_folder(...)` und `ensure_child_photo_folder(...)`; `children`-Datensätze verwenden das neue Feld `photo_folder_id` (automatische Anlage + Persistenz in Google Sheets). Admin-Upload speichert in `photos/<child_id>/`, Elternansicht zeigt nur eigene Bilder inkl. Vorschau und Download-Button.
+- Face-Recognition-Abhängigkeiten aus dem MVP entfernt (`photo.py` vereinfacht; `requirements-cv.txt` enthält keine CV-Pakete mehr).
+

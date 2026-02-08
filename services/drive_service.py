@@ -7,6 +7,8 @@ import streamlit as st
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
+from config import get_app_config
+from services import sheets_repo
 from services.google_clients import get_drive_client
 
 
@@ -27,6 +29,50 @@ def _translate_http_error(exc: HttpError) -> DriveServiceError:
             status_code=status,
         )
     return DriveServiceError(f"Drive API Fehler: {exc}", status_code=status)
+
+
+def create_folder(name: str, parent_id: str) -> str:
+    drive = get_drive_client()
+    metadata: dict[str, Any] = {
+        "name": name,
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [parent_id],
+    }
+
+    try:
+        created = (
+            drive.files()
+            .create(body=metadata, fields="id", supportsAllDrives=True)
+            .execute()
+        )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
+
+    return created["id"]
+
+
+def ensure_child_photo_folder(child_id: str) -> str:
+    normalized_child_id = child_id.strip()
+    child = sheets_repo.get_child_by_id(normalized_child_id)
+    if not child:
+        raise DriveServiceError(f"Kind mit ID '{child_id}' nicht gefunden.")
+
+    existing_folder_id = str(child.get("photo_folder_id", "")).strip()
+    if existing_folder_id:
+        return existing_folder_id
+
+    app_config = get_app_config()
+    if app_config.google is None:
+        raise DriveServiceError(
+            "Google-Konfiguration fehlt, Foto-Ordner kann nicht erstellt werden."
+        )
+
+    folder_id = create_folder(
+        name=normalized_child_id,
+        parent_id=app_config.google.drive_photos_root_folder_id,
+    )
+    sheets_repo.update_child(normalized_child_id, {"photo_folder_id": folder_id})
+    return folder_id
 
 
 def upload_bytes_to_folder(

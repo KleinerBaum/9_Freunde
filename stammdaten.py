@@ -73,6 +73,7 @@ class StammdatenManager:
             child_data: dict[str, Any] = {"name": name, "parent_email": parent_email}
             if folder_id:
                 child_data["folder_id"] = folder_id
+                child_data["photo_folder_id"] = folder_id
             return sheets_repo.add_child(child_data)
 
         child_id = uuid.uuid4().hex
@@ -83,6 +84,7 @@ class StammdatenManager:
         }
         if folder_id:
             child_data["folder_id"] = folder_id
+            child_data["photo_folder_id"] = folder_id
 
         children = self._read_local_children()
         children.append(child_data)
@@ -97,6 +99,17 @@ class StammdatenManager:
 
         for child in self._read_local_children():
             if child.get("parent_email") == parent_email:
+                return child
+        return None
+
+    def get_child_by_id(self, child_id: str) -> dict[str, Any] | None:
+        """Liefert den Kind-Datensatz über die Kind-ID."""
+        if self.storage_mode == "google":
+            child = sheets_repo.get_child_by_id(child_id)
+            return _normalize_child_record(child) if child else None
+
+        for child in self._read_local_children():
+            if child.get("id") == child_id:
                 return child
         return None
 

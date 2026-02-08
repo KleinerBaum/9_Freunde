@@ -13,6 +13,7 @@ from calendar_agent import CalendarAgent
 from config import get_app_config, validate_config_or_stop
 from services.drive_service import (
     DriveServiceError,
+    ensure_child_photo_folder,
     list_files_in_folder,
     upload_bytes_to_folder,
 )
@@ -478,45 +479,57 @@ else:
 
         # ---- Admin: Fotos ----
         elif menu == "Fotos":
-            st.subheader("Kinder-Fotos hochladen und verwalten")
-            if photo_agent.face_detection_enabled():
-                st.success("Gesichtserkennung aktiv. / Face detection active.")
-            else:
-                st.info(
-                    "Gesichtserkennung deaktiviert (optionale CV-Abhängigkeiten fehlen). / "
-                    "Face detection disabled (optional CV dependencies are missing)."
-                )
+            st.subheader("Kinder-Fotos hochladen und verwalten / Upload child photos")
+            st.info(
+                "MVP ohne Gesichtserkennung: Upload erfolgt in den kindspezifischen Foto-Ordner. / "
+                "MVP without face recognition: uploads are stored in each child's photo folder."
+            )
             children = stammdaten_manager.get_children()
             if not children:
                 st.warning("Bitte legen Sie zuerst Kinder-Stammdaten an.")
             else:
                 child_names = [child.get("name") for child in children]
-                selected_name = st.selectbox("Foto hochladen für Kind:", child_names)
+                selected_name = st.selectbox(
+                    "Foto hochladen für Kind / Upload photo for child", child_names
+                )
                 sel_child = next(
                     child for child in children if child.get("name") == selected_name
                 )
                 image_file = st.file_uploader(
-                    "Foto auswählen", type=["jpg", "jpeg", "png"]
+                    "Foto auswählen / Select photo", type=["jpg", "jpeg", "png"]
                 )
-                if image_file and st.button("Upload Foto"):
+                if image_file and st.button("Upload Foto / Upload photo"):
                     try:
-                        # Upload via PhotoAgent (speichert in Drive)
-                        photo_agent.upload_photo(
-                            image_file,
-                            sel_child.get("id") if sel_child else None,
-                            sel_child.get("folder_id"),
+                        child_id = str(sel_child.get("id", "")).strip()
+                        if app_config.storage_mode == "google":
+                            photo_folder_id = ensure_child_photo_folder(child_id)
+                        else:
+                            photo_folder_id = str(
+                                sel_child.get("photo_folder_id")
+                                or sel_child.get("folder_id")
+                                or ""
+                            )
+                        if not photo_folder_id:
+                            raise ValueError(
+                                "Kein Foto-Ordner für dieses Kind vorhanden. / No photo folder configured for this child."
+                            )
+                        photo_agent.upload_photo(image_file, photo_folder_id)
+                        st.success(
+                            f"Foto für {selected_name} hochgeladen. / Photo uploaded for {selected_name}."
                         )
-                        st.success(f"Foto für {selected_name} hochgeladen.")
                         st.image(
                             image_file,
-                            caption=f"Hochgeladenes Foto: {image_file.name}",
-                            use_column_width=True,
+                            caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
+                            use_container_width=True,
                         )
-                    except Exception as e:
-                        st.error(f"Fehler beim Foto-Upload: {e}")
+                    except Exception as exc:
+                        st.error(
+                            f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
+                        )
                 if app_config.storage_mode == "google":
                     st.info(
-                        "Fotos werden sicher auf Google Drive gespeichert und nur den berechtigten Eltern angezeigt."
+                        "Fotos werden in `photos/<child_id>/`-Ordnern abgelegt. Eltern sehen nur den eigenen Ordner. / "
+                        "Photos are stored in `photos/<child_id>/` folders. Parents only see their own folder."
                     )
                 else:
                     st.info(
@@ -593,21 +606,49 @@ else:
             else:
                 st.write("Keine Dokumente verfügbar.")
         elif menu == "Fotos":
-            st.subheader("Fotos")
-            if child and child.get("folder_id"):
-                photos = drive_agent.list_files(
-                    child["folder_id"], mime_type_filter="image/"
-                )
+            st.subheader("Fotos / Photos")
+            if child and child.get("id"):
+                try:
+                    if app_config.storage_mode == "google":
+                        photo_folder_id = ensure_child_photo_folder(str(child["id"]))
+                    else:
+                        photo_folder_id = str(
+                            child.get("photo_folder_id") or child.get("folder_id") or ""
+                        )
+                    photos = (
+                        drive_agent.list_files(
+                            photo_folder_id, mime_type_filter="image/"
+                        )
+                        if photo_folder_id
+                        else []
+                    )
+                except Exception as exc:
+                    photos = []
+                    st.error(
+                        "Fotos konnten nicht geladen werden. / Could not load photos."
+                    )
+                    st.info(str(exc))
+
                 if photos:
                     for photo in photos:
-                        img_bytes = drive_agent.download_file(photo["id"])
+                        file_name = str(photo.get("name", "photo"))
+                        file_id = str(photo.get("id", ""))
+                        img_bytes = drive_agent.download_file(file_id)
                         st.image(
-                            img_bytes, caption=photo.get("name"), use_column_width=True
+                            img_bytes,
+                            caption=f"{file_name} · Vorschau / Preview",
+                            use_container_width=True,
+                        )
+                        st.download_button(
+                            "Original herunterladen / Download original",
+                            data=img_bytes,
+                            file_name=file_name,
+                            key=f"download_photo_{file_id}",
                         )
                 else:
-                    st.write("Keine Fotos vorhanden.")
+                    st.write("Keine Fotos vorhanden. / No photos available.")
             else:
-                st.write("Keine Fotos verfügbar.")
+                st.write("Keine Fotos verfügbar. / No photos available.")
         elif menu == "Termine":
             st.subheader("Anstehende Termine")
             try:

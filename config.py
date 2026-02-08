@@ -28,8 +28,15 @@ class GoogleConfig:
     """Google-bezogene Konfigurationswerte aus ``st.secrets``."""
 
     service_account: dict[str, Any]
-    calendar_id: str
-    photos_folder_id: str
+    drive_photos_root_folder_id: str
+    drive_contracts_folder_id: str
+    stammdaten_sheet_id: str
+    calendar_id: str | None
+
+    @property
+    def photos_folder_id(self) -> str:
+        """Rückwärtskompatibler Alias für bestehenden Code."""
+        return self.drive_photos_root_folder_id
 
 
 @dataclass(frozen=True)
@@ -145,14 +152,72 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         )
 
     gcp = _require_mapping(secrets.get("gcp"), "gcp")
-    calendar_id = _require_string(gcp, "calendar_id", "gcp")
-    photos_folder_id = _require_string(gcp, "photos_folder_id", "gcp")
+
+    required_keys = (
+        "drive_photos_root_folder_id",
+        "drive_contracts_folder_id",
+        "stammdaten_sheet_id",
+    )
+    missing_gcp_keys = [
+        f"gcp.{key}"
+        for key in required_keys
+        if not isinstance(gcp.get(key), str) or not str(gcp.get(key)).strip()
+    ]
+    if missing_gcp_keys:
+        missing_joined = ", ".join(missing_gcp_keys)
+        raise ConfigError(
+            "Folgende Pflicht-Keys fehlen in .streamlit/secrets.toml: "
+            f"{missing_joined}."
+        )
+
+    drive_photos_root_folder_id = str(gcp["drive_photos_root_folder_id"]).strip()
+    drive_contracts_folder_id = str(gcp["drive_contracts_folder_id"]).strip()
+    stammdaten_sheet_id = str(gcp["stammdaten_sheet_id"]).strip()
+    calendar_raw = gcp.get("calendar_id")
+    calendar_id = (
+        str(calendar_raw).strip()
+        if isinstance(calendar_raw, str) and str(calendar_raw).strip()
+        else None
+    )
+
+    _validate_admin_emails_optional(secrets)
 
     return GoogleConfig(
         service_account=gcp_service_account,
+        drive_photos_root_folder_id=drive_photos_root_folder_id,
+        drive_contracts_folder_id=drive_contracts_folder_id,
+        stammdaten_sheet_id=stammdaten_sheet_id,
         calendar_id=calendar_id,
-        photos_folder_id=photos_folder_id,
     )
+
+
+def _validate_admin_emails_optional(secrets: Mapping[str, Any]) -> None:
+    """Validiert optionales Admin-E-Mail-Array in [app] oder [auth]."""
+    app_section = secrets.get("app", {})
+    auth_section = secrets.get("auth", {})
+
+    app_admin_emails = (
+        app_section.get("admin_emails") if isinstance(app_section, Mapping) else None
+    )
+    auth_admin_emails = (
+        auth_section.get("admin_emails") if isinstance(auth_section, Mapping) else None
+    )
+
+    if app_admin_emails is None and auth_admin_emails is None:
+        return
+
+    for path, values in (
+        ("app.admin_emails", app_admin_emails),
+        ("auth.admin_emails", auth_admin_emails),
+    ):
+        if values is None:
+            continue
+        if not isinstance(values, list) or not all(
+            isinstance(item, str) and item.strip() for item in values
+        ):
+            raise ConfigError(
+                f"Optionaler Key '{path}' muss eine Liste nicht-leerer E-Mail-Strings sein."
+            )
 
 
 def _read_secret_or_env(

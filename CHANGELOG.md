@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- Neuer Kalender-Service `services/calendar_service.py` mit `add_event(...)` und gecachtem `list_events(...)` (TTL 60s) für Google- und Local-Storage-Modus.
+
+### Changed
+- Kalender-UI in `app.py` überarbeitet: Admin-Formular **"Neuer Termin / New event"** (Titel, Datum, Uhrzeit, Beschreibung) erstellt Events über Google Calendar (`gcp.calendar_id` aus `st.secrets`); Eltern sehen eine read-only Liste **"Termine / Events"** mit kommenden Terminen.
+
+### Added
 - Neuer Foto-Consent-Flow für Downloads: Eltern können pro Kind in der Foto-Ansicht zwischen `Downloads verpixelt / Downloads pixelated` (Default) und `Downloads unverpixelt / Downloads unpixelated` wechseln; Admins können den Wert zusätzlich im Stammdaten-Edit-Formular überschreiben.
 - Neuer Service `services/photos_service.py` mit lokaler Gesichtsverpixelung (`opencv-python-headless`, Haar-Cascade), inkl. `get_download_bytes(image_bytes, consent_mode)` und `pixelate_faces(image_bytes)`.
 

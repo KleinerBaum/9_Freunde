@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- Neues Script `tools/smoke_check.py` ergänzt: validiert `secrets.toml`, führt einen Drive-List-Check auf `gcp.drive_contracts_folder_id` aus und liest den `children`-Header aus Google Sheets mit `OK`/`FAIL`-Ausgabe.
+
+### Changed
+- `requirements.txt` bereinigt und auf den aktuellen Core-Stack für Streamlit Cloud ausgerichtet (Google Auth-Pakete, `pandas`, `reportlab`, `opencv-python-headless`, keine Firebase/Face-Recognition-Altlasten).
+- README um vollständiges Secrets-Schema, explizite Freigabe-Hinweise (Ordner/Sheet mit Service-Account teilen) und Troubleshooting für `403`, `404` und `invalid_grant` erweitert.
+
+### Added
 - Neuer Kalender-Service `services/calendar_service.py` mit `add_event(...)` und gecachtem `list_events(...)` (TTL 60s) für Google- und Local-Storage-Modus.
 
 ### Changed

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping
 
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 
 DEFAULT_TIMEZONE = "Europe/Berlin"
 DEFAULT_OPENAI_MODEL_FAST = "gpt-4o-mini"
@@ -403,4 +404,17 @@ def validate_config_or_stop() -> AppConfig:
             f"{exc}\n\n"
             "Please update secrets.toml as documented in the README."
         )
+        st.stop()
+    except StreamlitSecretNotFoundError as exc:
+        st.error(
+            "Secrets-Datei ist ungültig oder fehlt. "
+            "Bitte prüfen Sie .streamlit/secrets.toml auf TOML-Syntaxfehler "
+            "(z. B. fehlende Werte nach '=' oder ungültige Inline-Tabellen)."
+        )
+        st.error(
+            "Secrets file is missing or invalid. "
+            "Please check .streamlit/secrets.toml for TOML syntax errors "
+            "(for example missing values after '=' or invalid inline tables)."
+        )
+        st.caption(str(exc))
         st.stop()

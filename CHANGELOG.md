@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Konfigurationsvalidierung verbessert: TOML-Parsing-Fehler in `.streamlit/secrets.toml` (z. B. `StreamlitSecretNotFoundError`/`TOMLDecodeError`) werden jetzt mit klaren, zweisprachigen UI-Hinweisen (DE/EN) abgefangen, statt einen unklaren Stacktrace im App-Start zu zeigen.
+
 ### Added
 - Neues Script `tools/smoke_check.py` ergänzt: validiert `secrets.toml`, führt einen Drive-List-Check auf `gcp.drive_contracts_folder_id` aus und liest den `children`-Header aus Google Sheets mit `OK`/`FAIL`-Ausgabe.
 

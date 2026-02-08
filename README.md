@@ -298,3 +298,7 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
 - **invalid_grant**
   - Ursache: Defekter Private Key, falsche Zeilenumbrüche in `private_key`, oder stark abweichende Serverzeit.
   - Lösung: Service-Account-JSON neu aus GCP exportieren, `private_key` unverändert (inkl. `\n`) übernehmen, Systemzeit/NTP prüfen.
+
+- **`StreamlitSecretNotFoundError` / `TOMLDecodeError` beim App-Start**
+  - Ursache: Syntaxfehler in `.streamlit/secrets.toml` (z. B. `key =` ohne Wert, fehlerhafte Inline-Tabelle, ungültige Quotes).
+  - Lösung: TOML prüfen, z. B. mit `python -c "import tomllib, pathlib; tomllib.loads(pathlib.Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))"`; fehlerhafte Zeile korrigieren.

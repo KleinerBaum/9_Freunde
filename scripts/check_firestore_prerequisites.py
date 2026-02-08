@@ -33,8 +33,7 @@ def _load_service_account(secrets_path: Path) -> dict[str, Any]:
     if missing_keys:
         missing_joined = ", ".join(missing_keys)
         raise ValueError(
-            "gcp_service_account ist unvollständig. "
-            f"Fehlende Felder: {missing_joined}."
+            f"gcp_service_account ist unvollständig. Fehlende Felder: {missing_joined}."
         )
 
     return service_account
@@ -98,10 +97,7 @@ def _check_service_account_roles(project_id: str, service_account_email: str) ->
 
     if roles & least_privilege_roles:
         matched_roles = ", ".join(sorted(roles & least_privilege_roles))
-        print(
-            "[PASS] Least-Privilege Firestore-Rolle vorhanden: "
-            f"{matched_roles}."
-        )
+        print(f"[PASS] Least-Privilege Firestore-Rolle vorhanden: {matched_roles}.")
         return True
 
     print(

@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- Neuer Foto-Consent-Flow für Downloads: Eltern können pro Kind in der Foto-Ansicht zwischen `Downloads verpixelt / Downloads pixelated` (Default) und `Downloads unverpixelt / Downloads unpixelated` wechseln; Admins können den Wert zusätzlich im Stammdaten-Edit-Formular überschreiben.
+- Neuer Service `services/photos_service.py` mit lokaler Gesichtsverpixelung (`opencv-python-headless`, Haar-Cascade), inkl. `get_download_bytes(image_bytes, consent_mode)` und `pixelate_faces(image_bytes)`.
+
+### Changed
+- Foto-Downloads in der Elternansicht respektieren jetzt den gespeicherten Consent (`download_consent` im `children`-Tab, Default `pixelated`) und cachen das Ergebnis per `st.cache_data` anhand von `(file_id, consent_mode)`.
+- `services/sheets_repo.py` und `stammdaten.py` normalisieren und persistieren das neue Feld `download_consent` konsistent in Google- und Local-Storage.
+
+### Added
 - Neue Admin-Ansicht **"Stammdaten Sheet"** in `app.py`: lädt read-only den konfigurierten Bereich `A1:Z500` aus Google Sheets (`gcp.stammdaten_sheet_id`, optional `gcp.stammdaten_sheet_tab` mit Default `Stammdaten_Eltern_2026`) und zeigt die Daten als `st.dataframe` an; Eltern sehen den Menüpunkt nicht.
 - Neuer Service `services/sheets_service.py` mit `read_sheet_values(sheet_id, range_a1)` für generisches Lesen von Sheet-Daten inkl. Validierung und normalisiertem Rückgabeformat.
 

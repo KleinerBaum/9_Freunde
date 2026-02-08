@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 from auth import AuthAgent
 from stammdaten import StammdatenManager
@@ -15,6 +16,7 @@ from services.drive_service import (
     list_files_in_folder,
     upload_bytes_to_folder,
 )
+from services.sheets_service import SheetsServiceError, read_sheet_values
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
@@ -161,7 +163,14 @@ else:
     if user_role == "admin":
         menu = st.sidebar.radio(
             "Navigationsmenü",
-            ("Stammdaten", "Dokumente", "Verträge", "Fotos", "Kalender"),
+            (
+                "Stammdaten",
+                "Stammdaten Sheet",
+                "Dokumente",
+                "Verträge",
+                "Fotos",
+                "Kalender",
+            ),
             index=0,
         )
     else:
@@ -263,6 +272,62 @@ else:
                     "Beim Anlegen eines Kindes wird lokal ein Prototyp-Ordner erstellt. / "
                     "A local prototype folder is created automatically."
                 )
+
+        # ---- Admin: Stammdaten Sheet ----
+        elif menu == "Stammdaten Sheet":
+            st.subheader(
+                "Stammdaten aus Google Sheets (read-only) / Master data from Google Sheets (read-only)"
+            )
+            if app_config.storage_mode != "google" or app_config.google is None:
+                st.info(
+                    "Google-Sheets-Ansicht ist nur im Google-Modus verfügbar. / "
+                    "Google Sheets view is only available in Google mode."
+                )
+            else:
+                tab_name = app_config.google.stammdaten_sheet_tab
+                range_a1 = f"{tab_name}!A1:Z500"
+                try:
+                    rows = read_sheet_values(
+                        sheet_id=app_config.google.stammdaten_sheet_id,
+                        range_a1=range_a1,
+                    )
+                except SheetsServiceError as exc:
+                    st.error(
+                        "Stammdaten konnten nicht geladen werden. Bitte Konfiguration prüfen. / "
+                        "Could not load master data. Please verify configuration."
+                    )
+                    st.info(str(exc))
+                except Exception as exc:
+                    st.error(
+                        "Fehler beim Laden des Sheets. Prüfen Sie Tabnamen und Berechtigungen. / "
+                        "Failed to load sheet. Please verify tab name and permissions."
+                    )
+                    st.info(str(exc))
+                else:
+                    if not rows:
+                        st.info(
+                            "Der ausgewählte Bereich ist leer. / The selected range is empty."
+                        )
+                    elif not rows[0]:
+                        st.info(
+                            "Header-Zeile fehlt oder ist leer. / Header row is missing or empty."
+                        )
+                    else:
+                        header = [str(column).strip() for column in rows[0]]
+                        data_rows = rows[1:]
+                        if not data_rows:
+                            st.info(
+                                "Es wurden nur Header gefunden, aber keine Datenzeilen. / "
+                                "Only headers were found, but no data rows."
+                            )
+                        else:
+                            normalized_rows: list[list[str]] = []
+                            for row in data_rows:
+                                padded_row = row + [""] * max(0, len(header) - len(row))
+                                normalized_rows.append(padded_row[: len(header)])
+
+                            dataframe = pd.DataFrame(normalized_rows, columns=header)
+                            st.dataframe(dataframe, use_container_width=True)
 
         # ---- Admin: Dokumente ----
         elif menu == "Dokumente":

@@ -213,6 +213,9 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 1. **Google Sheets API aktivieren**
 2. **Service Account mit dem Stammdaten-Sheet teilen** (Editor-Rechte)
 3. **Sheet-ID in `gcp.stammdaten_sheet_id` setzen**
+4. Optional **Tabname für die Admin-Ansicht** über `gcp.stammdaten_sheet_tab` setzen (Default: `Stammdaten_Eltern_2026`).
+
+Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
 Pflicht-Tab für Kinder:
 - `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`)

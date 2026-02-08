@@ -18,6 +18,7 @@ from services.drive_service import (
     upload_bytes_to_folder,
 )
 from services.sheets_service import SheetsServiceError, read_sheet_values
+from services.photos_service import get_download_bytes
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
@@ -33,6 +34,12 @@ def _trigger_rerun() -> None:
     experimental_rerun_fn = getattr(st, "experimental_rerun", None)
     if callable(experimental_rerun_fn):
         experimental_rerun_fn()
+
+
+@st.cache_data(show_spinner=False)
+def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
+    original_bytes = drive_agent.download_file(file_id)
+    return get_download_bytes(original_bytes, consent_mode)
 
 
 def _run_google_connection_check(
@@ -240,6 +247,24 @@ else:
                         "E-Mail Elternteil / Parent email",
                         value=selected_child.get("parent_email", ""),
                     )
+                    current_download_consent = (
+                        str(selected_child.get("download_consent", "pixelated"))
+                        .strip()
+                        .lower()
+                    )
+                    consent_options = ["pixelated", "unpixelated"]
+                    if current_download_consent not in consent_options:
+                        current_download_consent = "pixelated"
+                    edit_download_consent = st.selectbox(
+                        "Download-Consent / Download consent",
+                        options=consent_options,
+                        index=consent_options.index(current_download_consent),
+                        format_func=lambda mode: (
+                            "Downloads verpixelt / Downloads pixelated"
+                            if mode == "pixelated"
+                            else "Downloads unverpixelt / Downloads unpixelated"
+                        ),
+                    )
                     edit_submitted = st.form_submit_button(
                         "Änderungen speichern / Save"
                     )
@@ -255,6 +280,7 @@ else:
                                 {
                                     "name": edit_name.strip(),
                                     "parent_email": edit_parent_email.strip(),
+                                    "download_consent": edit_download_consent,
                                 },
                             )
                             st.success(
@@ -629,7 +655,47 @@ else:
                     )
                     st.info(str(exc))
 
+                if child:
+                    current_download_consent = (
+                        str(child.get("download_consent", "pixelated")).strip().lower()
+                    )
+                    consent_options = ["pixelated", "unpixelated"]
+                    if current_download_consent not in consent_options:
+                        current_download_consent = "pixelated"
+                    selected_download_consent = st.selectbox(
+                        "Foto-Download Consent / Photo download consent",
+                        options=consent_options,
+                        index=consent_options.index(current_download_consent),
+                        format_func=lambda mode: (
+                            "Downloads verpixelt / Downloads pixelated"
+                            if mode == "pixelated"
+                            else "Downloads unverpixelt / Downloads unpixelated"
+                        ),
+                        key="parent_download_consent_select",
+                    )
+                    if selected_download_consent != current_download_consent:
+                        try:
+                            stammdaten_manager.update_child(
+                                str(child.get("id", "")),
+                                {"download_consent": selected_download_consent},
+                            )
+                            st.success("Consent aktualisiert. / Consent updated.")
+                            _trigger_rerun()
+                        except Exception as exc:
+                            st.error(
+                                "Consent konnte nicht gespeichert werden. / Could not save consent."
+                            )
+                            st.info(str(exc))
+                    st.caption(
+                        "In der App bleibt die Vorschau unverändert. Der Consent betrifft nur den Download. / "
+                        "In-app preview remains unchanged. Consent affects download only."
+                    )
                 if photos:
+                    active_consent_mode = (
+                        str((child or {}).get("download_consent", "pixelated"))
+                        .strip()
+                        .lower()
+                    )
                     for photo in photos:
                         file_name = str(photo.get("name", "photo"))
                         file_id = str(photo.get("id", ""))
@@ -639,11 +705,15 @@ else:
                             caption=f"{file_name} · Vorschau / Preview",
                             use_container_width=True,
                         )
+                        download_bytes = _get_photo_download_bytes(
+                            file_id=file_id,
+                            consent_mode=active_consent_mode,
+                        )
                         st.download_button(
-                            "Original herunterladen / Download original",
-                            data=img_bytes,
+                            "Foto herunterladen / Download photo",
+                            data=download_bytes,
                             file_name=file_name,
-                            key=f"download_photo_{file_id}",
+                            key=f"download_photo_{file_id}_{active_consent_mode}",
                         )
                 else:
                     st.write("Keine Fotos vorhanden. / No photos available.")

@@ -5,7 +5,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern).
-- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen.
+- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 
@@ -190,11 +190,11 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
 Pflicht-Tab für Kinder:
-- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`, `photo_folder_id`)
+- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`, `photo_folder_id`, `download_consent`)
 
 Optional:
 - `parents` (`parent_id`, `email`, `name`, `phone`)
-- `consents` (z. B. Consent-Flags für Foto-Downloads)
+- `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
 
 ### Beispiel für das finale `secrets.toml`
 Die App validiert beim Start zentral folgende Pflichtstruktur:

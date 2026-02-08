@@ -12,6 +12,7 @@ CHILDREN_TAB = "children"
 PARENTS_TAB = "parents"
 CONSENTS_TAB = "consents"
 DEFAULT_CACHE_TTL_SECONDS = 15
+DEFAULT_DOWNLOAD_CONSENT = "pixelated"
 
 
 class SheetsRepositoryError(RuntimeError):
@@ -107,6 +108,13 @@ def _to_records(rows: list[list[str]]) -> list[dict[str, str]]:
     return records
 
 
+def _normalize_download_consent(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"pixelated", "unpixelated"}:
+        return normalized
+    return DEFAULT_DOWNLOAD_CONSENT
+
+
 def _get_row_index_by_id(tab: str, id_field: str, value: str) -> tuple[int, list[str]]:
     rows = _values_get(f"{tab}!A:ZZ")
     if not rows:
@@ -130,8 +138,15 @@ def _get_row_index_by_id(tab: str, id_field: str, value: str) -> tuple[int, list
 
 @st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
 def get_children() -> list[dict[str, str]]:
+    _ensure_children_header_columns(
+        ["folder_id", "photo_folder_id", "download_consent"]
+    )
     rows = _values_get(f"{CHILDREN_TAB}!A:ZZ")
     children = _to_records(rows)
+    for child in children:
+        child["download_consent"] = _normalize_download_consent(
+            child.get("download_consent")
+        )
     return sorted(children, key=lambda item: item.get("name", ""))
 
 
@@ -155,9 +170,17 @@ def get_child_by_id(child_id: str) -> dict[str, str] | None:
 
 def add_child(child_dict: dict[str, Any]) -> str:
     child_id = uuid4().hex
-    payload = {**child_dict, "child_id": child_id}
+    payload = {
+        **child_dict,
+        "child_id": child_id,
+        "download_consent": _normalize_download_consent(
+            str(child_dict.get("download_consent", ""))
+        ),
+    }
 
-    header = _ensure_children_header_columns(["folder_id", "photo_folder_id"])
+    header = _ensure_children_header_columns(
+        ["folder_id", "photo_folder_id", "download_consent"]
+    )
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
     _values_append(f"{CHILDREN_TAB}!A:ZZ", [row_values])
@@ -169,7 +192,9 @@ def add_child(child_dict: dict[str, Any]) -> str:
 
 
 def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
-    _ensure_children_header_columns(["folder_id", "photo_folder_id"])
+    _ensure_children_header_columns(
+        ["folder_id", "photo_folder_id", "download_consent"]
+    )
     row_index, header = _get_row_index_by_id(CHILDREN_TAB, "child_id", child_id)
 
     existing_rows = _values_get(f"{CHILDREN_TAB}!A{row_index}:ZZ{row_index}")
@@ -181,6 +206,9 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
     }
     current_payload.update(
         {key: str(value).strip() for key, value in patch_dict.items()}
+    )
+    current_payload["download_consent"] = _normalize_download_consent(
+        current_payload.get("download_consent")
     )
 
     row_values = [current_payload.get(column, "") for column in header]

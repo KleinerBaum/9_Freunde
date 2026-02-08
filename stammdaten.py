@@ -10,11 +10,23 @@ from config import get_app_config
 from services import sheets_repo
 from storage import DriveAgent
 
+DEFAULT_DOWNLOAD_CONSENT = "pixelated"
+
+
+def _normalize_download_consent(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"pixelated", "unpixelated"}:
+        return normalized
+    return DEFAULT_DOWNLOAD_CONSENT
+
 
 def _normalize_child_record(child: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(child)
     if "id" not in normalized and "child_id" in normalized:
         normalized["id"] = normalized["child_id"]
+    normalized["download_consent"] = _normalize_download_consent(
+        normalized.get("download_consent")
+    )
     return normalized
 
 
@@ -48,7 +60,9 @@ class StammdatenManager:
                 _normalize_child_record(child) for child in sheets_repo.get_children()
             ]
         else:
-            children = self._read_local_children()
+            children = [
+                _normalize_child_record(child) for child in self._read_local_children()
+            ]
 
         children.sort(key=lambda item: item.get("name", ""))
         return children
@@ -81,6 +95,7 @@ class StammdatenManager:
             "id": child_id,
             "name": name,
             "parent_email": parent_email,
+            "download_consent": DEFAULT_DOWNLOAD_CONSENT,
         }
         if folder_id:
             child_data["folder_id"] = folder_id
@@ -99,7 +114,7 @@ class StammdatenManager:
 
         for child in self._read_local_children():
             if child.get("parent_email") == parent_email:
-                return child
+                return _normalize_child_record(child)
         return None
 
     def get_child_by_id(self, child_id: str) -> dict[str, Any] | None:
@@ -110,7 +125,7 @@ class StammdatenManager:
 
         for child in self._read_local_children():
             if child.get("id") == child_id:
-                return child
+                return _normalize_child_record(child)
         return None
 
     def update_child(self, child_id: str, new_data: dict[str, Any]) -> None:
@@ -122,7 +137,11 @@ class StammdatenManager:
         children = self._read_local_children()
         for index, child in enumerate(children):
             if child.get("id") == child_id:
-                children[index] = {**child, **new_data}
+                merged_data = {**child, **new_data}
+                merged_data["download_consent"] = _normalize_download_consent(
+                    merged_data.get("download_consent")
+                )
+                children[index] = merged_data
                 self._write_local_children(children)
                 return
         raise KeyError(f"Kind mit ID '{child_id}' wurde nicht gefunden.")

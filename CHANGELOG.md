@@ -16,6 +16,9 @@
 
 
 ### Added
+- Admin-Bereich um einen separaten Menüpunkt **"Verträge / Contracts"** erweitert: Upload von PDF/DOCX direkt in den konfigurierten Drive-Ordner `gcp.drive_contracts_folder_id` sowie direkte Dateiliste nach dem Upload.
+- Neuer Drive-Service (`services/drive_service.py`) mit Funktionen für Upload, Listing und Download inkl. verständlicher 403/404-Fehlerhinweise (Ordnerfreigabe für Service-Account).
+
 - API-Inventur in `README.md` ergänzt (aktiv genutzt: Drive/Calendar/Firestore, optional: Sheets, ungenutzt: Docs/Forms/Tasks).
 - Neues Skript `scripts/check_google_api_inventory.py` ergänzt, das die Inventur ausgibt und optionale Minimal-Healthchecks für Sheets/Docs/Forms/Tasks unterstützt.
 

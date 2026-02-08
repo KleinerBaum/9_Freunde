@@ -10,6 +10,11 @@ from photo import PhotoAgent
 from storage import DriveAgent
 from calendar_agent import CalendarAgent
 from config import get_app_config, validate_config_or_stop
+from services.drive_service import (
+    DriveServiceError,
+    list_files_in_folder,
+    upload_bytes_to_folder,
+)
 
 # Streamlit page configuration
 st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
@@ -155,7 +160,9 @@ else:
 
     if user_role == "admin":
         menu = st.sidebar.radio(
-            "Navigationsmenü", ("Stammdaten", "Dokumente", "Fotos", "Kalender"), index=0
+            "Navigationsmenü",
+            ("Stammdaten", "Dokumente", "Verträge", "Fotos", "Kalender"),
+            index=0,
         )
     else:
         menu = st.sidebar.radio(
@@ -290,6 +297,71 @@ else:
                             )
                     else:
                         st.write("(Keine gespeicherten Dokumente vorhanden.)")
+
+        # ---- Admin: Verträge ----
+        elif menu == "Verträge":
+            st.subheader("Vertragsablage / Contract storage")
+            if app_config.storage_mode != "google" or app_config.google is None:
+                st.info(
+                    "Die Vertragsablage ist nur im Google-Modus verfügbar. / "
+                    "Contract storage is only available in Google mode."
+                )
+            else:
+                contracts_folder_id = app_config.google.drive_contracts_folder_id
+                contract_file = st.file_uploader(
+                    "Vertrag hochladen (PDF/DOCX) / Upload contract (PDF/DOCX)",
+                    type=["pdf", "docx"],
+                    key="contracts_uploader",
+                )
+                if st.button("In Drive speichern / Save to Drive"):
+                    if contract_file is None:
+                        st.warning(
+                            "Bitte zuerst eine PDF- oder DOCX-Datei auswählen. / "
+                            "Please select a PDF or DOCX file first."
+                        )
+                    else:
+                        try:
+                            file_id = upload_bytes_to_folder(
+                                contracts_folder_id,
+                                contract_file.name,
+                                contract_file.getvalue(),
+                                contract_file.type or "application/octet-stream",
+                            )
+                            st.success(
+                                "Datei in Google Drive gespeichert. / "
+                                f"File saved to Google Drive (ID: {file_id})."
+                            )
+                        except DriveServiceError as exc:
+                            st.error(
+                                "Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe für "
+                                "den Service-Account (403/404). / Upload failed. "
+                                "Please verify folder sharing with the service account "
+                                "(403/404)."
+                            )
+                            st.info(str(exc))
+
+                st.write("**Vorhandene Vertragsdateien / Existing contract files**")
+                try:
+                    contract_files = list_files_in_folder(contracts_folder_id)
+                    if contract_files:
+                        for file_meta in contract_files:
+                            st.markdown(
+                                f"- **{file_meta.get('name', '-')}** "
+                                f"`{file_meta.get('mimeType', '-')}` · "
+                                f"{file_meta.get('modifiedTime', '-')}"
+                            )
+                    else:
+                        st.caption(
+                            "Noch keine Dateien vorhanden. / No files available yet."
+                        )
+                except DriveServiceError as exc:
+                    st.error(
+                        "Dateiliste konnte nicht geladen werden. Stellen Sie sicher, "
+                        "dass der Zielordner mit dem Service-Account geteilt ist. / "
+                        "Could not load file list. Ensure the folder is shared with "
+                        "the service account."
+                    )
+                    st.info(str(exc))
 
         # ---- Admin: Fotos ----
         elif menu == "Fotos":

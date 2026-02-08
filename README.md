@@ -247,3 +247,54 @@ Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE
 
 ## Fehlerbehebung
 
+### Vollständiges Secrets-Schema (Pflicht + Optional)
+
+Pflicht (Google-Modus):
+- `[gcp_service_account]` mit allen Service-Account-Feldern (`type`, `project_id`, `private_key_id`, `private_key`, `client_email`, `client_id`, `token_uri`)
+- `[gcp]`
+  - `drive_photos_root_folder_id`
+  - `drive_contracts_folder_id`
+  - `stammdaten_sheet_id`
+
+Optional:
+- `gcp.calendar_id`
+- `gcp.stammdaten_sheet_tab`
+- `[app].admin_emails` oder `[auth].admin_emails`
+- `[openai]` (für KI-Dokumente)
+
+### Setup-Hinweis zu Freigaben (sehr wichtig)
+
+Wenn der Service-Account keine Rechte hat, schlagen API-Calls mit 403/404 fehl.
+Stellen Sie sicher:
+1. **Drive-Ordner ist mit dem Service-Account geteilt** (mindestens Editor/Bearbeiter).
+2. **Stammdaten-Sheet ist mit dem Service-Account geteilt** (mindestens Editor/Bearbeiter).
+3. **Kalender ist mit dem Service-Account geteilt**, falls `gcp.calendar_id` genutzt wird.
+
+### Smoke-Check (Drive + Sheets)
+
+Mit dem folgenden Script können Sie eine schnelle technische Prüfung ausführen:
+
+```bash
+python tools/smoke_check.py --secrets .streamlit/secrets.toml
+```
+
+Geprüft werden:
+- Secrets laden und Pflichtfelder vorhanden
+- Drive-List-Aufruf im `gcp.drive_contracts_folder_id`
+- Sheets-Header-Lesen für `children!1:1`
+
+Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
+
+### Typische Fehlerbilder
+
+- **403 PERMISSION_DENIED / insufficient permissions**
+  - Ursache: Ressource nicht mit Service-Account geteilt oder falsche Rolle.
+  - Lösung: Drive-Ordner/Sheet/Kalender explizit mit `client_email` des Service-Accounts teilen.
+
+- **404 File not found / Requested entity was not found**
+  - Ursache: Falsche ID (`drive_contracts_folder_id`, `stammdaten_sheet_id`, `calendar_id`) oder Ressource nicht im Zugriffskontext.
+  - Lösung: IDs prüfen und Freigaben erneut kontrollieren.
+
+- **invalid_grant**
+  - Ursache: Defekter Private Key, falsche Zeilenumbrüche in `private_key`, oder stark abweichende Serverzeit.
+  - Lösung: Service-Account-JSON neu aus GCP exportieren, `private_key` unverändert (inkl. `\n`) übernehmen, Systemzeit/NTP prüfen.

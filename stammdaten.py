@@ -7,12 +7,15 @@ from typing import Any
 import streamlit as st
 
 from config import get_app_config
-from storage import DriveAgent, init_firebase
+from services import sheets_repo
+from storage import DriveAgent
 
-try:
-    from firebase_admin import firestore
-except ImportError:  # pragma: no cover - depends on optional runtime package
-    firestore = None
+
+def _normalize_child_record(child: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(child)
+    if "id" not in normalized and "child_id" in normalized:
+        normalized["id"] = normalized["child_id"]
+    return normalized
 
 
 class StammdatenManager:
@@ -21,22 +24,7 @@ class StammdatenManager:
         self.storage_mode = self.config.storage_mode
         self.children_file = self.config.local.children_file
 
-        init_firebase()
-        self.db: Any | None = None
-
-        if self.storage_mode == "google":
-            if firestore is None:
-                st.warning(
-                    "Das Paket 'firebase-admin' ist nicht installiert. "
-                    "Stammdaten sind aktuell nur eingeschränkt verfügbar.",
-                )
-                return
-
-            try:
-                self.db = firestore.client()
-            except Exception as exc:
-                st.error(f"Datenbank-Verbindung fehlgeschlagen: {exc}")
-        else:
+        if self.storage_mode != "google":
             self.children_file.parent.mkdir(parents=True, exist_ok=True)
             if not self.children_file.exists():
                 self.children_file.write_text("[]", encoding="utf-8")
@@ -56,15 +44,9 @@ class StammdatenManager:
     def get_children(self) -> list[dict[str, Any]]:
         """Lädt alle Kinder-Datensätze."""
         if self.storage_mode == "google":
-            children: list[dict[str, Any]] = []
-            if not self.db:
-                return children
-
-            docs = self.db.collection("children").stream()
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                children.append(data)
+            children = [
+                _normalize_child_record(child) for child in sheets_repo.get_children()
+            ]
         else:
             children = self._read_local_children()
 
@@ -88,16 +70,10 @@ class StammdatenManager:
             print("Fehler beim Anlegen des Ordners:", exc)
 
         if self.storage_mode == "google":
-            if not self.db:
-                raise RuntimeError("Keine Datenbankverbindung.")
-
             child_data: dict[str, Any] = {"name": name, "parent_email": parent_email}
             if folder_id:
                 child_data["folder_id"] = folder_id
-
-            doc_ref = self.db.collection("children").document()
-            doc_ref.set(child_data)
-            return doc_ref.id
+            return sheets_repo.add_child(child_data)
 
         child_id = uuid.uuid4().hex
         child_data = {
@@ -116,19 +92,8 @@ class StammdatenManager:
     def get_child_by_parent(self, parent_email: str) -> dict[str, Any] | None:
         """Liefert den Kind-Datensatz für eine Eltern-E-Mail."""
         if self.storage_mode == "google":
-            if not self.db:
-                return None
-
-            query = (
-                self.db.collection("children")
-                .where("parent_email", "==", parent_email)
-                .stream()
-            )
-            for doc in query:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                return data
-            return None
+            child = sheets_repo.get_child_by_parent_email(parent_email)
+            return _normalize_child_record(child) if child else None
 
         for child in self._read_local_children():
             if child.get("parent_email") == parent_email:
@@ -138,9 +103,7 @@ class StammdatenManager:
     def update_child(self, child_id: str, new_data: dict[str, Any]) -> None:
         """Aktualisiert Felder des Kindes mit der ID child_id."""
         if self.storage_mode == "google":
-            if not self.db:
-                raise RuntimeError("Keine Datenbankverbindung.")
-            self.db.collection("children").document(child_id).update(new_data)
+            sheets_repo.update_child(child_id, new_data)
             return
 
         children = self._read_local_children()
@@ -154,9 +117,7 @@ class StammdatenManager:
     def delete_child(self, child_id: str) -> None:
         """Löscht den Kind-Datensatz."""
         if self.storage_mode == "google":
-            if not self.db:
-                raise RuntimeError("Keine Datenbankverbindung.")
-            self.db.collection("children").document(child_id).delete()
+            st.warning("Löschen über Google Sheets ist derzeit nicht implementiert.")
             return
 
         children = self._read_local_children()

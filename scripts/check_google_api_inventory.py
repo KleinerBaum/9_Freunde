@@ -35,16 +35,10 @@ INVENTORY: tuple[ApiInventoryEntry, ...] = (
         code_reference="calendar.py, app.py",
     ),
     ApiInventoryEntry(
-        name="Firestore API",
-        service_name="firestore.googleapis.com",
-        status="aktiv genutzt",
-        code_reference="stammdaten.py, storage.py, scripts/check_firestore_prerequisites.py",
-    ),
-    ApiInventoryEntry(
         name="Google Sheets API",
         service_name="sheets.googleapis.com",
-        status="optional/vorbereitet",
-        code_reference="services/google_clients.py",
+        status="aktiv genutzt",
+        code_reference="services/google_clients.py, services/sheets_repo.py, stammdaten.py",
     ),
     ApiInventoryEntry(
         name="Google Docs API",

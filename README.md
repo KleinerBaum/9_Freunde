@@ -126,8 +126,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 |---|---|---|
 | Google Drive API (`drive.googleapis.com`) | **aktiv genutzt** | `storage.py`, `services/drive_service.py`, `app.py` |
 | Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `calendar_agent.py`, `app.py` |
-| Firestore API (`firestore.googleapis.com`) | **aktiv genutzt** | `stammdaten.py`, `storage.py`, `scripts/check_firestore_prerequisites.py` |
-| Google Sheets API (`sheets.googleapis.com`) | **optional/vorbereitet** | `services/google_clients.py` (`get_sheets_client`) |
+| Google Sheets API (`sheets.googleapis.com`) | **aktiv genutzt** | `services/google_clients.py`, `services/sheets_repo.py`, `stammdaten.py` |
 | Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
 | Google Forms API (`forms.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
 | Google Tasks API (`tasks.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
@@ -146,7 +145,7 @@ Vorher/Nachher prüfen:
 
 ```bash
 gcloud services list --enabled --project "<PROJECT_ID>" \
-  --filter="name:(drive.googleapis.com OR calendar-json.googleapis.com OR firestore.googleapis.com OR sheets.googleapis.com OR docs.googleapis.com OR forms.googleapis.com OR tasks.googleapis.com)"
+  --filter="name:(drive.googleapis.com OR calendar-json.googleapis.com OR sheets.googleapis.com OR docs.googleapis.com OR forms.googleapis.com OR tasks.googleapis.com)"
 ```
 
 #### Optional vorbereitete APIs: Minimal-Healthchecks & Konfiguration
@@ -207,68 +206,20 @@ Die Dokumentenerstellung nutzt die **OpenAI Responses API** mit strukturiertem J
 - Optionaler EU-Endpunkt: `https://eu.api.openai.com/v1`
 - Timeouts + automatische Wiederholversuche mit exponentiellem Backoff sind integriert.
 
-### Firestore prerequisites
+### Google Sheets prerequisites
 
-Für Stammdaten wird Firestore über `firebase-admin` angesprochen. Vor dem ersten produktiven Einsatz müssen diese Punkte erfüllt sein:
+Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter `children`, `parents`, optional `consents`).
 
-1. **Firestore ist im Native Mode aktiviert**
+1. **Google Sheets API aktivieren**
+2. **Service Account mit dem Stammdaten-Sheet teilen** (Editor-Rechte)
+3. **Sheet-ID in `gcp.stammdaten_sheet_id` setzen**
 
-   ```bash
-   gcloud firestore databases describe \
-     --project "<PROJECT_ID>" \
-     --database="(default)" \
-     --format="value(type)"
-   ```
+Pflicht-Tab für Kinder:
+- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`)
 
-   Erwartete Ausgabe: `FIRESTORE_NATIVE`
-
-2. **Service Account hat Least-Privilege-Rolle für Firestore**
-
-   Minimal erforderlich ist eine Firestore-User-Rolle (`roles/firestore.user`) oder die kompatible Datastore-User-Rolle (`roles/datastore.user`).
-
-   Rollen prüfen:
-
-   ```bash
-   gcloud projects get-iam-policy "<PROJECT_ID>" \
-     --flatten="bindings[].members" \
-     --filter="bindings.members:serviceAccount:<SERVICE_ACCOUNT_EMAIL>" \
-     --format="value(bindings.role)"
-   ```
-
-   Rolle zuweisen (Beispiel mit `roles/datastore.user`):
-
-   ```bash
-   gcloud projects add-iam-policy-binding "<PROJECT_ID>" \
-     --member="serviceAccount:<SERVICE_ACCOUNT_EMAIL>" \
-     --role="roles/datastore.user"
-   ```
-
-3. **`init_firebase()` nutzt dasselbe `gcp_service_account` aus `secrets.toml`**
-
-   Automatischer Check (führt alle drei Firestore-Checks aus):
-
-   ```bash
-   python scripts/check_firestore_prerequisites.py --secrets .streamlit/secrets.toml
-   ```
-
-   Der Check verifiziert explizit:
-   - Firestore-Datenbanktyp (`FIRESTORE_NATIVE`)
-   - IAM-Rollen des Service Accounts
-   - dass `storage.init_firebase()` mit demselben `client_email` initialisiert wurde wie in `gcp_service_account`
-
-#### Typische Fehlermeldungen (Firestore) und Lösung
-
-- **`google.api_core.exceptions.FailedPrecondition: The Cloud Firestore API is not available for Firestore in Datastore Mode`**  
-  Firestore ist nicht im Native Mode. Datenbank in Native Mode anlegen oder bestehendes Projekt korrekt migrieren.
-
-- **`google.api_core.exceptions.PermissionDenied: 403 Missing or insufficient permissions`**  
-  Service Account hat keine passende IAM-Rolle. Mindestens `roles/datastore.user` oder `roles/firestore.user` zuweisen.
-
-- **`ValueError: [gcp_service_account] fehlt in secrets.toml`** (aus dem Setup-Skript)  
-  Abschnitt `[gcp_service_account]` in `.streamlit/secrets.toml` ergänzen und vollständige JSON-Felder übernehmen.
-
-- **`[FAIL] init_firebase() nutzt ein anderes Service Account Credential`** (aus dem Setup-Skript)  
-  Prüfen, ob in allen Umgebungen (lokal/Cloud) dieselben Secrets geladen werden und keine impliziten Default Credentials aktiv sind.
+Optional:
+- `parents` (`parent_id`, `email`, `name`, `phone`)
+- `consents` (z. B. Consent-Flags für Foto-Downloads)
 
 ### Beispiel für das finale `secrets.toml`
 Die App validiert beim Start zentral folgende Pflichtstruktur:
@@ -321,8 +272,5 @@ Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE
 
 ## Fehlerbehebung
 
-- **`ModuleNotFoundError: No module named 'firebase_admin'`**  
-  Installieren Sie die Abhängigkeiten mit `pip install -r requirements.txt`.
-  Falls `firebase-admin` im Laufzeitumfeld nicht verfügbar ist, startet die App jetzt weiterhin, zeigt aber für Stammdaten eine Hinweis-Meldung an, bis Firebase korrekt eingerichtet ist.
 - **`ModuleNotFoundError: No module named 'face_recognition'`**  
   Die Gesichtserkennung ist optional. Die App startet und der Foto-Upload funktioniert weiterhin; es erscheint ein Hinweis, dass automatische Gesichtserkennung in dieser Bereitstellung deaktiviert ist.

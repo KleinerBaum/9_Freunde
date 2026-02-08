@@ -203,9 +203,57 @@ else:
                 else:
                     try:
                         stammdaten_manager.add_child(name.strip(), parent_email.strip())
-                        st.success(f"Kind '{name}' hinzugefügt.")
+                        st.success(
+                            f"Kind '{name}' hinzugefügt. / Child '{name}' added."
+                        )
+                        _trigger_rerun()
                     except Exception as e:
                         st.error(f"Fehler beim Speichern: {e}")
+            if children:
+                st.write("**Kind bearbeiten / Edit child:**")
+                selected_child_name = st.selectbox(
+                    "Kind auswählen / Select child",
+                    options=[child.get("name", "") for child in children],
+                    key="edit_child_select",
+                )
+                selected_child = next(
+                    child
+                    for child in children
+                    if child.get("name") == selected_child_name
+                )
+                with st.form(key="edit_child_form"):
+                    edit_name = st.text_input(
+                        "Name des Kindes / Child name",
+                        value=selected_child.get("name", ""),
+                    )
+                    edit_parent_email = st.text_input(
+                        "E-Mail Elternteil / Parent email",
+                        value=selected_child.get("parent_email", ""),
+                    )
+                    edit_submitted = st.form_submit_button(
+                        "Änderungen speichern / Save"
+                    )
+                if edit_submitted:
+                    if not edit_name.strip() or not edit_parent_email.strip():
+                        st.error(
+                            "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
+                        )
+                    else:
+                        try:
+                            stammdaten_manager.update_child(
+                                selected_child.get("id", ""),
+                                {
+                                    "name": edit_name.strip(),
+                                    "parent_email": edit_parent_email.strip(),
+                                },
+                            )
+                            st.success(
+                                "Kind wurde aktualisiert. / Child record updated."
+                            )
+                            _trigger_rerun()
+                        except Exception as exc:
+                            st.error(f"Speichern fehlgeschlagen / Save failed: {exc}")
+
             if app_config.storage_mode == "google":
                 st.info(
                     "Beim Anlegen eines Kindes wird automatisch ein zugehöriger Drive-Ordner erstellt und verknüpft."
@@ -448,7 +496,8 @@ else:
 
     else:
         # ---- Parent/Eltern View ----
-        child = st.session_state.get("child")
+        child = stammdaten_manager.get_child_by_parent(user_email)
+        st.session_state.child = child
         if menu == "Mein Kind":
             st.subheader("Mein Kind - Übersicht")
             if child:

@@ -10,48 +10,11 @@ import streamlit as st
 from config import get_app_config
 
 try:
-    import firebase_admin
-    from firebase_admin import credentials
-except ImportError:  # pragma: no cover - depends on optional runtime package
-    firebase_admin = None
-    credentials = None
-
-try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 except ImportError:  # pragma: no cover - depends on optional runtime package
     service_account = None
     build = None
-
-
-firebase_app: Any | None = None
-
-
-def init_firebase() -> None:
-    """Initialisiert firebase_admin nur im Google-Modus."""
-    global firebase_app
-
-    app_config = get_app_config()
-    if app_config.storage_mode != "google":
-        return
-
-    if firebase_admin is None or credentials is None:
-        return
-
-    if firebase_app:
-        return
-
-    try:
-        cred_info = app_config.google.service_account if app_config.google else None
-        if cred_info:
-            cred = credentials.Certificate(cred_info)
-            firebase_app = firebase_admin.initialize_app(cred)
-        elif not firebase_admin._apps:
-            firebase_app = firebase_admin.initialize_app()
-        else:
-            firebase_app = firebase_admin.get_app()
-    except Exception as exc:  # pragma: no cover - external service setup
-        print("Firebase Initialisierung fehlgeschlagen:", exc)
 
 
 def _safe_name(name: str) -> str:

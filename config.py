@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 
 DEFAULT_TIMEZONE = "Europe/Berlin"
 DEFAULT_OPENAI_MODEL_FAST = "gpt-4o-mini"
@@ -21,6 +23,15 @@ DEFAULT_DATA_DIR = "./data"
 
 class ConfigError(RuntimeError):
     """Fehler bei fehlender oder ungültiger Konfiguration."""
+
+
+def _extract_toml_error_location(error_message: str) -> str | None:
+    """Extrahiert Zeilen-/Spaltenhinweis aus TOML-Fehlermeldungen."""
+    match = re.search(r"line\s+(\d+)\s+column\s+(\d+)", error_message)
+    if not match:
+        return None
+    line_number, column_number = match.groups()
+    return f"Zeile {line_number}, Spalte {column_number} / line {line_number}, column {column_number}"
 
 
 @dataclass(frozen=True)
@@ -403,4 +414,28 @@ def validate_config_or_stop() -> AppConfig:
             f"{exc}\n\n"
             "Please update secrets.toml as documented in the README."
         )
+        st.stop()
+    except StreamlitSecretNotFoundError as exc:
+        details = str(exc)
+        location_hint = _extract_toml_error_location(details)
+
+        st.error(
+            "Secrets-Datei ist ungültig oder fehlt. "
+            "Bitte prüfen Sie .streamlit/secrets.toml auf TOML-Syntaxfehler "
+            "(z. B. fehlende Werte nach '=' oder ungültige Inline-Tabellen)."
+        )
+        if location_hint:
+            st.info(f"Fehlerposition: {location_hint}")
+
+        st.error(
+            "Secrets file is missing or invalid. "
+            "Please check .streamlit/secrets.toml for TOML syntax errors "
+            "(for example missing values after '=' or invalid inline tables)."
+        )
+        st.caption(
+            "Schnelltest / Quick check: "
+            'python -c "import tomllib, pathlib; '
+            "tomllib.loads(pathlib.Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))\""
+        )
+        st.caption(details)
         st.stop()

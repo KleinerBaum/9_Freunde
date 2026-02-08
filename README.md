@@ -245,6 +245,65 @@ enable_web_search = true            # optional
 
 Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.
 
+
+### Vollständiges `secrets.toml` (Google-Modus, Copy & Paste)
+Beispiel mit korrekt formatiertem `private_key` als TOML-Multiline-String:
+
+```toml
+[storage]
+mode = "google"
+
+[gcp_service_account]
+type = "service_account"
+project_id = "my-project-id"
+private_key_id = "abc123..."
+private_key = """-----BEGIN PRIVATE KEY-----
+MIIEv...
+...
+-----END PRIVATE KEY-----
+"""
+client_email = "service-account@my-project-id.iam.gserviceaccount.com"
+client_id = "123456789012345678901"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/service-account%40my-project-id.iam.gserviceaccount.com"
+universe_domain = "googleapis.com"
+
+[gcp]
+calendar_id = "kita-kalender@group.calendar.google.com"
+drive_photos_root_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+drive_contracts_folder_id = "1ZaYxWvUtSrQpOnMlKjIhGfEdCb"
+stammdaten_sheet_id = "1SheetIdForStammdaten"
+stammdaten_sheet_tab = "children"
+
+[gcp_optional_apis]
+sheets_spreadsheet_id = "<optional>"
+docs_document_id = "<optional>"
+forms_form_id = "<optional>"
+
+[auth]
+admin_emails = ["leitung@example.org"]
+
+[auth.users]
+leitung@example.org = "demo123"
+eltern@example.org = "demo123"
+
+[openai]
+api_key = "sk-XXXX...IhrOpenAIKey...XXXX"
+model_fast = "gpt-4o-mini"
+model_precise = "o3-mini"
+precision_mode = "fast"
+reasoning_effort = "medium"
+timeout_seconds = 30
+max_retries = 3
+base_url = "https://eu.api.openai.com/v1"
+vector_store_id = "vs_..."
+enable_web_search = true
+```
+
+Alternative für `private_key`: statt Multiline-String können Sie auch die JSON-Variante mit `\n` verwenden.
+
 ## Fehlerbehebung
 
 ### Vollständiges Secrets-Schema (Pflicht + Optional)
@@ -298,3 +357,7 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
 - **invalid_grant**
   - Ursache: Defekter Private Key, falsche Zeilenumbrüche in `private_key`, oder stark abweichende Serverzeit.
   - Lösung: Service-Account-JSON neu aus GCP exportieren, `private_key` unverändert (inkl. `\n`) übernehmen, Systemzeit/NTP prüfen.
+
+- **`StreamlitSecretNotFoundError` / `TOMLDecodeError` beim App-Start**
+  - Ursache: Syntaxfehler in `.streamlit/secrets.toml` (z. B. `key =` ohne Wert, fehlerhafte Inline-Tabelle, ungültige Quotes).
+  - Lösung: TOML prüfen, z. B. mit `python -c "import tomllib, pathlib; tomllib.loads(pathlib.Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))"`; fehlerhafte Zeile korrigieren.

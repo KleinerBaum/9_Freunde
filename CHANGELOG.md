@@ -2,10 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+- Secrets-Fehlerhinweise erweitert: UI zeigt bei ungültigem TOML jetzt zusätzlich eine erkannte Fehlerposition (Zeile/Spalte) und einen direkten `tomllib`-Quick-Check.
+- Konfigurationsvalidierung verbessert: TOML-Parsing-Fehler in `.streamlit/secrets.toml` (z. B. `StreamlitSecretNotFoundError`/`TOMLDecodeError`) werden jetzt mit klaren, zweisprachigen UI-Hinweisen (DE/EN) abgefangen, statt einen unklaren Stacktrace im App-Start zu zeigen.
+
 ### Added
 - Neues Script `tools/smoke_check.py` ergänzt: validiert `secrets.toml`, führt einen Drive-List-Check auf `gcp.drive_contracts_folder_id` aus und liest den `children`-Header aus Google Sheets mit `OK`/`FAIL`-Ausgabe.
 
 ### Changed
+- README um ein vollständiges Copy-&-Paste-Beispiel für `storage.mode = "google"` ergänzt (inkl. korrektem `private_key`-Multiline-Format).
 - `requirements.txt` bereinigt und auf den aktuellen Core-Stack für Streamlit Cloud ausgerichtet (Google Auth-Pakete, `pandas`, `reportlab`, `opencv-python-headless`, keine Firebase/Face-Recognition-Altlasten).
 - README um vollständiges Secrets-Schema, explizite Freigabe-Hinweise (Ordner/Sheet mit Service-Account teilen) und Troubleshooting für `403`, `404` und `invalid_grant` erweitert.
 

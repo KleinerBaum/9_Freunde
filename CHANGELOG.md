@@ -4,6 +4,7 @@
 
 ### Fixed
 - Konfigurationsvalidierung verbessert: TOML-Parsing-Fehler in `.streamlit/secrets.toml` (z. B. `StreamlitSecretNotFoundError`/`TOMLDecodeError`) werden jetzt mit klaren, zweisprachigen UI-Hinweisen (DE/EN) abgefangen, statt einen unklaren Stacktrace im App-Start zu zeigen.
+- Google-Service-Account-Validierung für `gcp_service_account.private_key` ergänzt: `\n`-Escapes werden normalisiert und PEM-Format (`BEGIN/END PRIVATE KEY`, mehrzeilig) vor der Google-Client-Initialisierung geprüft, damit bei fehlerhaften Keys eine verständliche `ConfigError` statt `MalformedFraming` erscheint.
 
 ### Added
 - Neues Script `tools/smoke_check.py` ergänzt: validiert `secrets.toml`, führt einen Drive-List-Check auf `gcp.drive_contracts_folder_id` aus und liest den `children`-Header aus Google Sheets mit `OK`/`FAIL`-Ausgabe.

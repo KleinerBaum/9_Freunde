@@ -299,6 +299,10 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
   - Ursache: Defekter Private Key, falsche Zeilenumbrüche in `private_key`, oder stark abweichende Serverzeit.
   - Lösung: Service-Account-JSON neu aus GCP exportieren, `private_key` unverändert (inkl. `\n`) übernehmen, Systemzeit/NTP prüfen.
 
+- **`ValueError: Unable to load PEM file ... MalformedFraming`**
+  - Ursache: `gcp_service_account.private_key` ist als einzeiliger oder fehlerhaft gequoteter String hinterlegt (BEGIN/END fehlen oder Zeilenumbrüche sind kaputt).
+  - Lösung: `private_key` als mehrzeiligen TOML-String (`"""..."""`) oder mit korrekt erhaltenen `\n` speichern. Die App normalisiert reine `\n`-Escapes jetzt automatisch und validiert das PEM-Format früh mit einer klaren Fehlermeldung.
+
 - **`StreamlitSecretNotFoundError` / `TOMLDecodeError` beim App-Start**
   - Ursache: Syntaxfehler in `.streamlit/secrets.toml` (z. B. `key =` ohne Wert, fehlerhafte Inline-Tabelle, ungültige Quotes).
   - Lösung: TOML prüfen, z. B. mit `python -c "import tomllib, pathlib; tomllib.loads(pathlib.Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))"`; fehlerhafte Zeile korrigieren.

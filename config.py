@@ -87,6 +87,9 @@ REQUIRED_GCP_SERVICE_ACCOUNT_KEYS = (
     "token_uri",
 )
 
+_PEM_PRIVATE_KEY_BEGIN = "-----BEGIN PRIVATE KEY-----"
+_PEM_PRIVATE_KEY_END = "-----END PRIVATE KEY-----"
+
 
 def _require_mapping(raw_value: Any, path: str) -> Mapping[str, Any]:
     if not isinstance(raw_value, Mapping):
@@ -152,6 +155,11 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
             "Der Service-Account in 'gcp_service_account' ist unvollständig. "
             f"Fehlende Felder: {missing_joined}."
         )
+
+    private_key_value = str(gcp_service_account["private_key"])
+    normalized_private_key = _normalize_private_key(private_key_value)
+    _validate_private_key_format(normalized_private_key)
+    gcp_service_account["private_key"] = normalized_private_key
 
     gcp = _require_mapping(secrets.get("gcp"), "gcp")
 
@@ -242,6 +250,36 @@ def _read_secret_or_env(
     if isinstance(env_value, str) and env_value.strip():
         return env_value.strip()
     return None
+
+
+def _normalize_private_key(private_key: str) -> str:
+    """Normalisiert den Service-Account-Key für PEM-Parsing."""
+    normalized_key = private_key.strip()
+    if "\\n" in normalized_key and "\n" not in normalized_key:
+        return normalized_key.replace("\\n", "\n")
+    return normalized_key
+
+
+def _validate_private_key_format(private_key: str) -> None:
+    """Prüft, ob der private_key plausibel als PEM formatiert ist."""
+    starts_correctly = private_key.startswith(_PEM_PRIVATE_KEY_BEGIN)
+    ends_correctly = private_key.endswith(_PEM_PRIVATE_KEY_END)
+
+    if not starts_correctly or not ends_correctly:
+        raise ConfigError(
+            "Der Key 'gcp_service_account.private_key' ist nicht als gültiger "
+            "PEM-Block formatiert. Bitte verwenden Sie in "
+            "'.streamlit/secrets.toml' einen mehrzeiligen String mit "
+            "BEGIN/END PRIVATE KEY."
+        )
+
+    lines = private_key.splitlines()
+    if len(lines) < 3:
+        raise ConfigError(
+            "Der Key 'gcp_service_account.private_key' enthält keinen gültigen "
+            "PEM-Inhalt. Bitte prüfen Sie Zeilenumbrüche in "
+            "'.streamlit/secrets.toml' (z. B. via triple quotes)."
+        )
 
 
 def _read_bool(

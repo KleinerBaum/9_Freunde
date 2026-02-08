@@ -85,7 +85,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - **Kalender-ID:** Erstellen Sie einen neuen Google Kalender für die Einrichtung (oder nutzen Sie einen vorhandenen). Teilen Sie diesen Kalender mit dem Service-Account (Lesen/Schreiben) **oder** notieren Sie die Kalender-ID, falls Sie Domain-Berechtigungen nutzen. Alternativ kann auch das Primary-Kalender-ID des Service-Accounts genutzt werden, sofern Domain-weite Delegierung konfiguriert ist.
 5. **Service-Account Credentials einbinden:** Die heruntergeladene JSON-Datei enthält sensible Schlüssel. Diese können auf zwei Arten eingebunden werden:
    - **Lokal (Entwicklung):** Speichern Sie die JSON-Datei z. B. als `service_account.json` im Projekt (nicht einchecken in Git!). Legen Sie im `.streamlit/secrets.toml` eine Referenz oder die Inhalte ab.
-   - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Achten Sie darauf, multiline-Werte (insb. `private_key`) korrekt im TOML zu escapen (Zeilenumbrüche als `\\n` oder `"""` Syntax nutzen).
+   - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Nutzen Sie für `private_key` bevorzugt einen mehrzeiligen TOML-String mit `"""..."""`, damit echte Zeilenumbrüche erhalten bleiben, und vermeiden Sie zusätzliche umschließende Quotes (z. B. `'"..."'`).
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
    - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos.
    - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente.
@@ -204,7 +204,9 @@ Die App validiert beim Start zentral folgende Pflichtstruktur:
 type = "service_account"
 project_id = "my-project-id"
 private_key_id = "abc123..."
-private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+private_key = """-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----"""
 client_email = "service-account@my-project-id.iam.gserviceaccount.com"
 client_id = "123456789012345678901"
 auth_uri = "https://accounts.google.com/o/oauth2/auth"

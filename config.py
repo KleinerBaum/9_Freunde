@@ -31,6 +31,7 @@ class GoogleConfig:
     drive_photos_root_folder_id: str
     drive_contracts_folder_id: str
     stammdaten_sheet_id: str
+    stammdaten_sheet_tab: str
     calendar_id: str | None
 
     @property
@@ -173,6 +174,12 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
     drive_photos_root_folder_id = str(gcp["drive_photos_root_folder_id"]).strip()
     drive_contracts_folder_id = str(gcp["drive_contracts_folder_id"]).strip()
     stammdaten_sheet_id = str(gcp["stammdaten_sheet_id"]).strip()
+    sheet_tab_raw = gcp.get("stammdaten_sheet_tab")
+    stammdaten_sheet_tab = (
+        str(sheet_tab_raw).strip()
+        if isinstance(sheet_tab_raw, str) and str(sheet_tab_raw).strip()
+        else "Stammdaten_Eltern_2026"
+    )
     calendar_raw = gcp.get("calendar_id")
     calendar_id = (
         str(calendar_raw).strip()
@@ -187,6 +194,7 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         drive_photos_root_folder_id=drive_photos_root_folder_id,
         drive_contracts_folder_id=drive_contracts_folder_id,
         stammdaten_sheet_id=stammdaten_sheet_id,
+        stammdaten_sheet_tab=stammdaten_sheet_tab,
         calendar_id=calendar_id,
     )
 

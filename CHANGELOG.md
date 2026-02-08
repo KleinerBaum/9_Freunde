@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- Neue Admin-Ansicht **"Stammdaten Sheet"** in `app.py`: lädt read-only den konfigurierten Bereich `A1:Z500` aus Google Sheets (`gcp.stammdaten_sheet_id`, optional `gcp.stammdaten_sheet_tab` mit Default `Stammdaten_Eltern_2026`) und zeigt die Daten als `st.dataframe` an; Eltern sehen den Menüpunkt nicht.
+- Neuer Service `services/sheets_service.py` mit `read_sheet_values(sheet_id, range_a1)` für generisches Lesen von Sheet-Daten inkl. Validierung und normalisiertem Rückgabeformat.
+
+### Changed
+- `config.py` erweitert um `GoogleConfig.stammdaten_sheet_tab` (optional, Default `Stammdaten_Eltern_2026`).
+
 ### Changed
 - Stammdaten-Backend von Firebase/Firestore auf Google Sheets umgestellt: neuer `services/sheets_repo.py` (Read/Append/Update inkl. Cache + Cache-Invalidierung), `StammdatenManager` liest/schreibt im Google-Modus über Sheets (`children`/`parents`), Parent-Ansicht lädt ausschließlich das zugeordnete Kind über E-Mail, und die Admin-UI unterstützt jetzt zusätzlich das Bearbeiten bestehender Kind-Datensätze.
 - Firebase-Initialisierung aus Auth/Storage entfernt und `firebase-admin` aus `requirements.txt` entfernt, damit die App ohne Firebase-Abhängigkeit lauffähig ist.

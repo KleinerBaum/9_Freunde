@@ -69,6 +69,26 @@ def _values_append(range_name: str, values: list[list[str]]) -> None:
     )
 
 
+def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
+    rows = _values_get(f"{CHILDREN_TAB}!A:ZZ")
+    if not rows:
+        header = ["child_id", "name", "parent_email", "folder_id", "photo_folder_id"]
+        _values_update(f"{CHILDREN_TAB}!A1", [header])
+        return header
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{CHILDREN_TAB}!A1:ZZ1", [header])
+
+    return header
+
+
 def _to_records(rows: list[list[str]]) -> list[dict[str, str]]:
     if not rows:
         return []
@@ -124,26 +144,32 @@ def get_child_by_parent_email(email: str) -> dict[str, str] | None:
     return None
 
 
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_child_by_id(child_id: str) -> dict[str, str] | None:
+    normalized_child_id = child_id.strip()
+    for child in get_children():
+        if child.get("child_id", "").strip() == normalized_child_id:
+            return child
+    return None
+
+
 def add_child(child_dict: dict[str, Any]) -> str:
     child_id = uuid4().hex
     payload = {**child_dict, "child_id": child_id}
 
-    rows = _values_get(f"{CHILDREN_TAB}!A:ZZ")
-    if not rows:
-        header = ["child_id", "name", "parent_email", "folder_id"]
-        _values_update(f"{CHILDREN_TAB}!A1", [header])
-    else:
-        header = [str(col).strip() for col in rows[0]]
+    header = _ensure_children_header_columns(["folder_id", "photo_folder_id"])
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
     _values_append(f"{CHILDREN_TAB}!A:ZZ", [row_values])
 
     get_children.clear()
     get_child_by_parent_email.clear()
+    get_child_by_id.clear()
     return child_id
 
 
 def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
+    _ensure_children_header_columns(["folder_id", "photo_folder_id"])
     row_index, header = _get_row_index_by_id(CHILDREN_TAB, "child_id", child_id)
 
     existing_rows = _values_get(f"{CHILDREN_TAB}!A{row_index}:ZZ{row_index}")
@@ -162,6 +188,7 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
 
     get_children.clear()
     get_child_by_parent_email.clear()
+    get_child_by_id.clear()
 
 
 @st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)

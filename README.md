@@ -5,14 +5,14 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern).
-- **Fotoverwaltung:** DSGVO-konformer Upload von Fotos auf Google Drive mit automatischer Gesichtserkennung, sodass Eltern nur relevante Fotos sehen.
+- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 
 
 ## Installation und Voraussetzungen
 
-Es gibt **zwei Installationsmodi**:
+Die App nutzt eine **Core-Installation** ohne optionale CV-Abhängigkeiten.
 
 ### 1) Core-Installation (Cloud/Deployment-sicher)
 Für Streamlit Cloud und andere ressourcenbegrenzte Umgebungen:
@@ -29,40 +29,12 @@ Enthalten sind nur die Kernabhängigkeiten:
 - Dokument-Bibliotheken (`python-docx`, `PyPDF2`)
 - Pillow
 
-### 2) CV-Installation (lokal / Full Environment)
-Für lokale Setups mit optionaler Gesichtserkennung:
-
-```bash
-pip install -r requirements.txt
-pip install -r requirements-cv.txt
-```
-
-`requirements-cv.txt` enthält die optionalen Computer-Vision-Pakete (u. a. `face-recognition` und kompatibles `dlib`).
-
 ### Allgemeine Voraussetzungen
 
 1. **Python installieren:** Stellen Sie sicher, dass Python 3.11+ installiert ist.
 2. **Code beschaffen:** Klonen oder laden Sie das Repository mit dem App-Code.
 3. **Virtuelle Umgebung:** Nutzen Sie idealerweise ein venv (`python -m venv .venv`).
 4. **Streamlit testen:** `streamlit hello` ausführen, um die lokale Laufzeit zu prüfen.
-
-### Deployment-Hinweis für Streamlit Cloud (dlib/face_recognition)
-
-Für Debian-basierte Build-Umgebungen liegt im Repo eine `packages.txt` mit minimalen nativen Build-Abhängigkeiten für `dlib`:
-
-- `cmake`
-- `build-essential`
-- `libopenblas-dev`
-- `liblapack-dev`
-- `libjpeg-dev`
-- `zlib1g-dev`
-- `libpng-dev`
-
-Wichtig:
-- Die Kern-App bleibt ohne CV-Abhängigkeiten lauffähig (Gesichtserkennung ist optional).
-- Wenn Builds in der Cloud wegen Zeit-/RAM-Limits instabil sind, installieren Sie **nur** `requirements.txt`.
-- In diesem Fall zeigt die App einen Hinweis an und deaktiviert automatisch die Gesichtserkennung.
-
 
 ## Prototyp-Modus (lokale Speicherung, einfache Konfiguration)
 
@@ -218,7 +190,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
 Pflicht-Tab für Kinder:
-- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`)
+- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`, `photo_folder_id`)
 
 Optional:
 - `parents` (`parent_id`, `email`, `name`, `phone`)
@@ -275,5 +247,3 @@ Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE
 
 ## Fehlerbehebung
 
-- **`ModuleNotFoundError: No module named 'face_recognition'`**  
-  Die Gesichtserkennung ist optional. Die App startet und der Foto-Upload funktioniert weiterhin; es erscheint ein Hinweis, dass automatische Gesichtserkennung in dieser Bereitstellung deaktiviert ist.

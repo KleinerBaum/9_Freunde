@@ -23,6 +23,7 @@ from services.drive_service import (
     list_files_in_folder,
     upload_bytes_to_folder,
 )
+from services.sheets_repo import SheetsRepositoryError
 from services.sheets_service import SheetsServiceError, read_sheet_values
 from services.photos_service import get_download_bytes
 
@@ -201,14 +202,35 @@ else:
         # ---- Admin: Stammdaten ----
         if menu == "Stammdaten":
             st.subheader("Kinder-Stammdaten verwalten")
-            children = stammdaten_manager.get_children()
+            children: list[dict[str, str]] = []
+            children_load_error = False
+            try:
+                children = stammdaten_manager.get_children()
+            except SheetsRepositoryError as exc:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
+                    "Service-Account Zugriff auf die konfigurierte Tabelle hat "
+                    "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
+                    "verify that the service account has access to the configured "
+                    "sheet (gcp.stammdaten_sheet_id)."
+                )
+                st.caption(f"Details / Details: {exc}")
+            except Exception:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
+                    "erneut versuchen. / Master data could not be loaded right now. "
+                    "Please try again later."
+                )
+
             # Anzeige der vorhandenen Kinder
-            if children:
+            if not children_load_error and children:
                 for child in children:
                     st.write(
                         f"- **{child.get('name')}** (Eltern: {child.get('parent_email')})"
                     )
-            else:
+            elif not children_load_error:
                 st.write("*Noch keine Kinder registriert.*")
 
             # Formular zum Hinzufügen eines neuen Kindes

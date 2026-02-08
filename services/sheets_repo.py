@@ -4,6 +4,7 @@ from typing import Any
 from uuid import uuid4
 
 import streamlit as st
+from googleapiclient.errors import HttpError
 
 from config import get_app_config
 from services.google_clients import get_sheets_client
@@ -18,6 +19,29 @@ DEFAULT_DOWNLOAD_CONSENT = "pixelated"
 class SheetsRepositoryError(RuntimeError):
     """Fehler beim Zugriff auf Google Sheets."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def _translate_http_error(exc: HttpError) -> SheetsRepositoryError:
+    status = getattr(exc.resp, "status", None)
+    if status == 403:
+        return SheetsRepositoryError(
+            "Kein Zugriff auf das Stammdaten-Sheet (403). Bitte den Service-Account "
+            "für die Tabelle 'gcp.stammdaten_sheet_id' berechtigen. / "
+            "Access denied to the master-data sheet (403). Please grant the service "
+            "account access to the sheet configured in 'gcp.stammdaten_sheet_id'.",
+            status_code=status,
+        )
+
+    return SheetsRepositoryError(
+        "Google-Sheets-Anfrage fehlgeschlagen. Bitte Konfiguration und Berechtigungen "
+        "prüfen. / Google Sheets request failed. Please verify configuration and "
+        "permissions.",
+        status_code=status,
+    )
+
 
 def _sheet_id() -> str:
     app_config = get_app_config()
@@ -30,44 +54,53 @@ def _sheet_id() -> str:
 
 def _values_get(range_name: str) -> list[list[str]]:
     service = get_sheets_client()
-    response = (
-        service.spreadsheets()
-        .values()
-        .get(spreadsheetId=_sheet_id(), range=range_name)
-        .execute()
-    )
+    try:
+        response = (
+            service.spreadsheets()
+            .values()
+            .get(spreadsheetId=_sheet_id(), range=range_name)
+            .execute()
+        )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
     return response.get("values", [])
 
 
 def _values_update(range_name: str, values: list[list[str]]) -> None:
     service = get_sheets_client()
-    (
-        service.spreadsheets()
-        .values()
-        .update(
-            spreadsheetId=_sheet_id(),
-            range=range_name,
-            valueInputOption="RAW",
-            body={"values": values},
+    try:
+        (
+            service.spreadsheets()
+            .values()
+            .update(
+                spreadsheetId=_sheet_id(),
+                range=range_name,
+                valueInputOption="RAW",
+                body={"values": values},
+            )
+            .execute()
         )
-        .execute()
-    )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
 
 
 def _values_append(range_name: str, values: list[list[str]]) -> None:
     service = get_sheets_client()
-    (
-        service.spreadsheets()
-        .values()
-        .append(
-            spreadsheetId=_sheet_id(),
-            range=range_name,
-            valueInputOption="RAW",
-            insertDataOption="INSERT_ROWS",
-            body={"values": values},
+    try:
+        (
+            service.spreadsheets()
+            .values()
+            .append(
+                spreadsheetId=_sheet_id(),
+                range=range_name,
+                valueInputOption="RAW",
+                insertDataOption="INSERT_ROWS",
+                body={"values": values},
+            )
+            .execute()
         )
-        .execute()
-    )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
 
 
 def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:

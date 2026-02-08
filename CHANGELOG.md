@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- `services/google_clients.py` als Service-Account-Client-Factory überarbeitet: Drive-, Sheets- und optional Calendar-Client werden nun direkt aus `st.secrets["gcp_service_account"]` erzeugt und mit `@st.cache_resource` stabil über Streamlit-Reruns gecacht.
 - Zentrale Secrets-Validierung erweitert: Im Google-Modus werden jetzt `gcp.drive_photos_root_folder_id`, `gcp.drive_contracts_folder_id` und `gcp.stammdaten_sheet_id` als Pflicht-Keys geprüft; `gcp.calendar_id` sowie `app.admin_emails`/`auth.admin_emails` bleiben optional (mit Formatprüfung).
 - README-Secrets-Vorlage auf die neue GCP-Key-Struktur aktualisiert (inkl. Drive-Ordner-IDs und Stammdaten-Sheet-ID, ohne echte Werte).
 

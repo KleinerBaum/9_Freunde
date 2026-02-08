@@ -35,7 +35,7 @@ class CalendarAgent:
                 scopes=scopes,
             )
             self.service = build("calendar", "v3", credentials=credentials)
-            self.calendar_id = app_config.google.calendar_id
+            self.calendar_id = app_config.google.calendar_id or "primary"
         else:
             self.service = None
             self.calendar_id = "local-calendar"

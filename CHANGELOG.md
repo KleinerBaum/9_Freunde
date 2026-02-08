@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Changed
+- Zentrale Secrets-Validierung erweitert: Im Google-Modus werden jetzt `gcp.drive_photos_root_folder_id`, `gcp.drive_contracts_folder_id` und `gcp.stammdaten_sheet_id` als Pflicht-Keys geprüft; `gcp.calendar_id` sowie `app.admin_emails`/`auth.admin_emails` bleiben optional (mit Formatprüfung).
+- README-Secrets-Vorlage auf die neue GCP-Key-Struktur aktualisiert (inkl. Drive-Ordner-IDs und Stammdaten-Sheet-ID, ohne echte Werte).
+
+### Changed
 - Prototyp-Betrieb auf lokale Speicherung umgestellt: neuer `storage.mode` (`local`/`google`) mit Default `local`, lokale Datenablage für Stammdaten, Kalender-Events sowie Dokumente/Fotos unter `./data`.
 - `StammdatenManager`, `DriveAgent` und `CalendarAgent` unterstützen jetzt einen lokalen Backend-Modus ohne Google/Firebase-Setup; Google-Integrationen bleiben optional per `storage.mode = "google"` erhalten.
 - `app.py` und `README.md` um Hinweise für den lokalen Prototyp-Modus ergänzt (einschließlich minimaler `secrets.toml`-Konfiguration).

@@ -114,8 +114,10 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - **Lokal (Entwicklung):** Speichern Sie die JSON-Datei z. B. als `service_account.json` im Projekt (nicht einchecken in Git!). Legen Sie im `.streamlit/secrets.toml` eine Referenz oder die Inhalte ab.
    - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Achten Sie darauf, multiline-Werte (insb. `private_key`) korrekt im TOML zu escapen (Zeilenumbrüche als `\\n` oder `"""` Syntax nutzen).
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
-   - `photos_folder_id`: die ID des in Schritt 4 erstellten Drive-Hauptordners für Fotos/Dokumente.
-   - `calendar_id`: die Kalender-ID aus Schritt 4 für den Google Kalender der Einrichtung (z. B. die Kalender-E-Mail-Adresse oder die aus URL kopierte ID).
+   - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos.
+   - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente.
+   - `stammdaten_sheet_id`: die ID des Google Sheets für Stammdaten.
+   - `calendar_id` (optional): die Kalender-ID für den Google Kalender der Einrichtung.
 
 ### API-Inventur (Stand: aktuell im Code)
 
@@ -176,7 +178,7 @@ Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
 2. **Ziel-Drive-Ordner freigeben (Editor)**  
    In Google Drive den Zielordner öffnen → **Freigeben** → Service-Account-E-Mail eintragen → Rolle **Editor** (`Bearbeiter`) setzen → speichern.
 3. **Ordner-ID übernehmen**  
-   Die Ordner-ID aus der Drive-URL in `gcp.photos_folder_id` eintragen.
+   Die Ordner-ID aus der Drive-URL in `gcp.drive_photos_root_folder_id` eintragen.
 4. **Kalender mit Service-Account teilen**  
    In Google Kalender den Einrichtungs-Kalender öffnen → **Einstellungen und Freigabe** → **Für bestimmte Personen freigeben** → Service-Account-E-Mail hinzufügen → Berechtigung mindestens **Änderungen an Terminen vornehmen** (`Make changes to events`) setzen.
 5. **Kalender-ID übernehmen**  
@@ -286,12 +288,20 @@ universe_domain = "googleapis.com"
 
 [gcp]
 calendar_id = "kita-kalender@group.calendar.google.com"
-photos_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+drive_photos_root_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+drive_contracts_folder_id = "1ZaYxWvUtSrQpOnMlKjIhGfEdCb"
+stammdaten_sheet_id = "1SheetIdForStammdaten"
 
 [gcp_optional_apis]
 sheets_spreadsheet_id = "<optional>"
 docs_document_id = "<optional>"
 forms_form_id = "<optional>"
+
+[app]
+admin_emails = ["leitung@example.org"]  # optional, alternativ [auth].admin_emails
+
+[auth]
+admin_emails = ["leitung@example.org"]  # optional, alternativ [app].admin_emails
 
 [openai]
 api_key = "sk-XXXX...IhrOpenAIKey...XXXX"

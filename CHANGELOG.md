@@ -9,6 +9,7 @@
 - Admin-Navigation logisch gebündelt: Sidebar-Menüpunkte **„Stammdaten“, „Stammdaten Sheet“, „Infos verwalten“, „Medikationen“** wurden unter **„Stammdaten & Infos“** zusammengeführt; **„Dokumente“** und **„Verträge“** wurden unter **„Dokumente & Verträge“** zusammengeführt. Die Unterbereiche sind als horizontaler Umschalter (`Bereich / Section`) verfügbar.
 
 - `DocumentAgent` erzeugt neue DOCX-Vorlagen mit eingebettetem Logo (`images/logo.png`), aktuellem Erstellungsdatum und vorausgefüllten Kinddaten; die Abrechnung unterstützt einen frei wählbaren Zeitraum inklusive validierter Datumsgrenzen.
+- Admin-Bereich **Fotos → Foto-Status verwalten / Manage photo status** zeigt pro Datei jetzt eine eingebettete DE/EN-Bildvorschau in einer aufklappbaren Detailansicht; fehlerhafte Downloads werden pro Foto abgefangen, damit die Statuspflege der übrigen Einträge weiter funktioniert.
 
 
 ### Changed

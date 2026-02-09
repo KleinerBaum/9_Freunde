@@ -1397,51 +1397,78 @@ else:
                 )
                 if child_photos:
                     for child_photo in child_photos:
+                        file_id = str(child_photo.get("id", ""))
+                        file_name = str(child_photo.get("name", "photo"))
                         meta = (
-                            stammdaten_manager.get_photo_meta_by_file_id(
-                                str(child_photo.get("id", ""))
-                            )
-                            or {}
+                            stammdaten_manager.get_photo_meta_by_file_id(file_id) or {}
                         )
                         current_status = _normalize_photo_status(meta.get("status"))
-                        col_file, col_status = st.columns([2, 2])
-                        with col_file:
-                            st.write(f"**{child_photo.get('name', 'photo')}**")
-                            st.caption(f"ID: {child_photo.get('id', '-')}")
-                        with col_status:
-                            selected_status = st.selectbox(
-                                "Status / Status",
-                                options=list(PHOTO_STATUS_OPTIONS),
-                                index=list(PHOTO_STATUS_OPTIONS).index(current_status),
-                                key=f"admin_photo_status_{child_photo.get('id', '')}",
-                            )
-                        if selected_status != current_status:
+
+                        with st.expander(
+                            f"{file_name} · Status verwalten / Manage status",
+                            expanded=False,
+                        ):
+                            col_file, col_status = st.columns([2, 2])
+                            with col_file:
+                                st.write(f"**{file_name}**")
+                                st.caption(f"ID: {file_id or '-'}")
+                            with col_status:
+                                selected_status = st.selectbox(
+                                    "Status / Status",
+                                    options=list(PHOTO_STATUS_OPTIONS),
+                                    index=list(PHOTO_STATUS_OPTIONS).index(
+                                        current_status
+                                    ),
+                                    key=f"admin_photo_status_{file_id}",
+                                )
+
                             try:
-                                stammdaten_manager.upsert_photo_meta(
-                                    str(child_photo.get("id", "")),
-                                    {
-                                        "child_id": child_id,
-                                        "status": selected_status,
-                                        "uploaded_by": str(meta.get("uploaded_by", ""))
-                                        or user_email,
-                                        "uploaded_at": str(meta.get("uploaded_at", ""))
-                                        or pd.Timestamp.now(
-                                            tz="Europe/Berlin"
-                                        ).isoformat(),
-                                        "album": str(meta.get("album", "")),
-                                        "retention_until": str(
-                                            meta.get("retention_until", "")
-                                        ),
-                                    },
+                                image_bytes = drive_agent.download_file(file_id)
+                                st.image(
+                                    image_bytes,
+                                    caption=(
+                                        f"Vorschau: {file_name} / Preview: {file_name}"
+                                    ),
+                                    width=320,
                                 )
-                                st.success(
-                                    "Foto-Status aktualisiert. / Photo status updated."
-                                )
-                                _trigger_rerun()
                             except Exception as exc:
-                                st.error(
-                                    f"Foto-Status konnte nicht gespeichert werden. / Could not save photo status: {exc}"
+                                st.warning(
+                                    "Bildvorschau konnte nicht geladen werden. / "
+                                    f"Could not load image preview: {exc}"
                                 )
+
+                            if selected_status != current_status:
+                                try:
+                                    stammdaten_manager.upsert_photo_meta(
+                                        file_id,
+                                        {
+                                            "child_id": child_id,
+                                            "status": selected_status,
+                                            "uploaded_by": str(
+                                                meta.get("uploaded_by", "")
+                                            )
+                                            or user_email,
+                                            "uploaded_at": str(
+                                                meta.get("uploaded_at", "")
+                                            )
+                                            or pd.Timestamp.now(
+                                                tz="Europe/Berlin"
+                                            ).isoformat(),
+                                            "album": str(meta.get("album", "")),
+                                            "retention_until": str(
+                                                meta.get("retention_until", "")
+                                            ),
+                                        },
+                                    )
+                                    st.success(
+                                        "Foto-Status aktualisiert. / Photo status updated."
+                                    )
+                                    _trigger_rerun()
+                                except Exception as exc:
+                                    st.error(
+                                        "Foto-Status konnte nicht gespeichert werden. / "
+                                        f"Could not save photo status: {exc}"
+                                    )
                 else:
                     st.caption(
                         "Keine Fotos für dieses Kind gefunden. / No photos found for this child."

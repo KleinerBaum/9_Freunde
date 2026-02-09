@@ -294,6 +294,7 @@ Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE
 
 - Beim Upload wird pro Foto ein Metadatensatz im Tab `photo_meta` angelegt (`status=draft`).
 - Admins können den Status je Foto in der UI auf `draft`, `published` oder `archived` setzen.
+- In der Admin-Statusliste wird pro Foto zusätzlich eine DE/EN-Vorschau geladen; Ladefehler einzelner Dateien blockieren die restliche Liste nicht.
 - Eltern sehen ausschließlich Fotos mit Status `published`.
 - Bestehende Fotos ohne Metadaten bleiben kompatibel und werden defensiv als `draft` behandelt.
 - Download-Consent (`pixelated`/`unpixelated`) und Verpixelungslogik beim Download bleiben unverändert.

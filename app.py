@@ -349,14 +349,10 @@ else:
         menu = st.sidebar.radio(
             "Navigationsmenü",
             (
-                "Stammdaten",
-                "Stammdaten Sheet",
-                "Infos verwalten",
-                "Dokumente",
-                "Verträge",
+                "Stammdaten & Infos",
+                "Dokumente & Verträge",
                 "Fotos",
                 "Kalender",
-                "Medikationen",
             ),
             index=0,
         )
@@ -376,8 +372,29 @@ else:
     # Content area:
     st.header(menu)
     if user_role == "admin":
+        admin_view = menu
+        if menu == "Stammdaten & Infos":
+            admin_view = st.radio(
+                "Bereich / Section",
+                (
+                    "Stammdaten",
+                    "Stammdaten Sheet",
+                    "Infos verwalten",
+                    "Medikationen",
+                ),
+                horizontal=True,
+                key="admin_master_data_section",
+            )
+        elif menu == "Dokumente & Verträge":
+            admin_view = st.radio(
+                "Bereich / Section",
+                ("Dokumente", "Verträge"),
+                horizontal=True,
+                key="admin_documents_section",
+            )
+
         # ---- Admin: Stammdaten ----
-        if menu == "Stammdaten":
+        if admin_view == "Stammdaten":
             st.subheader("Kinder-Stammdaten verwalten")
             children: list[dict[str, str]] = []
             children_load_error = False
@@ -837,7 +854,7 @@ else:
                 )
 
         # ---- Admin: Stammdaten Sheet ----
-        elif menu == "Stammdaten Sheet":
+        elif admin_view == "Stammdaten Sheet":
             st.subheader(
                 "Stammdaten aus Google Sheets (read-only) / Master data from Google Sheets (read-only)"
             )
@@ -946,7 +963,7 @@ else:
                             st.dataframe(dataframe, use_container_width=True)
 
         # ---- Admin: Infos verwalten ----
-        elif menu == "Infos verwalten":
+        elif admin_view == "Infos verwalten":
             st.subheader("Infos verwalten / Manage info pages")
             language = st.radio(
                 "Sprache / Language",
@@ -1068,7 +1085,7 @@ else:
                     st.caption("Kein Inhalt vorhanden. / No content available.")
 
         # ---- Admin: Dokumente ----
-        elif menu == "Dokumente":
+        elif admin_view == "Dokumente":
             st.subheader("Dokumente generieren und verwalten")
             children = stammdaten_manager.get_children()
             if not children:
@@ -1233,7 +1250,7 @@ else:
                         st.write("(Keine gespeicherten Dokumente vorhanden.)")
 
         # ---- Admin: Verträge ----
-        elif menu == "Verträge":
+        elif admin_view == "Verträge":
             st.subheader("Vertragsablage / Contract storage")
             if app_config.storage_mode != "google" or app_config.google is None:
                 st.info(
@@ -1299,7 +1316,7 @@ else:
                     st.info(str(exc))
 
         # ---- Admin: Fotos ----
-        elif menu == "Fotos":
+        elif admin_view == "Fotos":
             st.subheader("Kinder-Fotos hochladen und verwalten / Upload child photos")
             st.info(
                 "MVP ohne Gesichtserkennung: Upload erfolgt in den kindspezifischen Foto-Ordner. / "
@@ -1442,7 +1459,7 @@ else:
                     )
 
         # ---- Admin: Kalender ----
-        elif menu == "Medikationen":
+        elif admin_view == "Medikationen":
             st.subheader("Medikamentengabe-Log / Medication log")
             children = stammdaten_manager.get_children()
             if not children:
@@ -1531,7 +1548,7 @@ else:
                 else:
                     st.caption("Noch keine Einträge vorhanden. / No entries yet.")
 
-        elif menu == "Kalender":
+        elif admin_view == "Kalender":
             st.subheader("Neuer Termin / New event")
             title = st.text_input("Titel / Title")
             event_date = st.date_input("Datum / Date")

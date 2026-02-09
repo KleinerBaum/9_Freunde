@@ -6,6 +6,8 @@
 - Admin-Bereich **Dokumente** um zwei neue Stammdaten-basierte Vorlagen erweitert: **Betreuungsvertrag / Childcare contract** und **Lebensmittelpauschale-Abrechnung / Food allowance invoice** mit Download-Option.
 
 ### Changed
+- Admin-Navigation logisch gebündelt: Sidebar-Menüpunkte **„Stammdaten“, „Stammdaten Sheet“, „Infos verwalten“, „Medikationen“** wurden unter **„Stammdaten & Infos“** zusammengeführt; **„Dokumente“** und **„Verträge“** wurden unter **„Dokumente & Verträge“** zusammengeführt. Die Unterbereiche sind als horizontaler Umschalter (`Bereich / Section`) verfügbar.
+
 - `DocumentAgent` erzeugt neue DOCX-Vorlagen mit eingebettetem Logo (`images/logo.png`), aktuellem Erstellungsdatum und vorausgefüllten Kinddaten; die Abrechnung unterstützt einen frei wählbaren Zeitraum inklusive validierter Datumsgrenzen.
 
 

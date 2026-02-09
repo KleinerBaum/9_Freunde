@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- Admin-Ansicht **"Stammdaten Sheet"** um Export/Backup-Funktionen erweitert: zentrale Tabs (`children`, `parents`) sowie optionale Tabs (`attendance`, `daily_logs`, `messages`) können jetzt direkt als **CSV** und **JSON** heruntergeladen werden.
+
+### Changed
+- Export-Handling für Google-Sheets-Tabellen robust gemacht: leere Tabs oder fehlende Header führen zu klaren DE/EN-Hinweisen statt Absturz; CSV-Dateien nutzen konsistente Spaltenreihenfolge anhand der Header-Zeile.
+
 ### Changed
 - Drive-Konsolidierung umgesetzt: `storage.py` (`DriveAgent`) nutzt im Google-Modus jetzt vollständig `services/drive_service.py` als primäre Schicht für `upload/list/download/create_folder`; dadurch greifen konsistente 403/404-Fehlermeldungen und Shared-Drive-Optionen (`supportsAllDrives`, `includeItemsFromAllDrives`) app-weit.
 - Vertragsablage und Google-Connection-Check in `app.py` auf die vereinheitlichte Drive-Schicht umgestellt (keine direkte Parallel-Abstraktion mehr für Upload/Listing in Google-Mode).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import json
 from pathlib import Path
 
 from datetime import date
@@ -231,6 +232,33 @@ def _page_body(page: object, language: str) -> str:
     if language == "en":
         return body_en or body_de
     return body_de or body_en
+
+
+def _normalize_sheet_table(rows: list[list[str]]) -> tuple[list[str], list[list[str]]]:
+    """Normalisiert Google-Sheet-Rohdaten in Header + Datenzeilen."""
+    if not rows or not rows[0]:
+        return [], []
+
+    header = [str(column).strip() for column in rows[0]]
+    data_rows = rows[1:]
+    normalized_rows: list[list[str]] = []
+    for row in data_rows:
+        padded_row = row + [""] * max(0, len(header) - len(row))
+        normalized_rows.append(padded_row[: len(header)])
+    return header, normalized_rows
+
+
+def _build_export_payload(rows: list[list[str]]) -> tuple[bytes, bytes] | None:
+    """Erstellt CSV- und JSON-Exportdaten aus Sheet-Zeilen."""
+    header, normalized_rows = _normalize_sheet_table(rows)
+    if not header:
+        return None
+
+    dataframe = pd.DataFrame(normalized_rows, columns=header)
+    csv_bytes = dataframe.to_csv(index=False).encode("utf-8")
+    records = [dict(zip(header, row, strict=False)) for row in normalized_rows]
+    json_bytes = json.dumps(records, ensure_ascii=False, indent=2).encode("utf-8")
+    return csv_bytes, json_bytes
 
 
 # Validate required secrets early and fail with clear UI guidance
@@ -822,6 +850,65 @@ else:
                     "Google Sheets view is only available in Google mode."
                 )
             else:
+                export_tabs: list[tuple[str, str]] = [
+                    ("children", app_config.google.children_tab),
+                    ("parents", app_config.google.parents_tab),
+                    ("attendance", "attendance"),
+                    ("daily_logs", "daily_logs"),
+                    ("messages", "messages"),
+                ]
+                st.markdown("**Export / Backup (CSV + JSON)**")
+                for export_key, tab_name in export_tabs:
+                    tab_range = f"{tab_name}!A:ZZ"
+                    with st.container(border=True):
+                        st.write(f"**{export_key}** · Tab: `{tab_name}`")
+                        try:
+                            export_rows = read_sheet_values(
+                                sheet_id=app_config.google.stammdaten_sheet_id,
+                                range_a1=tab_range,
+                            )
+                        except SheetsServiceError as exc:
+                            st.warning(
+                                "Tab konnte nicht gelesen werden. Bitte Konfiguration prüfen. / "
+                                "Could not read tab. Please verify configuration."
+                            )
+                            st.caption(str(exc))
+                            continue
+                        except Exception as exc:
+                            st.warning(
+                                "Tab konnte nicht gelesen werden (Berechtigung oder Tabname prüfen). / "
+                                "Could not read tab (check permissions or tab name)."
+                            )
+                            st.caption(str(exc))
+                            continue
+
+                        payload = _build_export_payload(export_rows)
+                        if payload is None:
+                            st.info(
+                                "Tab ist leer oder enthält keine Header-Zeile. / "
+                                "Tab is empty or does not contain a header row."
+                            )
+                            continue
+
+                        csv_bytes, json_bytes = payload
+                        csv_col, json_col = st.columns(2)
+                        with csv_col:
+                            st.download_button(
+                                label="CSV herunterladen / Download CSV",
+                                data=csv_bytes,
+                                file_name=f"{export_key}.csv",
+                                mime="text/csv",
+                                key=f"download_export_csv_{export_key}",
+                            )
+                        with json_col:
+                            st.download_button(
+                                label="JSON herunterladen / Download JSON",
+                                data=json_bytes,
+                                file_name=f"{export_key}.json",
+                                mime="application/json",
+                                key=f"download_export_json_{export_key}",
+                            )
+
                 tab_name = app_config.google.stammdaten_sheet_tab
                 range_a1 = f"{tab_name}!A1:Z500"
                 try:
@@ -842,28 +929,22 @@ else:
                     )
                     st.info(str(exc))
                 else:
+                    header, normalized_rows = _normalize_sheet_table(rows)
                     if not rows:
                         st.info(
                             "Der ausgewählte Bereich ist leer. / The selected range is empty."
                         )
-                    elif not rows[0]:
+                    elif not header:
                         st.info(
                             "Header-Zeile fehlt oder ist leer. / Header row is missing or empty."
                         )
                     else:
-                        header = [str(column).strip() for column in rows[0]]
-                        data_rows = rows[1:]
-                        if not data_rows:
+                        if not normalized_rows:
                             st.info(
                                 "Es wurden nur Header gefunden, aber keine Datenzeilen. / "
                                 "Only headers were found, but no data rows."
                             )
                         else:
-                            normalized_rows: list[list[str]] = []
-                            for row in data_rows:
-                                padded_row = row + [""] * max(0, len(header) - len(row))
-                                normalized_rows.append(padded_row[: len(header)])
-
                             dataframe = pd.DataFrame(normalized_rows, columns=header)
                             st.dataframe(dataframe, use_container_width=True)
 

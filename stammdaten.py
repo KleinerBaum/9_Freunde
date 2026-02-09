@@ -84,7 +84,11 @@ class StammdatenManager:
             print("Fehler beim Anlegen des Ordners:", exc)
 
         if self.storage_mode == "google":
-            child_data: dict[str, Any] = {"name": name, "parent_email": parent_email}
+            child_data: dict[str, Any] = {
+                "name": name,
+                "parent_email": parent_email,
+                "status": "active",
+            }
             if folder_id:
                 child_data["folder_id"] = folder_id
                 child_data["photo_folder_id"] = folder_id
@@ -96,6 +100,7 @@ class StammdatenManager:
             "name": name,
             "parent_email": parent_email,
             "download_consent": DEFAULT_DOWNLOAD_CONSENT,
+            "status": "active",
         }
         if folder_id:
             child_data["folder_id"] = folder_id

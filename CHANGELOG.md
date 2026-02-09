@@ -6,6 +6,8 @@
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.
 
 ### Changed
+- Stammdaten-Schema für Google Sheets erweitert: `children` ergänzt um `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status` sowie `parents` um `phone2`, `address`, `preferred_language`, `emergency_contact_name`, `emergency_contact_phone`, `notifications_opt_in`; fehlende Header werden automatisch ergänzt.
+- Admin-UI „Stammdaten“ erweitert: Neue Kinderfelder sind beim Anlegen/Bearbeiten jetzt direkt pflegbar; Elternansicht „Mein Kind“ zeigt parent-sichtbare Zusatzfelder (z. B. Gruppe, Allergien, Hinweise) an.
 - Google-Sheets-Konfiguration erweitert: `gcp.children_tab`, `gcp.parents_tab` und `gcp.consents_tab` sind jetzt optional konfigurierbar (Defaults: `children`, `parents`, `consents`) und werden vom Sheets-Repository statt harter Konstanten verwendet.
 - Start-Validierung für konfigurierbare Sheet-Tabnamen ergänzt: leere/ungültige Werte werden mit klaren DE/EN-Fehlermeldungen abgefangen (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen).
 - Google-Sheets-Healthcheck nutzt jetzt den konfigurierten Tab `gcp.stammdaten_sheet_tab` (statt hartcodiert `children`) und quotet den A1-Range robust für Tabs mit Leerzeichen/Sonderzeichen, z. B. `'Stammdaten Eltern'!A1:A1`.

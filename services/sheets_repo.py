@@ -11,6 +11,35 @@ from services.google_clients import get_sheets_client
 
 DEFAULT_CACHE_TTL_SECONDS = 15
 DEFAULT_DOWNLOAD_CONSENT = "pixelated"
+CHILDREN_REQUIRED_COLUMNS = [
+    "child_id",
+    "name",
+    "parent_email",
+    "folder_id",
+    "photo_folder_id",
+    "download_consent",
+    "birthdate",
+    "start_date",
+    "group",
+    "primary_caregiver",
+    "allergies",
+    "notes_parent_visible",
+    "notes_internal",
+    "pickup_password",
+    "status",
+]
+PARENTS_REQUIRED_COLUMNS = [
+    "parent_id",
+    "email",
+    "name",
+    "phone",
+    "phone2",
+    "address",
+    "preferred_language",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+    "notifications_opt_in",
+]
 
 
 class SheetsRepositoryError(RuntimeError):
@@ -126,7 +155,7 @@ def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
     if not rows:
         header = ["child_id", "name", "parent_email", "folder_id", "photo_folder_id"]
         _values_update(f"{_children_tab()}!A1", [header])
-        return header
+        rows = [[*header]]
 
     header = [str(col).strip() for col in rows[0]]
     changed = False
@@ -137,6 +166,26 @@ def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
 
     if changed:
         _values_update(f"{_children_tab()}!A1:ZZ1", [header])
+
+    return header
+
+
+def _ensure_parents_header_columns(required_columns: list[str]) -> list[str]:
+    rows = _values_get(f"{_parents_tab()}!A:ZZ")
+    if not rows:
+        header = ["parent_id", "email", "name", "phone"]
+        _values_update(f"{_parents_tab()}!A1", [header])
+        rows = [[*header]]
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{_parents_tab()}!A1:ZZ1", [header])
 
     return header
 
@@ -189,9 +238,7 @@ def _get_row_index_by_id(tab: str, id_field: str, value: str) -> tuple[int, list
 
 @st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
 def get_children() -> list[dict[str, str]]:
-    _ensure_children_header_columns(
-        ["folder_id", "photo_folder_id", "download_consent"]
-    )
+    _ensure_children_header_columns(CHILDREN_REQUIRED_COLUMNS)
     rows = _values_get(f"{_children_tab()}!A:ZZ")
     children = _to_records(rows)
     for child in children:
@@ -224,14 +271,13 @@ def add_child(child_dict: dict[str, Any]) -> str:
     payload = {
         **child_dict,
         "child_id": child_id,
+        "status": str(child_dict.get("status") or "active").strip() or "active",
         "download_consent": _normalize_download_consent(
             str(child_dict.get("download_consent", ""))
         ),
     }
 
-    header = _ensure_children_header_columns(
-        ["folder_id", "photo_folder_id", "download_consent"]
-    )
+    header = _ensure_children_header_columns(CHILDREN_REQUIRED_COLUMNS)
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
     _values_append(f"{_children_tab()}!A:ZZ", [row_values])
@@ -243,9 +289,7 @@ def add_child(child_dict: dict[str, Any]) -> str:
 
 
 def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
-    _ensure_children_header_columns(
-        ["folder_id", "photo_folder_id", "download_consent"]
-    )
+    _ensure_children_header_columns(CHILDREN_REQUIRED_COLUMNS)
     row_index, header = _get_row_index_by_id(_children_tab(), "child_id", child_id)
 
     existing_rows = _values_get(f"{_children_tab()}!A{row_index}:ZZ{row_index}")
@@ -261,6 +305,9 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
     current_payload["download_consent"] = _normalize_download_consent(
         current_payload.get("download_consent")
     )
+    current_payload["status"] = str(current_payload.get("status") or "active").strip()
+    if not current_payload["status"]:
+        current_payload["status"] = "active"
 
     row_values = [current_payload.get(column, "") for column in header]
     _values_update(f"{_children_tab()}!A{row_index}:ZZ{row_index}", [row_values])
@@ -272,20 +319,23 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
 
 @st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
 def get_parents() -> list[dict[str, str]]:
+    _ensure_parents_header_columns(PARENTS_REQUIRED_COLUMNS)
     rows = _values_get(f"{_parents_tab()}!A:ZZ")
     return _to_records(rows)
 
 
 def add_parent(parent_dict: dict[str, Any]) -> str:
     parent_id = str(parent_dict.get("parent_id") or uuid4().hex)
-    payload = {**parent_dict, "parent_id": parent_id}
+    payload = {
+        **parent_dict,
+        "parent_id": parent_id,
+        "notifications_opt_in": str(
+            parent_dict.get("notifications_opt_in", "false")
+        ).strip()
+        or "false",
+    }
 
-    rows = _values_get(f"{_parents_tab()}!A:ZZ")
-    if not rows:
-        header = ["parent_id", "email", "name", "phone"]
-        _values_update(f"{_parents_tab()}!A1", [header])
-    else:
-        header = [str(col).strip() for col in rows[0]]
+    header = _ensure_parents_header_columns(PARENTS_REQUIRED_COLUMNS)
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
     _values_append(f"{_parents_tab()}!A:ZZ", [row_values])
@@ -295,6 +345,7 @@ def add_parent(parent_dict: dict[str, Any]) -> str:
 
 
 def update_parent(parent_id: str, patch_dict: dict[str, Any]) -> None:
+    _ensure_parents_header_columns(PARENTS_REQUIRED_COLUMNS)
     row_index, header = _get_row_index_by_id(_parents_tab(), "parent_id", parent_id)
 
     existing_rows = _values_get(f"{_parents_tab()}!A{row_index}:ZZ{row_index}")

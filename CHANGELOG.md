@@ -6,6 +6,7 @@
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.
 
 ### Changed
+- Google-Sheets-Healthcheck nutzt jetzt den konfigurierten Tab `gcp.stammdaten_sheet_tab` (statt hartcodiert `children`) und quotet den A1-Range robust für Tabs mit Leerzeichen/Sonderzeichen, z. B. `'Stammdaten Eltern'!A1:A1`.
 - Fehlerdiagnose für den Google-Sheets-Check verbessert (DE/EN): `403` weist jetzt explizit auf fehlende Sheet-Freigabe/Berechtigung für den Service-Account hin, `404` auf eine wahrscheinlich falsche `stammdaten_sheet_id`, andere Fehler werden als generischer Sheets-API-Fehler ausgewiesen.
 - Google-Connection-Check nutzt für den Sheets-Aufruf einen kurzen Retry mit exponentiellem Backoff (bis zu 3 Versuche), um transiente API-Fehler robuster abzufangen.
 - Google-Konfiguration nutzt für Stammdaten jetzt standardmäßig die Tabelle **Stammdaten_Eltern_2026** (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`), wenn `gcp.stammdaten_sheet_id` nicht gesetzt ist; das Feld bleibt als Override verfügbar.

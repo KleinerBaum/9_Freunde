@@ -42,6 +42,20 @@ PARENTS_REQUIRED_COLUMNS = [
 ]
 
 
+PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS = [
+    "pickup_id",
+    "child_id",
+    "name",
+    "relationship",
+    "phone",
+    "valid_from",
+    "valid_to",
+    "active",
+    "created_at",
+    "created_by",
+]
+
+
 class SheetsRepositoryError(RuntimeError):
     """Fehler beim Zugriff auf Google Sheets."""
 
@@ -97,6 +111,10 @@ def _parents_tab() -> str:
 
 def _consents_tab() -> str:
     return _google_config().consents_tab
+
+
+def _pickup_authorizations_tab() -> str:
+    return _google_config().pickup_authorizations_tab
 
 
 def _values_get(range_name: str) -> list[list[str]]:
@@ -186,6 +204,28 @@ def _ensure_parents_header_columns(required_columns: list[str]) -> list[str]:
 
     if changed:
         _values_update(f"{_parents_tab()}!A1:ZZ1", [header])
+
+    return header
+
+
+def _ensure_pickup_authorizations_header_columns(
+    required_columns: list[str],
+) -> list[str]:
+    rows = _values_get(f"{_pickup_authorizations_tab()}!A:ZZ")
+    if not rows:
+        header = ["pickup_id", "child_id", "name", "relationship", "phone"]
+        _values_update(f"{_pickup_authorizations_tab()}!A1", [header])
+        rows = [[*header]]
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{_pickup_authorizations_tab()}!A1:ZZ1", [header])
 
     return header
 
@@ -363,3 +403,75 @@ def update_parent(parent_id: str, patch_dict: dict[str, Any]) -> None:
     _values_update(f"{_parents_tab()}!A{row_index}:ZZ{row_index}", [row_values])
 
     get_parents.clear()
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_pickup_authorizations() -> list[dict[str, str]]:
+    _ensure_pickup_authorizations_header_columns(PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS)
+    rows = _values_get(f"{_pickup_authorizations_tab()}!A:ZZ")
+    return _to_records(rows)
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_pickup_authorizations_by_child_id(child_id: str) -> list[dict[str, str]]:
+    normalized_child_id = child_id.strip()
+    records = [
+        authorization
+        for authorization in get_pickup_authorizations()
+        if authorization.get("child_id", "").strip() == normalized_child_id
+    ]
+    return sorted(records, key=lambda item: item.get("name", ""))
+
+
+def add_pickup_authorization(pickup_dict: dict[str, Any]) -> str:
+    pickup_id = str(pickup_dict.get("pickup_id") or uuid4().hex)
+    payload = {
+        **pickup_dict,
+        "pickup_id": pickup_id,
+        "active": str(pickup_dict.get("active", "true")).strip().lower() or "true",
+    }
+
+    header = _ensure_pickup_authorizations_header_columns(
+        PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS
+    )
+    row_values = [str(payload.get(column, "")).strip() for column in header]
+    _values_append(f"{_pickup_authorizations_tab()}!A:ZZ", [row_values])
+
+    get_pickup_authorizations.clear()
+    get_pickup_authorizations_by_child_id.clear()
+    return pickup_id
+
+
+def update_pickup_authorization(pickup_id: str, patch_dict: dict[str, Any]) -> None:
+    _ensure_pickup_authorizations_header_columns(PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS)
+    row_index, header = _get_row_index_by_id(
+        _pickup_authorizations_tab(),
+        "pickup_id",
+        pickup_id,
+    )
+
+    existing_rows = _values_get(
+        f"{_pickup_authorizations_tab()}!A{row_index}:ZZ{row_index}"
+    )
+    existing_row = existing_rows[0] if existing_rows else []
+
+    current_payload = {
+        column: str(existing_row[index]).strip() if index < len(existing_row) else ""
+        for index, column in enumerate(header)
+    }
+    current_payload.update(
+        {key: str(value).strip() for key, value in patch_dict.items()}
+    )
+    if "active" in current_payload:
+        current_payload["active"] = (
+            str(current_payload.get("active", "true")).strip().lower() or "true"
+        )
+
+    row_values = [current_payload.get(column, "") for column in header]
+    _values_update(
+        f"{_pickup_authorizations_tab()}!A{row_index}:ZZ{row_index}",
+        [row_values],
+    )
+
+    get_pickup_authorizations.clear()
+    get_pickup_authorizations_by_child_id.clear()

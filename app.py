@@ -71,6 +71,14 @@ def _optional_date_to_iso(value: date | None) -> str:
     return value.isoformat()
 
 
+def _normalize_active_flag(value: str | bool | None) -> bool:
+    return str(value or "false").strip().lower() == "true"
+
+
+def _active_flag_to_string(value: bool) -> str:
+    return "true" if value else "false"
+
+
 @st.cache_data(show_spinner=False)
 def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     original_bytes = drive_agent.download_file(file_id)
@@ -565,6 +573,231 @@ else:
                         except Exception as exc:
                             st.error(f"Speichern fehlgeschlagen / Save failed: {exc}")
 
+            if children:
+                st.write("**Abholberechtigte / Pickup authorizations:**")
+                selected_pickup_child_name = st.selectbox(
+                    "Kind für Abholberechtigungen / Child for pickup authorizations",
+                    options=[child.get("name", "") for child in children],
+                    key="pickup_child_select",
+                )
+                pickup_child = next(
+                    child
+                    for child in children
+                    if child.get("name") == selected_pickup_child_name
+                )
+                pickup_child_id = str(pickup_child.get("id", "")).strip()
+                pickup_records = (
+                    stammdaten_manager.get_pickup_authorizations_by_child_id(
+                        pickup_child_id
+                    )
+                )
+
+                if pickup_records:
+                    for record in pickup_records:
+                        state_label = (
+                            "Aktiv / Active"
+                            if _normalize_active_flag(record.get("active"))
+                            else "Inaktiv / Inactive"
+                        )
+                        period_parts = []
+                        if record.get("valid_from"):
+                            period_parts.append(f"ab / from {record.get('valid_from')}")
+                        if record.get("valid_to"):
+                            period_parts.append(f"bis / until {record.get('valid_to')}")
+                        period_label = (
+                            f" ({', '.join(period_parts)})" if period_parts else ""
+                        )
+                        st.write(
+                            f"- **{record.get('name', '—')}** · "
+                            f"{record.get('relationship', '—')} · "
+                            f"{record.get('phone', '—')} · "
+                            f"{state_label}{period_label}"
+                        )
+                else:
+                    st.caption(
+                        "Keine Abholberechtigten hinterlegt. / No pickup authorizations yet."
+                    )
+
+                with st.form(key="pickup_add_form"):
+                    pickup_add_col_left, pickup_add_col_right = st.columns(2)
+                    with pickup_add_col_left:
+                        pickup_name = st.text_input(
+                            "Name / Name",
+                            key="pickup_add_name",
+                        )
+                        pickup_relationship = st.text_input(
+                            "Beziehung / Relationship",
+                            key="pickup_add_relationship",
+                        )
+                        pickup_phone = st.text_input(
+                            "Telefon / Phone",
+                            key="pickup_add_phone",
+                        )
+                    with pickup_add_col_right:
+                        pickup_valid_from = st.date_input(
+                            "Gültig von / Valid from",
+                            value=None,
+                            format="YYYY-MM-DD",
+                            key="pickup_add_valid_from",
+                        )
+                        pickup_valid_to = st.date_input(
+                            "Gültig bis / Valid to",
+                            value=None,
+                            format="YYYY-MM-DD",
+                            key="pickup_add_valid_to",
+                        )
+                        pickup_active = st.checkbox(
+                            "Aktiv / Active",
+                            value=True,
+                            key="pickup_add_active",
+                        )
+                    pickup_add_submitted = st.form_submit_button(
+                        "Abholberechtigte hinzufügen / Add pickup authorization"
+                    )
+                if pickup_add_submitted:
+                    if not pickup_name.strip():
+                        st.error("Bitte Name angeben. / Please provide a name.")
+                    else:
+                        try:
+                            stammdaten_manager.add_pickup_authorization(
+                                pickup_child_id,
+                                {
+                                    "name": pickup_name.strip(),
+                                    "relationship": pickup_relationship.strip(),
+                                    "phone": pickup_phone.strip(),
+                                    "valid_from": _optional_date_to_iso(
+                                        pickup_valid_from
+                                    ),
+                                    "valid_to": _optional_date_to_iso(pickup_valid_to),
+                                    "active": _active_flag_to_string(pickup_active),
+                                },
+                                created_by=user_email,
+                            )
+                            st.success(
+                                "Abholberechtigung angelegt. / Pickup authorization created."
+                            )
+                            _trigger_rerun()
+                        except Exception as exc:
+                            st.error(
+                                "Abholberechtigung konnte nicht gespeichert werden / "
+                                f"Could not save pickup authorization: {exc}"
+                            )
+
+                if pickup_records:
+                    selected_pickup_name = st.selectbox(
+                        "Abholberechtigte bearbeiten / Edit pickup authorization",
+                        options=[record.get("name", "") for record in pickup_records],
+                        key="pickup_edit_select",
+                    )
+                    selected_pickup_record = next(
+                        record
+                        for record in pickup_records
+                        if record.get("name") == selected_pickup_name
+                    )
+                    with st.form(key="pickup_edit_form"):
+                        pickup_edit_col_left, pickup_edit_col_right = st.columns(2)
+                        with pickup_edit_col_left:
+                            pickup_edit_name = st.text_input(
+                                "Name / Name",
+                                value=selected_pickup_record.get("name", ""),
+                                key="pickup_edit_name",
+                            )
+                            pickup_edit_relationship = st.text_input(
+                                "Beziehung / Relationship",
+                                value=selected_pickup_record.get("relationship", ""),
+                                key="pickup_edit_relationship",
+                            )
+                            pickup_edit_phone = st.text_input(
+                                "Telefon / Phone",
+                                value=selected_pickup_record.get("phone", ""),
+                                key="pickup_edit_phone",
+                            )
+                        with pickup_edit_col_right:
+                            pickup_edit_valid_from = st.date_input(
+                                "Gültig von / Valid from",
+                                value=_parse_optional_iso_date(
+                                    selected_pickup_record.get("valid_from", "")
+                                ),
+                                format="YYYY-MM-DD",
+                                key="pickup_edit_valid_from",
+                            )
+                            pickup_edit_valid_to = st.date_input(
+                                "Gültig bis / Valid to",
+                                value=_parse_optional_iso_date(
+                                    selected_pickup_record.get("valid_to", "")
+                                ),
+                                format="YYYY-MM-DD",
+                                key="pickup_edit_valid_to",
+                            )
+                            pickup_edit_active = st.checkbox(
+                                "Aktiv / Active",
+                                value=_normalize_active_flag(
+                                    selected_pickup_record.get("active")
+                                ),
+                                key="pickup_edit_active",
+                            )
+                        pickup_edit_submitted = st.form_submit_button(
+                            "Abholberechtigung speichern / Save pickup authorization"
+                        )
+                    if pickup_edit_submitted:
+                        pickup_id = str(
+                            selected_pickup_record.get("pickup_id", "")
+                        ).strip()
+                        if not pickup_id:
+                            st.error(
+                                "Pickup-ID fehlt. / Pickup ID missing in selected record."
+                            )
+                        elif not pickup_edit_name.strip():
+                            st.error("Bitte Name angeben. / Please provide a name.")
+                        else:
+                            try:
+                                stammdaten_manager.update_pickup_authorization(
+                                    pickup_id,
+                                    {
+                                        "name": pickup_edit_name.strip(),
+                                        "relationship": pickup_edit_relationship.strip(),
+                                        "phone": pickup_edit_phone.strip(),
+                                        "valid_from": _optional_date_to_iso(
+                                            pickup_edit_valid_from
+                                        ),
+                                        "valid_to": _optional_date_to_iso(
+                                            pickup_edit_valid_to
+                                        ),
+                                        "active": _active_flag_to_string(
+                                            pickup_edit_active
+                                        ),
+                                    },
+                                )
+                                st.success(
+                                    "Abholberechtigung aktualisiert. / Pickup authorization updated."
+                                )
+                                _trigger_rerun()
+                            except Exception as exc:
+                                st.error(
+                                    "Aktualisierung fehlgeschlagen / Update failed: "
+                                    f"{exc}"
+                                )
+
+                    deactivate_label = (
+                        "Deaktivieren / Deactivate"
+                        if _normalize_active_flag(selected_pickup_record.get("active"))
+                        else "Aktivieren / Activate"
+                    )
+                    if st.button(deactivate_label, key="pickup_toggle_active"):
+                        pickup_id = str(
+                            selected_pickup_record.get("pickup_id", "")
+                        ).strip()
+                        if pickup_id:
+                            new_active = not _normalize_active_flag(
+                                selected_pickup_record.get("active")
+                            )
+                            stammdaten_manager.update_pickup_authorization(
+                                pickup_id,
+                                {"active": _active_flag_to_string(new_active)},
+                            )
+                            st.success("Status aktualisiert. / Pickup status updated.")
+                            _trigger_rerun()
+
             if app_config.storage_mode == "google":
                 st.info(
                     "Beim Anlegen eines Kindes wird automatisch ein zugehöriger Drive-Ordner erstellt und verknüpft."
@@ -1018,6 +1251,34 @@ else:
                     st.write(f"**Allergien / Allergies:** {child.get('allergies')}")
                 if child.get("notes_parent_visible"):
                     st.info(f"Hinweise / Notes:\n\n{child.get('notes_parent_visible')}")
+
+                child_pickup_records = (
+                    stammdaten_manager.get_pickup_authorizations_by_child_id(
+                        str(child.get("id", "")).strip(),
+                        active_only=True,
+                    )
+                )
+                st.markdown("**Wer ist eingetragen? / Who is listed?**")
+                if child_pickup_records:
+                    for record in child_pickup_records:
+                        period_parts = []
+                        if record.get("valid_from"):
+                            period_parts.append(f"ab / from {record.get('valid_from')}")
+                        if record.get("valid_to"):
+                            period_parts.append(f"bis / until {record.get('valid_to')}")
+                        period_label = (
+                            f" ({', '.join(period_parts)})" if period_parts else ""
+                        )
+                        st.write(
+                            f"- **{record.get('name', '—')}** · "
+                            f"{record.get('relationship', '—')} · "
+                            f"{record.get('phone', '—')}{period_label}"
+                        )
+                else:
+                    st.caption(
+                        "Keine aktiven Abholberechtigten hinterlegt. / "
+                        "No active pickup authorizations listed."
+                    )
             else:
                 st.write("Keine Kinderdaten gefunden. / No child data found.")
         elif menu == "Infos":

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import time
+
 import pandas as pd
 import streamlit as st
+from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
@@ -52,7 +55,7 @@ def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
 def _run_google_connection_check(
     drive: DriveAgent,
 ) -> list[tuple[str, bool, str]]:
-    """Prüft Drive- und Calendar-Verbindung mit lesenden Testaufrufen."""
+    """Prüft Drive-, Calendar- und Sheets-Verbindung mit lesenden Testaufrufen."""
     checks: list[tuple[str, bool, str]] = []
 
     try:
@@ -102,6 +105,75 @@ def _run_google_connection_check(
                 f"Fehler: {exc}",
             )
         )
+
+    app_config = get_app_config()
+    if app_config.google is not None:
+        sheet_id = app_config.google.stammdaten_sheet_id
+        check_range = "children!A1:A1"
+        max_attempts = 3
+        last_error: Exception | None = None
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                read_sheet_values(sheet_id=sheet_id, range_a1=check_range)
+                checks.append(
+                    (
+                        "Google Sheets Zugriff / Google Sheets access",
+                        True,
+                        "Sheets-Lesezugriff erfolgreich (Range children!A1:A1). / "
+                        "Successfully read from Google Sheets "
+                        "(range children!A1:A1).",
+                    )
+                )
+                break
+            except HttpError as exc:  # pragma: no cover - runtime external dependency
+                last_error = exc
+                status_code = int(getattr(exc.resp, "status", 0) or 0)
+                if status_code in (403, 404):
+                    break
+            except (
+                SheetsServiceError
+            ) as exc:  # pragma: no cover - runtime external dependency
+                last_error = exc
+                break
+            except Exception as exc:  # pragma: no cover - runtime external dependency
+                last_error = exc
+
+            if attempt < max_attempts:
+                time.sleep(2 ** (attempt - 1))
+
+        if last_error is not None:
+            status_code: int | None = None
+            if isinstance(last_error, HttpError):
+                status_code = int(getattr(last_error.resp, "status", 0) or 0)
+
+            if status_code == 403:
+                message = (
+                    "Sheets-Test fehlgeschlagen (403). Die Tabelle ist vermutlich nicht "
+                    "mit dem Service-Account geteilt oder die Berechtigung fehlt. / "
+                    "Sheets check failed (403). The sheet is likely not shared with the "
+                    "service account or permissions are missing."
+                )
+            elif status_code == 404:
+                message = (
+                    "Sheets-Test fehlgeschlagen (404). Die konfigurierte "
+                    "`stammdaten_sheet_id` scheint falsch zu sein. / "
+                    "Sheets check failed (404). The configured "
+                    "`stammdaten_sheet_id` seems to be invalid."
+                )
+            else:
+                message = (
+                    "Sheets-Test fehlgeschlagen. Allgemeiner Google-Sheets-API-Fehler. / "
+                    "Sheets check failed. Generic Google Sheets API error."
+                )
+
+            checks.append(
+                (
+                    "Google Sheets Zugriff / Google Sheets access",
+                    False,
+                    f"{message} Fehler / Error: {last_error}",
+                )
+            )
 
     return checks
 
@@ -164,7 +236,10 @@ else:
         and st.sidebar.button("Google-Verbindung prüfen / Check Google connection")
     ):
         with st.sidebar:
-            with st.spinner("Prüfe Drive & Kalender... / Checking drive & calendar..."):
+            with st.spinner(
+                "Prüfe Drive, Kalender & Sheets... / "
+                "Checking drive, calendar & sheets..."
+            ):
                 check_results = _run_google_connection_check(drive_agent)
             for check_title, ok, message in check_results:
                 if ok:

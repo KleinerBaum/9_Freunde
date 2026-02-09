@@ -159,12 +159,13 @@ Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
    Prüfen, dass der Service-Account in beiden Freigabelisten sichtbar ist (Drive-Ordner + Kalender).
 
 #### Optionaler Laufzeit-Healthcheck in der App
-Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check Google connection“** zur Verfügung. Der Check führt zwei Testaufrufe aus:
+Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check Google connection“** zur Verfügung. Der Check führt drei Testaufrufe aus:
 
 - **Drive-Test:** Ein kleiner List-Aufruf gegen die Drive API.
 - **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id` (aus `st.secrets["gcp"]["calendar_id"]`).
+- **Sheets-Test:** Ein minimaler Read-Call auf `children!A1:A1` des konfigurierten `gcp.stammdaten_sheet_id` inkl. kurzer Retries mit exponentiellem Backoff (bis zu 3 Versuche) bei transienten Fehlern.
 
-Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner oder Kalender nicht mit Service-Account geteilt).
+Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner, Kalender nicht mit Service-Account geteilt, oder fehlende Sheet-Freigabe/ungültige `stammdaten_sheet_id` bei 403/404).
 
 ### OpenAI API (Textgenerierung)
 Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüssel:

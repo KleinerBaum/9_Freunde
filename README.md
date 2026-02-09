@@ -9,6 +9,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache).
 - **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
+- **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 

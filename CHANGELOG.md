@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- Drive-Konsolidierung umgesetzt: `storage.py` (`DriveAgent`) nutzt im Google-Modus jetzt vollständig `services/drive_service.py` als primäre Schicht für `upload/list/download/create_folder`; dadurch greifen konsistente 403/404-Fehlermeldungen und Shared-Drive-Optionen (`supportsAllDrives`, `includeItemsFromAllDrives`) app-weit.
+- Vertragsablage und Google-Connection-Check in `app.py` auf die vereinheitlichte Drive-Schicht umgestellt (keine direkte Parallel-Abstraktion mehr für Upload/Listing in Google-Mode).
+
 ### Added
 - Medikamentengabe-Log als neues Teilschema ergänzt: neuer Google-Sheets-Tab `medications` (konfigurierbar über `gcp.medications_tab`, Header-Auto-Setup) und lokaler Fallback `data/medications.json`.
 - Neuer Admin-Menüpunkt **"Medikationen"**: Einträge pro Kind erstellen und anzeigen (`date_time`, `med_name`, `dose`, `given_by`, `notes`, optional `consent_doc_file_id`) inkl. auditierbarer Felder `created_at`/`created_by`.

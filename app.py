@@ -23,12 +23,8 @@ from services.calendar_service import (
     add_event,
     list_events,
 )
-from services.drive_service import (
-    DriveServiceError,
-    ensure_child_photo_folder,
-    list_files_in_folder,
-    upload_bytes_to_folder,
-)
+from services.drive_service import DriveServiceError, ensure_child_photo_folder
+from services.google_clients import get_drive_client
 from services.content_repo import ContentRepository, ContentRepositoryError
 from services.sheets_repo import SheetsRepositoryError
 from services.sheets_service import SheetsServiceError, read_sheet_values
@@ -85,14 +81,18 @@ def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     return get_download_bytes(original_bytes, consent_mode)
 
 
-def _run_google_connection_check(
-    drive: DriveAgent,
-) -> list[tuple[str, bool, str]]:
+def _run_google_connection_check() -> list[tuple[str, bool, str]]:
     """Prüft Drive-, Calendar- und Sheets-Verbindung mit lesenden Testaufrufen."""
     checks: list[tuple[str, bool, str]] = []
 
     try:
-        drive.service.files().list(pageSize=1, fields="files(id,name)").execute()
+        drive_client = get_drive_client()
+        drive_client.files().list(
+            pageSize=1,
+            fields="files(id,name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        ).execute()
         checks.append(
             (
                 "Google Drive Zugriff / Google Drive access",
@@ -299,7 +299,7 @@ else:
                 "Prüfe Drive, Kalender & Sheets... / "
                 "Checking drive, calendar & sheets..."
             ):
-                check_results = _run_google_connection_check(drive_agent)
+                check_results = _run_google_connection_check()
             for check_title, ok, message in check_results:
                 if ok:
                     st.success(f"{check_title}: {message}")
@@ -1094,11 +1094,12 @@ else:
                         )
                     else:
                         try:
-                            file_id = upload_bytes_to_folder(
-                                contracts_folder_id,
-                                contract_file.name,
-                                contract_file.getvalue(),
-                                contract_file.type or "application/octet-stream",
+                            file_id = drive_agent.upload_file(
+                                name=contract_file.name,
+                                content_bytes=contract_file.getvalue(),
+                                mime_type=contract_file.type
+                                or "application/octet-stream",
+                                parent_folder_id=contracts_folder_id,
                             )
                             st.success(
                                 "Datei in Google Drive gespeichert. / "
@@ -1115,7 +1116,7 @@ else:
 
                 st.write("**Vorhandene Vertragsdateien / Existing contract files**")
                 try:
-                    contract_files = list_files_in_folder(contracts_folder_id)
+                    contract_files = drive_agent.list_files(contracts_folder_id)
                     if contract_files:
                         for file_meta in contract_files:
                             st.markdown(

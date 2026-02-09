@@ -8,13 +8,12 @@ from typing import Any
 import streamlit as st
 
 from config import get_app_config
-
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-except ImportError:  # pragma: no cover - depends on optional runtime package
-    service_account = None
-    build = None
+from services.drive_service import (
+    create_folder as create_google_folder,
+    download_file as download_google_file,
+    list_files_in_folder,
+    upload_bytes_to_folder,
+)
 
 
 def _safe_name(name: str) -> str:
@@ -28,21 +27,7 @@ class DriveAgent:
         self.local_drive_root = app_config.local.drive_root
         self.index_file = self.local_drive_root / "drive_index.json"
 
-        if self.storage_mode == "google":
-            if service_account is None or build is None:
-                raise RuntimeError(
-                    "Google API-Pakete fehlen. Bitte requirements installieren."
-                )
-            if app_config.google is None:
-                raise RuntimeError("Google-Konfiguration fehlt.")
-            scopes = ["https://www.googleapis.com/auth/drive"]
-            drive_credentials = service_account.Credentials.from_service_account_info(
-                app_config.google.service_account,
-                scopes=scopes,
-            )
-            self.service = build("drive", "v3", credentials=drive_credentials)
-        else:
-            self.service = None
+        if self.storage_mode != "google":
             self.local_drive_root.mkdir(parents=True, exist_ok=True)
 
     def _read_index(self) -> dict[str, dict[str, str]]:
@@ -61,15 +46,7 @@ class DriveAgent:
     ) -> list[dict[str, Any]]:
         """Gibt eine Liste der Dateien in einem Ordner zurück."""
         if self.storage_mode == "google":
-            query = f"'{folder_id}' in parents and trashed=false"
-            if mime_type_filter:
-                query += f" and mimeType contains '{mime_type_filter}'"
-            results = (
-                self.service.files()
-                .list(q=query, fields="files(id, name, mimeType)")
-                .execute()
-            )
-            return results.get("files", [])
+            return list_files_in_folder(folder_id, mime_type_filter)
 
         index = self._read_index()
         files: list[dict[str, Any]] = []
@@ -89,8 +66,7 @@ class DriveAgent:
     def download_file(self, file_id: str) -> bytes:
         """Lädt eine Datei herunter."""
         if self.storage_mode == "google":
-            request = self.service.files().get_media(fileId=file_id)
-            return request.execute()
+            return download_google_file(file_id)
 
         index = self._read_index()
         metadata = index.get(file_id)
@@ -108,22 +84,12 @@ class DriveAgent:
     ) -> str | None:
         """Lädt eine Datei hoch und gibt die File-ID zurück."""
         if self.storage_mode == "google":
-            from io import BytesIO
-
-            from googleapiclient.http import MediaIoBaseUpload
-
-            media = MediaIoBaseUpload(
-                BytesIO(content_bytes), mimetype=mime_type, resumable=False
+            return upload_bytes_to_folder(
+                parent_folder_id,
+                name,
+                content_bytes,
+                mime_type,
             )
-            metadata: dict[str, Any] = {"name": name}
-            if parent_folder_id:
-                metadata["parents"] = [parent_folder_id]
-            file = (
-                self.service.files()
-                .create(body=metadata, media_body=media, fields="id")
-                .execute()
-            )
-            return file.get("id")
 
         folder_id = parent_folder_id or "root"
         folder_path = self.local_drive_root / folder_id
@@ -150,16 +116,7 @@ class DriveAgent:
     ) -> str | None:
         """Erstellt einen neuen Ordner und gibt die ID zurück."""
         if self.storage_mode == "google":
-            folder_metadata: dict[str, Any] = {
-                "name": name,
-                "mimeType": "application/vnd.google-apps.folder",
-            }
-            if parent_folder_id:
-                folder_metadata["parents"] = [parent_folder_id]
-            folder = (
-                self.service.files().create(body=folder_metadata, fields="id").execute()
-            )
-            return folder.get("id")
+            return create_google_folder(name=name, parent_id=parent_folder_id)
 
         folder_id = uuid.uuid4().hex
         folder_path = self.local_drive_root / folder_id

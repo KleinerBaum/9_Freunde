@@ -31,13 +31,14 @@ def _translate_http_error(exc: HttpError) -> DriveServiceError:
     return DriveServiceError(f"Drive API Fehler: {exc}", status_code=status)
 
 
-def create_folder(name: str, parent_id: str) -> str:
+def create_folder(name: str, parent_id: str | None = None) -> str:
     drive = get_drive_client()
     metadata: dict[str, Any] = {
         "name": name,
         "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id],
     }
+    if parent_id:
+        metadata["parents"] = [parent_id]
 
     try:
         created = (
@@ -76,7 +77,7 @@ def ensure_child_photo_folder(child_id: str) -> str:
 
 
 def upload_bytes_to_folder(
-    folder_id: str,
+    folder_id: str | None,
     filename: str,
     file_bytes: bytes,
     mime_type: str,
@@ -84,10 +85,9 @@ def upload_bytes_to_folder(
     drive = get_drive_client()
     media = MediaIoBaseUpload(BytesIO(file_bytes), mimetype=mime_type, resumable=False)
 
-    metadata: dict[str, Any] = {
-        "name": filename,
-        "parents": [folder_id],
-    }
+    metadata: dict[str, Any] = {"name": filename}
+    if folder_id:
+        metadata["parents"] = [folder_id]
 
     try:
         created = (
@@ -106,9 +106,14 @@ def upload_bytes_to_folder(
     return created["id"]
 
 
-def list_files_in_folder(folder_id: str) -> list[dict[str, Any]]:
+def list_files_in_folder(
+    folder_id: str,
+    mime_type_filter: str | None = None,
+) -> list[dict[str, Any]]:
     drive = get_drive_client()
     q = f"'{folder_id}' in parents and trashed = false"
+    if mime_type_filter:
+        q += f" and mimeType contains '{mime_type_filter}'"
 
     try:
         res = (

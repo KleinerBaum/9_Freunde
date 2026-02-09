@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- Admin-Bereich **Dokumente** um zwei neue Stammdaten-basierte Vorlagen erweitert: **Betreuungsvertrag / Childcare contract** und **Lebensmittelpauschale-Abrechnung / Food allowance invoice** mit Download-Option.
+
+### Changed
+- `DocumentAgent` erzeugt neue DOCX-Vorlagen mit eingebettetem Logo (`images/logo.png`), aktuellem Erstellungsdatum und vorausgefüllten Kinddaten; die Abrechnung unterstützt einen frei wählbaren Zeitraum inklusive validierter Datumsgrenzen.
+
+
 ### Changed
 - Stammdaten-Lokalspeicher von mehreren JSON-Dateien auf eine zentrale ODS-Arbeitsmappe umgestellt (`data/stammdaten.ods`); lokale Reads/Writes für `children`, `parents`, `consents`, `pickup_authorizations`, `medications` und `photo_meta` laufen jetzt über `odfpy` + `pandas` mit Header-Selbstheilung.
 - `StammdatenManager` migriert beim ersten Start bestehende Legacy-JSON-Dateien automatisch in die ODS-Datei, sodass vorhandene lokale Daten erhalten bleiben.

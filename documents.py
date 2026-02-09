@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import time
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -164,3 +164,128 @@ class DocumentAgent:
         date_stamp = datetime.now().strftime("%Y%m%d")
         file_name = f"Bericht_{safe_name}_{date_stamp}.docx"
         return doc_bytes, file_name
+
+    def _add_logo_and_generation_date(self, doc: Document) -> None:
+        if self.logo_path.exists():
+            doc.add_picture(str(self.logo_path), width=Inches(1.8))
+        today_str = datetime.now().strftime("%d.%m.%Y")
+        doc.add_paragraph(f"Erstellt am / Generated on: {today_str}")
+        doc.add_paragraph("")
+
+    @staticmethod
+    def _safe_child_name(child_data: dict[str, Any]) -> str:
+        return str(child_data.get("name", "Kind")).strip() or "Kind"
+
+    def generate_care_contract(self, child_data: dict[str, Any]) -> tuple[bytes, str]:
+        """Erstellt einen Betreuungsvertrag auf Basis der Stammdaten."""
+        child_name = self._safe_child_name(child_data)
+        parent_email = str(child_data.get("parent_email", "")).strip() or "—"
+        birthdate = str(child_data.get("birthdate", "")).strip() or "—"
+        start_date = str(child_data.get("start_date", "")).strip() or "—"
+        group = str(child_data.get("group", "")).strip() or "—"
+        allergies = str(child_data.get("allergies", "")).strip() or "Keine / None"
+
+        doc = Document()
+        self._add_logo_and_generation_date(doc)
+        doc.add_heading("Betreuungsvertrag / Childcare Contract", level=1)
+        doc.add_paragraph(
+            "Zwischen der Großtagespflege 9 Freunde und den Sorgeberechtigten wird "
+            "folgender Betreuungsvertrag geschlossen. / Between Großtagespflege 9 "
+            "Freunde and the legal guardians the following childcare contract is "
+            "concluded."
+        )
+
+        doc.add_heading("1. Vertragsdaten / Contract details", level=2)
+        doc.add_paragraph(f"Kind / Child: {child_name}")
+        doc.add_paragraph(f"Elternkontakt / Parent contact: {parent_email}")
+        doc.add_paragraph(f"Geburtsdatum / Birthdate: {birthdate}")
+        doc.add_paragraph(f"Betreuungsbeginn / Start date: {start_date}")
+        doc.add_paragraph(f"Gruppe / Group: {group}")
+        doc.add_paragraph(f"Allergien / Allergies: {allergies}")
+
+        doc.add_heading("2. Leistungsumfang / Scope of care", level=2)
+        doc.add_paragraph(
+            "Die Einrichtung übernimmt die regelmäßige Betreuung, Förderung und "
+            "Verpflegung im vereinbarten Betreuungsrahmen. / The daycare provides "
+            "regular care, educational support and meals within the agreed scope."
+        )
+
+        doc.add_heading("3. Hinweise / Notes", level=2)
+        notes_parent = str(child_data.get("notes_parent_visible", "")).strip()
+        doc.add_paragraph(
+            notes_parent or "Keine zusätzlichen Hinweise. / No extra notes."
+        )
+
+        doc.add_paragraph("")
+        doc.add_paragraph(
+            "Ort, Datum: _____________________    Unterschrift Eltern: "
+            "_____________________"
+        )
+        doc.add_paragraph(
+            "Place, Date: _____________________    Signature daycare: "
+            "_____________________"
+        )
+
+        output = BytesIO()
+        doc.save(output)
+        date_stamp = datetime.now().strftime("%Y%m%d")
+        file_name = (
+            f"Betreuungsvertrag_{child_name.replace(' ', '_')}_{date_stamp}.docx"
+        )
+        return output.getvalue(), file_name
+
+    def generate_food_allowance_invoice(
+        self,
+        child_data: dict[str, Any],
+        period_start: date,
+        period_end: date,
+        monthly_amount_eur: float,
+    ) -> tuple[bytes, str]:
+        """Erstellt eine Abrechnung der Lebensmittelpauschale für einen Zeitraum."""
+        if period_end < period_start:
+            raise DocumentGenerationError(
+                "Das Enddatum muss nach dem Startdatum liegen. / End date must be after start date."
+            )
+
+        child_name = self._safe_child_name(child_data)
+        parent_email = str(child_data.get("parent_email", "")).strip() or "—"
+        days_in_period = (period_end - period_start).days + 1
+        daily_amount_eur = monthly_amount_eur / 30.0
+        total_amount_eur = round(days_in_period * daily_amount_eur, 2)
+
+        doc = Document()
+        self._add_logo_and_generation_date(doc)
+        doc.add_heading(
+            "Abrechnung Lebensmittelpauschale / Food allowance invoice", level=1
+        )
+        doc.add_paragraph(f"Kind / Child: {child_name}")
+        doc.add_paragraph(f"Elternkontakt / Parent contact: {parent_email}")
+        doc.add_paragraph(
+            "Abrechnungszeitraum / Billing period: "
+            f"{period_start.strftime('%d.%m.%Y')} - {period_end.strftime('%d.%m.%Y')}"
+        )
+
+        table = doc.add_table(rows=4, cols=2)
+        table.style = "Light List"
+        table.cell(0, 0).text = "Pauschale pro Monat / Monthly allowance"
+        table.cell(0, 1).text = f"{monthly_amount_eur:.2f} €"
+        table.cell(1, 0).text = "Tagessatz (Monat/30) / Daily rate (month/30)"
+        table.cell(1, 1).text = f"{daily_amount_eur:.2f} €"
+        table.cell(2, 0).text = "Anzahl Tage / Number of days"
+        table.cell(2, 1).text = str(days_in_period)
+        table.cell(3, 0).text = "Gesamtbetrag / Total amount"
+        table.cell(3, 1).text = f"{total_amount_eur:.2f} €"
+
+        doc.add_paragraph("")
+        doc.add_paragraph(
+            "Bitte überweisen Sie den Gesamtbetrag bis zum 10. des Folgemonats. / "
+            "Please transfer the total amount by the 10th of the following month."
+        )
+
+        output = BytesIO()
+        doc.save(output)
+        date_stamp = datetime.now().strftime("%Y%m%d")
+        file_name = (
+            f"Lebensmittelpauschale_{child_name.replace(' ', '_')}_{date_stamp}.docx"
+        )
+        return output.getvalue(), file_name

@@ -6,6 +6,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
+- **Dokumentvorlagen aus Stammdaten:** Im Bereich „Dokumente“ lassen sich zusätzlich ein **Betreuungsvertrag** sowie eine **Abrechnung der Lebensmittelpauschale** (frei wählbarer Zeitraum, aktuelles Datum, Logo) je Kind erzeugen.
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache).
 - **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.

@@ -55,6 +55,8 @@ class LocalConfig:
 
     data_dir: Path
     children_file: Path
+    parents_file: Path
+    consents_file: Path
     pickup_authorizations_file: Path
     medications_file: Path
     photo_meta_file: Path
@@ -196,6 +198,8 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
     )
 
     children_file = data_dir / "children.json"
+    parents_file = data_dir / "parents.json"
+    consents_file = data_dir / "consents.json"
     pickup_authorizations_file = data_dir / "pickup_authorizations.json"
     medications_file = data_dir / "medications.json"
     photo_meta_file = data_dir / "photo_meta.json"
@@ -209,6 +213,8 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
     return LocalConfig(
         data_dir=data_dir,
         children_file=children_file,
+        parents_file=parents_file,
+        consents_file=consents_file,
         pickup_authorizations_file=pickup_authorizations_file,
         medications_file=medications_file,
         photo_meta_file=photo_meta_file,

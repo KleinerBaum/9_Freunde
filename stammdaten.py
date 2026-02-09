@@ -5,7 +5,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-import streamlit as st
 
 from config import get_app_config
 from services import sheets_repo
@@ -36,6 +35,8 @@ class StammdatenManager:
         self.config = get_app_config()
         self.storage_mode = self.config.storage_mode
         self.children_file = self.config.local.children_file
+        self.parents_file = self.config.local.parents_file
+        self.consents_file = self.config.local.consents_file
         self.pickup_authorizations_file = self.config.local.pickup_authorizations_file
         self.medications_file = self.config.local.medications_file
         self.photo_meta_file = self.config.local.photo_meta_file
@@ -44,6 +45,10 @@ class StammdatenManager:
             self.children_file.parent.mkdir(parents=True, exist_ok=True)
             if not self.children_file.exists():
                 self.children_file.write_text("[]", encoding="utf-8")
+            if not self.parents_file.exists():
+                self.parents_file.write_text("[]", encoding="utf-8")
+            if not self.consents_file.exists():
+                self.consents_file.write_text("[]", encoding="utf-8")
             if not self.pickup_authorizations_file.exists():
                 self.pickup_authorizations_file.write_text("[]", encoding="utf-8")
             if not self.medications_file.exists():
@@ -60,6 +65,30 @@ class StammdatenManager:
     def _write_local_children(self, children: list[dict[str, Any]]) -> None:
         self.children_file.write_text(
             json.dumps(children, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _read_local_parents(self) -> list[dict[str, Any]]:
+        if not self.parents_file.exists():
+            return []
+        data = json.loads(self.parents_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_parents(self, parents: list[dict[str, Any]]) -> None:
+        self.parents_file.write_text(
+            json.dumps(parents, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _read_local_consents(self) -> list[dict[str, Any]]:
+        if not self.consents_file.exists():
+            return []
+        data = json.loads(self.consents_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_consents(self, consents: list[dict[str, Any]]) -> None:
+        self.consents_file.write_text(
+            json.dumps(consents, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
@@ -203,7 +232,7 @@ class StammdatenManager:
     def delete_child(self, child_id: str) -> None:
         """Löscht den Kind-Datensatz."""
         if self.storage_mode == "google":
-            st.warning("Löschen über Google Sheets ist derzeit nicht implementiert.")
+            sheets_repo.delete_child(child_id)
             return
 
         children = self._read_local_children()

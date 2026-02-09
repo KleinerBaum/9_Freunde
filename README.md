@@ -45,7 +45,9 @@ Enthalten sind nur die Kernabhängigkeiten:
 Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben werden.
 Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
 
-- `data/children.json` für Stammdaten
+- `data/children.json` für Kinder-Stammdaten
+- `data/parents.json` für Eltern-Stammdaten
+- `data/consents.json` für Einwilligungen
 - `data/pickup_authorizations.json` für Abholberechtigungen (pro Kind, aktiv/inaktiv)
 - `data/content_pages.json` für Infos-Seiten (Fallback im Local-Mode)
 - `data/calendar_events.json` für Termine
@@ -221,6 +223,8 @@ Empfohlener Eltern-Tab (`parents`):
 
 Optional:
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
+
+Hinweis zu CRUD-Parität: Das Löschen eines Kindes ist nun auch im Google-Modus implementiert (Zeile wird im `children`-Tab entfernt).
 
 Pflicht-Tab für Medikamenten-Log (`medications`):
 - `med_id` (uuid), `child_id`, `date_time`, `med_name`, `dose`, `given_by`, `notes`, `consent_doc_file_id` (optional), `created_at`, `created_by`

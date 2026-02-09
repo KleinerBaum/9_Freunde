@@ -314,6 +314,17 @@ Optional:
 - `[app].admin_emails` oder `[auth].admin_emails`
 - `[openai]` (für KI-Dokumente)
 
+
+### Quick Fix: Fehlendes `gcp.calendar_id` (Google-Modus)
+
+Wenn in der Sidebar der Google-Check beim Kalender fehlschlägt und auf ein fehlendes `gcp.calendar_id` hinweist:
+
+1. Öffnen Sie **Settings → Secrets** in Streamlit Cloud.
+2. Ergänzen Sie im Bereich `[gcp]` den Eintrag `calendar_id = "<ihre-kalender-id>"`.
+3. Speichern Sie die Secrets und starten Sie die App neu.
+
+EN: If the Google sidebar check reports missing `gcp.calendar_id`, open **Settings → Secrets**, add `calendar_id` under `[gcp]`, save, and restart the app.
+
 ### Setup-Hinweis zu Freigaben (sehr wichtig)
 
 Wenn der Service-Account keine Rechte hat, schlagen API-Calls mit 403/404 fehl.

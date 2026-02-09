@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- Google-Verbindungscheck in `app.py` prüft `gcp.calendar_id` jetzt explizit vor dem API-Aufruf und zeigt bei fehlender Kalender-ID eine konkrete DE/EN-Quick-Fix-Meldung mit Zielpfad `Settings → Secrets → [gcp].calendar_id`.
+- `tools/smoke_check.py` weist `gcp.calendar_id` jetzt als optionalen, aber geprüften Key aus (`[WARN]` statt Fehler bei Fehlen) mit verständlichem Quick-Fix-Hinweis.
+- README-Fehlerbehebung um einen Quick-Fix-Abschnitt für fehlendes `gcp.calendar_id` ergänzt.
+
 ### Added
 - Admin-Bereich **Dokumente** um zwei neue Stammdaten-basierte Vorlagen erweitert: **Betreuungsvertrag / Childcare contract** und **Lebensmittelpauschale-Abrechnung / Food allowance invoice** mit Download-Option.
 

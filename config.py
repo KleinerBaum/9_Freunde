@@ -34,6 +34,9 @@ class GoogleConfig:
     drive_contracts_folder_id: str
     stammdaten_sheet_id: str
     stammdaten_sheet_tab: str
+    children_tab: str
+    parents_tab: str
+    consents_tab: str
     calendar_id: str | None
 
     @property
@@ -88,6 +91,10 @@ REQUIRED_GCP_SERVICE_ACCOUNT_KEYS = (
     "token_uri",
 )
 
+DEFAULT_CHILDREN_TAB = "children"
+DEFAULT_PARENTS_TAB = "parents"
+DEFAULT_CONSENTS_TAB = "consents"
+
 
 def _strip_outer_quotes(value: str) -> str:
     stripped = value.strip()
@@ -130,6 +137,39 @@ def _require_string(config: Mapping[str, Any], key: str, path: str) -> str:
             "Bitte ergänzen Sie den Wert in .streamlit/secrets.toml."
         )
     return value.strip()
+
+
+def _read_tab_name(config: Mapping[str, Any], key: str, default: str) -> str:
+    raw_value = config.get(key)
+    if raw_value is None:
+        return default
+
+    if not isinstance(raw_value, str):
+        raise ConfigError(
+            f"Ungültiger Wert für gcp.{key}. Erwartet wird ein nicht-leerer String."
+        )
+
+    normalized = raw_value.strip()
+    if not normalized:
+        raise ConfigError(
+            f"Ungültiger Wert für gcp.{key}. Der Tab-Name darf nicht leer sein."
+        )
+
+    invalid_chars = {":", "\\", "/", "?", "*", "[", "]"}
+    invalid_found = sorted(char for char in invalid_chars if char in normalized)
+    if invalid_found:
+        invalid_joined = " ".join(invalid_found)
+        raise ConfigError(
+            f"Ungültiger Wert für gcp.{key}. Der Tab-Name enthält nicht erlaubte "
+            f"Zeichen ({invalid_joined})."
+        )
+
+    if len(normalized) > 100:
+        raise ConfigError(
+            f"Ungültiger Wert für gcp.{key}. Der Tab-Name darf maximal 100 Zeichen "
+            "lang sein."
+        )
+    return normalized
 
 
 def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
@@ -211,6 +251,9 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         if isinstance(sheet_tab_raw, str) and str(sheet_tab_raw).strip()
         else "Stammdaten_Eltern_2026"
     )
+    children_tab = _read_tab_name(gcp, "children_tab", DEFAULT_CHILDREN_TAB)
+    parents_tab = _read_tab_name(gcp, "parents_tab", DEFAULT_PARENTS_TAB)
+    consents_tab = _read_tab_name(gcp, "consents_tab", DEFAULT_CONSENTS_TAB)
     calendar_raw = gcp.get("calendar_id")
     calendar_id = (
         str(calendar_raw).strip()
@@ -226,6 +269,9 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         drive_contracts_folder_id=drive_contracts_folder_id,
         stammdaten_sheet_id=stammdaten_sheet_id,
         stammdaten_sheet_tab=stammdaten_sheet_tab,
+        children_tab=children_tab,
+        parents_tab=parents_tab,
+        consents_tab=consents_tab,
         calendar_id=calendar_id,
     )
 

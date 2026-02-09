@@ -6,12 +6,9 @@ from uuid import uuid4
 import streamlit as st
 from googleapiclient.errors import HttpError
 
-from config import get_app_config
+from config import GoogleConfig, get_app_config
 from services.google_clients import get_sheets_client
 
-CHILDREN_TAB = "children"
-PARENTS_TAB = "parents"
-CONSENTS_TAB = "consents"
 DEFAULT_CACHE_TTL_SECONDS = 15
 DEFAULT_DOWNLOAD_CONSENT = "pixelated"
 
@@ -50,6 +47,27 @@ def _sheet_id() -> str:
             "Google-Sheets-Zugriff ist nur im Google-Modus verfügbar."
         )
     return app_config.google.stammdaten_sheet_id
+
+
+def _google_config() -> GoogleConfig:
+    app_config = get_app_config()
+    if app_config.storage_mode != "google" or app_config.google is None:
+        raise SheetsRepositoryError(
+            "Google-Sheets-Zugriff ist nur im Google-Modus verfügbar."
+        )
+    return app_config.google
+
+
+def _children_tab() -> str:
+    return _google_config().children_tab
+
+
+def _parents_tab() -> str:
+    return _google_config().parents_tab
+
+
+def _consents_tab() -> str:
+    return _google_config().consents_tab
 
 
 def _values_get(range_name: str) -> list[list[str]]:
@@ -104,10 +122,10 @@ def _values_append(range_name: str, values: list[list[str]]) -> None:
 
 
 def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
-    rows = _values_get(f"{CHILDREN_TAB}!A:ZZ")
+    rows = _values_get(f"{_children_tab()}!A:ZZ")
     if not rows:
         header = ["child_id", "name", "parent_email", "folder_id", "photo_folder_id"]
-        _values_update(f"{CHILDREN_TAB}!A1", [header])
+        _values_update(f"{_children_tab()}!A1", [header])
         return header
 
     header = [str(col).strip() for col in rows[0]]
@@ -118,7 +136,7 @@ def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
             changed = True
 
     if changed:
-        _values_update(f"{CHILDREN_TAB}!A1:ZZ1", [header])
+        _values_update(f"{_children_tab()}!A1:ZZ1", [header])
 
     return header
 
@@ -174,7 +192,7 @@ def get_children() -> list[dict[str, str]]:
     _ensure_children_header_columns(
         ["folder_id", "photo_folder_id", "download_consent"]
     )
-    rows = _values_get(f"{CHILDREN_TAB}!A:ZZ")
+    rows = _values_get(f"{_children_tab()}!A:ZZ")
     children = _to_records(rows)
     for child in children:
         child["download_consent"] = _normalize_download_consent(
@@ -216,7 +234,7 @@ def add_child(child_dict: dict[str, Any]) -> str:
     )
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
-    _values_append(f"{CHILDREN_TAB}!A:ZZ", [row_values])
+    _values_append(f"{_children_tab()}!A:ZZ", [row_values])
 
     get_children.clear()
     get_child_by_parent_email.clear()
@@ -228,9 +246,9 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
     _ensure_children_header_columns(
         ["folder_id", "photo_folder_id", "download_consent"]
     )
-    row_index, header = _get_row_index_by_id(CHILDREN_TAB, "child_id", child_id)
+    row_index, header = _get_row_index_by_id(_children_tab(), "child_id", child_id)
 
-    existing_rows = _values_get(f"{CHILDREN_TAB}!A{row_index}:ZZ{row_index}")
+    existing_rows = _values_get(f"{_children_tab()}!A{row_index}:ZZ{row_index}")
     existing_row = existing_rows[0] if existing_rows else []
 
     current_payload = {
@@ -245,7 +263,7 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
     )
 
     row_values = [current_payload.get(column, "") for column in header]
-    _values_update(f"{CHILDREN_TAB}!A{row_index}:ZZ{row_index}", [row_values])
+    _values_update(f"{_children_tab()}!A{row_index}:ZZ{row_index}", [row_values])
 
     get_children.clear()
     get_child_by_parent_email.clear()
@@ -254,7 +272,7 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
 
 @st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
 def get_parents() -> list[dict[str, str]]:
-    rows = _values_get(f"{PARENTS_TAB}!A:ZZ")
+    rows = _values_get(f"{_parents_tab()}!A:ZZ")
     return _to_records(rows)
 
 
@@ -262,24 +280,24 @@ def add_parent(parent_dict: dict[str, Any]) -> str:
     parent_id = str(parent_dict.get("parent_id") or uuid4().hex)
     payload = {**parent_dict, "parent_id": parent_id}
 
-    rows = _values_get(f"{PARENTS_TAB}!A:ZZ")
+    rows = _values_get(f"{_parents_tab()}!A:ZZ")
     if not rows:
         header = ["parent_id", "email", "name", "phone"]
-        _values_update(f"{PARENTS_TAB}!A1", [header])
+        _values_update(f"{_parents_tab()}!A1", [header])
     else:
         header = [str(col).strip() for col in rows[0]]
 
     row_values = [str(payload.get(column, "")).strip() for column in header]
-    _values_append(f"{PARENTS_TAB}!A:ZZ", [row_values])
+    _values_append(f"{_parents_tab()}!A:ZZ", [row_values])
 
     get_parents.clear()
     return parent_id
 
 
 def update_parent(parent_id: str, patch_dict: dict[str, Any]) -> None:
-    row_index, header = _get_row_index_by_id(PARENTS_TAB, "parent_id", parent_id)
+    row_index, header = _get_row_index_by_id(_parents_tab(), "parent_id", parent_id)
 
-    existing_rows = _values_get(f"{PARENTS_TAB}!A{row_index}:ZZ{row_index}")
+    existing_rows = _values_get(f"{_parents_tab()}!A{row_index}:ZZ{row_index}")
     existing_row = existing_rows[0] if existing_rows else []
 
     current_payload = {
@@ -291,6 +309,6 @@ def update_parent(parent_id: str, patch_dict: dict[str, Any]) -> None:
     )
 
     row_values = [current_payload.get(column, "") for column in header]
-    _values_update(f"{PARENTS_TAB}!A{row_index}:ZZ{row_index}", [row_values])
+    _values_update(f"{_parents_tab()}!A{row_index}:ZZ{row_index}", [row_values])
 
     get_parents.clear()

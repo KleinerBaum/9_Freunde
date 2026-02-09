@@ -6,6 +6,8 @@
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.
 
 ### Changed
+- Google-Sheets-Konfiguration erweitert: `gcp.children_tab`, `gcp.parents_tab` und `gcp.consents_tab` sind jetzt optional konfigurierbar (Defaults: `children`, `parents`, `consents`) und werden vom Sheets-Repository statt harter Konstanten verwendet.
+- Start-Validierung für konfigurierbare Sheet-Tabnamen ergänzt: leere/ungültige Werte werden mit klaren DE/EN-Fehlermeldungen abgefangen (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen).
 - Google-Sheets-Healthcheck nutzt jetzt den konfigurierten Tab `gcp.stammdaten_sheet_tab` (statt hartcodiert `children`) und quotet den A1-Range robust für Tabs mit Leerzeichen/Sonderzeichen, z. B. `'Stammdaten Eltern'!A1:A1`.
 - Fehlerdiagnose für den Google-Sheets-Check verbessert (DE/EN): `403` weist jetzt explizit auf fehlende Sheet-Freigabe/Berechtigung für den Service-Account hin, `404` auf eine wahrscheinlich falsche `stammdaten_sheet_id`, andere Fehler werden als generischer Sheets-API-Fehler ausgewiesen.
 - Google-Connection-Check nutzt für den Sheets-Aufruf einen kurzen Retry mit exponentiellem Backoff (bis zu 3 Versuche), um transiente API-Fehler robuster abzufangen.
@@ -101,4 +103,3 @@
 - `face-recognition` als optionale Laufzeitabhängigkeit umgesetzt: Foto-Upload funktioniert auch ohne CV-Stack, inklusive Hinweis in der UI, wenn Gesichtserkennung deaktiviert ist.
 - Fotoablage-MVP auf child-spezifische Drive-Ordner umgestellt: `services/drive_service.py` ergänzt um `create_folder(...)` und `ensure_child_photo_folder(...)`; `children`-Datensätze verwenden das neue Feld `photo_folder_id` (automatische Anlage + Persistenz in Google Sheets). Admin-Upload speichert in `photos/<child_id>/`, Elternansicht zeigt nur eigene Bilder inkl. Vorschau und Download-Button.
 - Face-Recognition-Abhängigkeiten aus dem MVP entfernt (`photo.py` vereinfacht; `requirements-cv.txt` enthält keine CV-Pakete mehr).
-

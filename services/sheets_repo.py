@@ -245,6 +245,62 @@ def _values_append(range_name: str, values: list[list[str]]) -> None:
         raise _translate_http_error(exc) from exc
 
 
+def _get_tab_sheet_id(tab_name: str) -> int:
+    service = get_sheets_client()
+    try:
+        response = (
+            service.spreadsheets()
+            .get(
+                spreadsheetId=_sheet_id(),
+                fields="sheets(properties(sheetId,title))",
+            )
+            .execute()
+        )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
+
+    for sheet in response.get("sheets", []):
+        properties = sheet.get("properties", {})
+        if str(properties.get("title", "")).strip() == tab_name:
+            sheet_id = properties.get("sheetId")
+            if isinstance(sheet_id, int):
+                return sheet_id
+
+    raise KeyError(f"Tab '{tab_name}' nicht gefunden.")
+
+
+def _delete_row(tab: str, row_index: int) -> None:
+    if row_index < 2:
+        raise ValueError("Header-Zeile kann nicht gelöscht werden.")
+
+    service = get_sheets_client()
+    sheet_id = _get_tab_sheet_id(tab)
+    try:
+        (
+            service.spreadsheets()
+            .batchUpdate(
+                spreadsheetId=_sheet_id(),
+                body={
+                    "requests": [
+                        {
+                            "deleteDimension": {
+                                "range": {
+                                    "sheetId": sheet_id,
+                                    "dimension": "ROWS",
+                                    "startIndex": row_index - 1,
+                                    "endIndex": row_index,
+                                }
+                            }
+                        }
+                    ]
+                },
+            )
+            .execute()
+        )
+    except HttpError as exc:
+        raise _translate_http_error(exc) from exc
+
+
 def _create_sheet_if_missing(tab_name: str) -> None:
     service = get_sheets_client()
     try:
@@ -501,6 +557,16 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
 
     row_values = [current_payload.get(column, "") for column in header]
     _values_update(f"{_children_tab()}!A{row_index}:ZZ{row_index}", [row_values])
+
+    get_children.clear()
+    get_child_by_parent_email.clear()
+    get_child_by_id.clear()
+
+
+def delete_child(child_id: str) -> None:
+    _ensure_children_header_columns(CHILDREN_REQUIRED_COLUMNS)
+    row_index, _ = _get_row_index_by_id(_children_tab(), "child_id", child_id)
+    _delete_row(_children_tab(), row_index)
 
     get_children.clear()
     get_child_by_parent_email.clear()

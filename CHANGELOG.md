@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- Local-Storage-Parität für Stammdaten erweitert: neue lokale Dateien `data/parents.json` und `data/consents.json` werden über `LocalConfig` bereitgestellt und im `StammdatenManager` initialisiert.
+
+### Changed
+- `StammdatenManager.delete_child()` unterstützt im Google-Modus jetzt echtes Löschen über Google Sheets (`deleteDimension` auf der gefundenen Kinder-Zeile) statt nur einer Warnung; damit sind CRUD-Operationen für Kinder in beiden Speicher-Modi konsistenter.
+
+
+### Added
 - Foto-Freigabe-Workflow erweitert: neuer Schema-Tab `photo_meta` (konfigurierbar über `gcp.photo_meta_tab`, Default `photo_meta`) inkl. lokalem Fallback `data/photo_meta.json`.
 - Admin-Bereich **Fotos** um Statusverwaltung pro Datei erweitert (`draft`/`published`/`archived`).
 

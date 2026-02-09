@@ -18,6 +18,7 @@ DEFAULT_OPENAI_MAX_RETRIES = 3
 DEFAULT_OPENAI_REASONING_EFFORT: Literal["low", "medium", "high"] = "medium"
 DEFAULT_STORAGE_MODE: Literal["local", "google"] = "local"
 DEFAULT_DATA_DIR = "./data"
+DEFAULT_STAMMDATEN_SHEET_ID = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A"
 
 
 class ConfigError(RuntimeError):
@@ -183,11 +184,7 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
 
     gcp = _require_mapping(secrets.get("gcp"), "gcp")
 
-    required_keys = (
-        "drive_photos_root_folder_id",
-        "drive_contracts_folder_id",
-        "stammdaten_sheet_id",
-    )
+    required_keys = ("drive_photos_root_folder_id", "drive_contracts_folder_id")
     missing_gcp_keys = [
         f"gcp.{key}"
         for key in required_keys
@@ -202,7 +199,12 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
 
     drive_photos_root_folder_id = str(gcp["drive_photos_root_folder_id"]).strip()
     drive_contracts_folder_id = str(gcp["drive_contracts_folder_id"]).strip()
-    stammdaten_sheet_id = str(gcp["stammdaten_sheet_id"]).strip()
+    sheet_id_raw = gcp.get("stammdaten_sheet_id")
+    stammdaten_sheet_id = (
+        str(sheet_id_raw).strip()
+        if isinstance(sheet_id_raw, str) and str(sheet_id_raw).strip()
+        else DEFAULT_STAMMDATEN_SHEET_ID
+    )
     sheet_tab_raw = gcp.get("stammdaten_sheet_tab")
     stammdaten_sheet_tab = (
         str(sheet_tab_raw).strip()

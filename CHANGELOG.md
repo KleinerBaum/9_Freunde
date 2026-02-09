@@ -8,6 +8,7 @@
 ### Changed
 - Fehlerdiagnose für den Google-Sheets-Check verbessert (DE/EN): `403` weist jetzt explizit auf fehlende Sheet-Freigabe/Berechtigung für den Service-Account hin, `404` auf eine wahrscheinlich falsche `stammdaten_sheet_id`, andere Fehler werden als generischer Sheets-API-Fehler ausgewiesen.
 - Google-Connection-Check nutzt für den Sheets-Aufruf einen kurzen Retry mit exponentiellem Backoff (bis zu 3 Versuche), um transiente API-Fehler robuster abzufangen.
+- Google-Konfiguration nutzt für Stammdaten jetzt standardmäßig die Tabelle **Stammdaten_Eltern_2026** (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`), wenn `gcp.stammdaten_sheet_id` nicht gesetzt ist; das Feld bleibt als Override verfügbar.
 
 ### Fixed
 - Google-Service-Account-Private-Key wird beim Laden jetzt robust normalisiert: äußere Zusatz-Quotes werden entfernt, `\n`-Escapes in echte Zeilenumbrüche umgewandelt und das PEM-Format (`BEGIN/END PRIVATE KEY`) strikt validiert, bevor `from_service_account_info(...)` aufgerufen wird.

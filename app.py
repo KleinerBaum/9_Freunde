@@ -1072,19 +1072,26 @@ else:
             st.subheader("Dokumente generieren und verwalten")
             children = stammdaten_manager.get_children()
             if not children:
-                st.warning("Keine Kinder vorhanden. Bitte zuerst Stammdaten anlegen.")
+                st.warning(
+                    "Keine Kinder vorhanden. Bitte zuerst Stammdaten anlegen. / "
+                    "No children available. Please add master data first."
+                )
             else:
                 # Formular für Dokumentenerstellung
                 sel_child = st.selectbox(
-                    "Für welches Kind soll ein Dokument erstellt werden?",
+                    "Für welches Kind soll ein Dokument erstellt werden? / "
+                    "Select child for document generation",
                     options=children,
                     format_func=lambda child: str(child.get("name", "")),
                 )
-                doc_notes = st.text_area("Stichpunkte oder Notizen für das Dokument:")
-                save_to_drive = st.checkbox(
-                    "Dokument im Drive-Ordner des Kindes speichern?"
+                doc_notes = st.text_area(
+                    "Stichpunkte oder Notizen für das Dokument / Notes for the report"
                 )
-                if st.button("Dokument erstellen"):
+                save_to_drive = st.checkbox(
+                    "Dokument im Drive-Ordner des Kindes speichern? / "
+                    "Save document in child's Drive folder?"
+                )
+                if st.button("Bericht erstellen / Create report"):
                     with st.spinner("Generiere Dokument mit OpenAI..."):
                         try:
                             doc_bytes, file_name = doc_agent.generate_document(
@@ -1124,6 +1131,85 @@ else:
                             st.info(str(e))
                         except Exception as e:
                             st.error(f"Fehler bei der Dokumentenerstellung: {e}")
+
+                st.divider()
+                st.write("**Vorlagen aus Stammdaten / Templates from master data**")
+                contract_col, invoice_col = st.columns(2)
+
+                with contract_col:
+                    st.write("Betreuungsvertrag / Childcare contract")
+                    if st.button(
+                        "Betreuungsvertrag generieren / Generate childcare contract"
+                    ):
+                        try:
+                            contract_bytes, contract_filename = (
+                                doc_agent.generate_care_contract(sel_child)
+                            )
+                            st.success(
+                                "Betreuungsvertrag erstellt. / Childcare contract generated."
+                            )
+                            st.download_button(
+                                "📄 Vertrag herunterladen / Download contract",
+                                data=contract_bytes,
+                                file_name=contract_filename,
+                                key=f"contract_download_{sel_child.get('id', 'child')}",
+                            )
+                        except Exception as exc:
+                            st.error(
+                                "Vertrag konnte nicht erstellt werden. / "
+                                "Contract could not be generated."
+                            )
+                            st.info(str(exc))
+
+                with invoice_col:
+                    st.write("Lebensmittelpauschale abrechnen / Food allowance invoice")
+                    period_start = st.date_input(
+                        "Startdatum / Start date",
+                        value=date.today().replace(day=1),
+                        key="food_invoice_start",
+                    )
+                    period_end = st.date_input(
+                        "Enddatum / End date",
+                        value=date.today(),
+                        key="food_invoice_end",
+                    )
+                    monthly_amount = st.number_input(
+                        "Monatliche Pauschale (€) / Monthly allowance (€)",
+                        min_value=0.0,
+                        value=120.0,
+                        step=5.0,
+                        key="food_invoice_monthly_amount",
+                    )
+                    if st.button(
+                        "Abrechnung erstellen / Generate invoice",
+                        key="create_food_invoice_button",
+                    ):
+                        try:
+                            invoice_bytes, invoice_filename = (
+                                doc_agent.generate_food_allowance_invoice(
+                                    child_data=sel_child,
+                                    period_start=period_start,
+                                    period_end=period_end,
+                                    monthly_amount_eur=float(monthly_amount),
+                                )
+                            )
+                            st.success(
+                                "Abrechnung erstellt. / Food allowance invoice generated."
+                            )
+                            st.download_button(
+                                "📄 Abrechnung herunterladen / Download invoice",
+                                data=invoice_bytes,
+                                file_name=invoice_filename,
+                                key=f"invoice_download_{sel_child.get('id', 'child')}",
+                            )
+                        except DocumentGenerationError as exc:
+                            st.error(
+                                "Abrechnung konnte nicht erstellt werden. / "
+                                "Invoice could not be generated."
+                            )
+                            st.info(str(exc))
+                        except Exception as exc:
+                            st.error(f"Fehler bei der Abrechnungserstellung: {exc}")
 
                 # Optionale Liste vorhandener Dokumente im Drive
                 if sel_child.get("folder_id"):

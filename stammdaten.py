@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 import streamlit as st
@@ -35,11 +36,14 @@ class StammdatenManager:
         self.config = get_app_config()
         self.storage_mode = self.config.storage_mode
         self.children_file = self.config.local.children_file
+        self.pickup_authorizations_file = self.config.local.pickup_authorizations_file
 
         if self.storage_mode != "google":
             self.children_file.parent.mkdir(parents=True, exist_ok=True)
             if not self.children_file.exists():
                 self.children_file.write_text("[]", encoding="utf-8")
+            if not self.pickup_authorizations_file.exists():
+                self.pickup_authorizations_file.write_text("[]", encoding="utf-8")
 
     def _read_local_children(self) -> list[dict[str, Any]]:
         if not self.children_file.exists():
@@ -50,6 +54,21 @@ class StammdatenManager:
     def _write_local_children(self, children: list[dict[str, Any]]) -> None:
         self.children_file.write_text(
             json.dumps(children, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _read_local_pickup_authorizations(self) -> list[dict[str, Any]]:
+        if not self.pickup_authorizations_file.exists():
+            return []
+        data = json.loads(self.pickup_authorizations_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_pickup_authorizations(
+        self,
+        pickup_authorizations: list[dict[str, Any]],
+    ) -> None:
+        self.pickup_authorizations_file.write_text(
+            json.dumps(pickup_authorizations, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
@@ -160,3 +179,95 @@ class StammdatenManager:
         children = self._read_local_children()
         filtered = [child for child in children if child.get("id") != child_id]
         self._write_local_children(filtered)
+
+    def get_pickup_authorizations_by_child_id(
+        self,
+        child_id: str,
+        *,
+        active_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Liefert Abholberechtigungen eines Kindes."""
+        if self.storage_mode == "google":
+            authorizations = sheets_repo.get_pickup_authorizations_by_child_id(child_id)
+        else:
+            normalized_child_id = child_id.strip()
+            authorizations = [
+                record
+                for record in self._read_local_pickup_authorizations()
+                if str(record.get("child_id", "")).strip() == normalized_child_id
+            ]
+
+        normalized_authorizations: list[dict[str, Any]] = []
+        for authorization in authorizations:
+            normalized = {
+                key: str(value).strip() for key, value in authorization.items()
+            }
+            normalized["active"] = (
+                str(authorization.get("active", "true")).strip().lower() or "true"
+            )
+            normalized_authorizations.append(normalized)
+
+        if active_only:
+            normalized_authorizations = [
+                record
+                for record in normalized_authorizations
+                if record.get("active", "true") == "true"
+            ]
+
+        normalized_authorizations.sort(key=lambda item: item.get("name", ""))
+        return normalized_authorizations
+
+    def add_pickup_authorization(
+        self,
+        child_id: str,
+        pickup_data: dict[str, Any],
+        *,
+        created_by: str,
+    ) -> str:
+        """Legt eine neue Abholberechtigung an."""
+        payload = {
+            "child_id": child_id.strip(),
+            "name": str(pickup_data.get("name", "")).strip(),
+            "relationship": str(pickup_data.get("relationship", "")).strip(),
+            "phone": str(pickup_data.get("phone", "")).strip(),
+            "valid_from": str(pickup_data.get("valid_from", "")).strip(),
+            "valid_to": str(pickup_data.get("valid_to", "")).strip(),
+            "active": str(pickup_data.get("active", "true")).strip().lower() or "true",
+            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+            "created_by": created_by.strip(),
+        }
+
+        if self.storage_mode == "google":
+            return sheets_repo.add_pickup_authorization(payload)
+
+        pickup_id = uuid.uuid4().hex
+        local_records = self._read_local_pickup_authorizations()
+        local_records.append({"pickup_id": pickup_id, **payload})
+        self._write_local_pickup_authorizations(local_records)
+        return pickup_id
+
+    def update_pickup_authorization(
+        self,
+        pickup_id: str,
+        patch_data: dict[str, Any],
+    ) -> None:
+        """Aktualisiert eine vorhandene Abholberechtigung."""
+        normalized_patch = {
+            key: str(value).strip() for key, value in patch_data.items()
+        }
+        if "active" in normalized_patch:
+            normalized_patch["active"] = (
+                str(normalized_patch.get("active", "true")).strip().lower() or "true"
+            )
+
+        if self.storage_mode == "google":
+            sheets_repo.update_pickup_authorization(pickup_id, normalized_patch)
+            return
+
+        local_records = self._read_local_pickup_authorizations()
+        for index, record in enumerate(local_records):
+            if str(record.get("pickup_id", "")).strip() == pickup_id.strip():
+                local_records[index] = {**record, **normalized_patch}
+                self._write_local_pickup_authorizations(local_records)
+                return
+        raise KeyError(f"Abholberechtigung mit ID '{pickup_id}' wurde nicht gefunden.")

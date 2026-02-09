@@ -44,6 +44,7 @@ Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben wer
 Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
 
 - `data/children.json` für Stammdaten
+- `data/pickup_authorizations.json` für Abholberechtigungen (pro Kind, aktiv/inaktiv)
 - `data/content_pages.json` für Infos-Seiten (Fallback im Local-Mode)
 - `data/calendar_events.json` für Termine
 - `data/drive/` für Dokumente und Fotos
@@ -184,7 +185,7 @@ Die Dokumentenerstellung nutzt die **OpenAI Responses API** mit strukturiertem J
 
 ### Google Sheets prerequisites
 
-Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter `children`, `parents`, optional `consents`).
+Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter `children`, `parents`, optional `consents`, sowie `pickup_authorizations` für Abholberechtigungen).
 
 1. **Google Sheets API aktivieren**
 2. **Service Account mit dem Stammdaten-Sheet teilen** (Editor-Rechte)
@@ -194,6 +195,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
    - `gcp.children_tab` (Default: `children`)
    - `gcp.parents_tab` (Default: `parents`)
    - `gcp.consents_tab` (Default: `consents`)
+   - `gcp.pickup_authorizations_tab` (Default: `pickup_authorizations`)
    - `gcp.content_pages_tab` (Default: `content_pages`)
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
@@ -236,9 +238,10 @@ calendar_id = "kita-kalender@group.calendar.google.com"
 drive_photos_root_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
 drive_contracts_folder_id = "1ZaYxWvUtSrQpOnMlKjIhGfEdCb"
 stammdaten_sheet_id = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A" # optional; Default ist dieser Wert
-children_tab = "children"   # optional; Default: children
-parents_tab = "parents"     # optional; Default: parents
-consents_tab = "consents"   # optional; Default: consents
+children_tab = "children"                       # optional; Default: children
+parents_tab = "parents"                         # optional; Default: parents
+consents_tab = "consents"                       # optional; Default: consents
+pickup_authorizations_tab = "pickup_authorizations"  # optional; Default: pickup_authorizations
 content_pages_tab = "content_pages" # optional; Default: content_pages
 
 [gcp_optional_apis]

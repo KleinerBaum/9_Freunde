@@ -4,6 +4,7 @@
 
 ### Changed
 - App-Branding ergänzt: `images/logo.png` wird jetzt als Streamlit-Seitenlogo angezeigt und zusätzlich in generierte DOCX-Dokumente (Berichte/Verträge) eingebettet, sofern die Datei vorhanden ist.
+- Abholberechtigte als neues Stammdaten-Teilschema ergänzt: neuer Google-Sheets-Tab `pickup_authorizations` (konfigurierbar über `gcp.pickup_authorizations_tab`, Header-Auto-Setup), lokaler Fallback `data/pickup_authorizations.json`, Admin-CRUD (Add/Edit/Aktiv-Inaktiv) pro Kind sowie Eltern-Read-only-Ansicht aktiver Einträge in „Mein Kind“.
 
 ### Added
 - Neuer Infos-Bereich für Eltern (`Infos`) mit read-only Darstellung veröffentlichter Seiten aus `content_pages` (Filter: `published=true` und `audience in {parent,both}`) inkl. DE/EN-Sprachumschaltung.

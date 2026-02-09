@@ -6,9 +6,11 @@ import random
 import time
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from docx import Document
+from docx.shared import Inches
 from openai import APITimeoutError, OpenAI, OpenAIError, RateLimitError
 
 from config import OpenAIConfig, get_app_config
@@ -25,6 +27,7 @@ class DocumentAgent:
         app_config = get_app_config()
         self.openai_config: OpenAIConfig = app_config.openai
         self.client = self._build_client()
+        self.logo_path = Path(__file__).resolve().parent / "images" / "logo.png"
 
     def _build_client(self) -> OpenAI | None:
         if not self.openai_config.api_key:
@@ -145,6 +148,8 @@ class DocumentAgent:
         result = self._generate_with_retry(prompt)
 
         doc = Document()
+        if self.logo_path.exists():
+            doc.add_picture(str(self.logo_path), width=Inches(1.8))
         doc.add_heading(result["title"], level=1)
         today_str = datetime.now().strftime("%d.%m.%Y")
         doc.add_paragraph(f"Datum: {today_str}")

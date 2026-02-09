@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
+
 from datetime import date
 
 import pandas as pd
@@ -33,7 +35,12 @@ from services.sheets_service import SheetsServiceError, read_sheet_values
 from services.photos_service import get_download_bytes
 
 # Streamlit page configuration
-st.set_page_config(page_title="9 Freunde App", page_icon="🤱", layout="wide")
+LOGO_PATH = Path(__file__).resolve().parent / "images" / "logo.png"
+st.set_page_config(
+    page_title="9 Freunde App",
+    page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "🤱",
+    layout="wide",
+)
 
 
 def _trigger_rerun() -> None:
@@ -221,6 +228,9 @@ def _page_body(page: object, language: str) -> str:
 # Validate required secrets early and fail with clear UI guidance
 validate_config_or_stop()
 app_config = get_app_config()
+
+if LOGO_PATH.exists():
+    st.image(str(LOGO_PATH), width=180)
 
 # Initialize agents (ensure single instance per session)
 if "auth_agent" not in st.session_state:

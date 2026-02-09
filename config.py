@@ -38,6 +38,7 @@ class GoogleConfig:
     parents_tab: str
     consents_tab: str
     pickup_authorizations_tab: str
+    medications_tab: str
     content_pages_tab: str
     calendar_id: str | None
 
@@ -54,6 +55,7 @@ class LocalConfig:
     data_dir: Path
     children_file: Path
     pickup_authorizations_file: Path
+    medications_file: Path
     content_pages_file: Path
     calendar_file: Path
     drive_root: Path
@@ -99,6 +101,7 @@ DEFAULT_CHILDREN_TAB = "children"
 DEFAULT_PARENTS_TAB = "parents"
 DEFAULT_CONSENTS_TAB = "consents"
 DEFAULT_PICKUP_AUTHORIZATIONS_TAB = "pickup_authorizations"
+DEFAULT_MEDICATIONS_TAB = "medications"
 DEFAULT_CONTENT_PAGES_TAB = "content_pages"
 
 
@@ -191,6 +194,7 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
 
     children_file = data_dir / "children.json"
     pickup_authorizations_file = data_dir / "pickup_authorizations.json"
+    medications_file = data_dir / "medications.json"
     content_pages_file = data_dir / "content_pages.json"
     calendar_file = data_dir / "calendar_events.json"
     drive_root = data_dir / "drive"
@@ -202,6 +206,7 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
         data_dir=data_dir,
         children_file=children_file,
         pickup_authorizations_file=pickup_authorizations_file,
+        medications_file=medications_file,
         content_pages_file=content_pages_file,
         calendar_file=calendar_file,
         drive_root=drive_root,
@@ -269,6 +274,7 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         "pickup_authorizations_tab",
         DEFAULT_PICKUP_AUTHORIZATIONS_TAB,
     )
+    medications_tab = _read_tab_name(gcp, "medications_tab", DEFAULT_MEDICATIONS_TAB)
     content_pages_tab = _read_tab_name(
         gcp,
         "content_pages_tab",
@@ -293,6 +299,7 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
         parents_tab=parents_tab,
         consents_tab=consents_tab,
         pickup_authorizations_tab=pickup_authorizations_tab,
+        medications_tab=medications_tab,
         content_pages_tab=content_pages_tab,
         calendar_id=calendar_id,
     )

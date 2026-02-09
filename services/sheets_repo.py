@@ -56,6 +56,20 @@ PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS = [
 ]
 
 
+MEDICATIONS_REQUIRED_COLUMNS = [
+    "med_id",
+    "child_id",
+    "date_time",
+    "med_name",
+    "dose",
+    "given_by",
+    "notes",
+    "consent_doc_file_id",
+    "created_at",
+    "created_by",
+]
+
+
 class SheetsRepositoryError(RuntimeError):
     """Fehler beim Zugriff auf Google Sheets."""
 
@@ -115,6 +129,10 @@ def _consents_tab() -> str:
 
 def _pickup_authorizations_tab() -> str:
     return _google_config().pickup_authorizations_tab
+
+
+def _medications_tab() -> str:
+    return _google_config().medications_tab
 
 
 def _values_get(range_name: str) -> list[list[str]]:
@@ -226,6 +244,26 @@ def _ensure_pickup_authorizations_header_columns(
 
     if changed:
         _values_update(f"{_pickup_authorizations_tab()}!A1:ZZ1", [header])
+
+    return header
+
+
+def _ensure_medications_header_columns(required_columns: list[str]) -> list[str]:
+    rows = _values_get(f"{_medications_tab()}!A:ZZ")
+    if not rows:
+        header = ["med_id", "child_id", "date_time", "med_name", "dose", "given_by"]
+        _values_update(f"{_medications_tab()}!A1", [header])
+        rows = [[*header]]
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{_medications_tab()}!A1:ZZ1", [header])
 
     return header
 
@@ -475,3 +513,38 @@ def update_pickup_authorization(pickup_id: str, patch_dict: dict[str, Any]) -> N
 
     get_pickup_authorizations.clear()
     get_pickup_authorizations_by_child_id.clear()
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_medications() -> list[dict[str, str]]:
+    _ensure_medications_header_columns(MEDICATIONS_REQUIRED_COLUMNS)
+    rows = _values_get(f"{_medications_tab()}!A:ZZ")
+    records = _to_records(rows)
+    return sorted(records, key=lambda item: item.get("date_time", ""), reverse=True)
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_medications_by_child_id(child_id: str) -> list[dict[str, str]]:
+    normalized_child_id = child_id.strip()
+    records = [
+        medication
+        for medication in get_medications()
+        if medication.get("child_id", "").strip() == normalized_child_id
+    ]
+    return sorted(records, key=lambda item: item.get("date_time", ""), reverse=True)
+
+
+def add_medication(medication_dict: dict[str, Any]) -> str:
+    med_id = str(medication_dict.get("med_id") or uuid4().hex)
+    payload = {
+        **medication_dict,
+        "med_id": med_id,
+    }
+
+    header = _ensure_medications_header_columns(MEDICATIONS_REQUIRED_COLUMNS)
+    row_values = [str(payload.get(column, "")).strip() for column in header]
+    _values_append(f"{_medications_tab()}!A:ZZ", [row_values])
+
+    get_medications.clear()
+    get_medications_by_child_id.clear()
+    return med_id

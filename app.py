@@ -317,12 +317,15 @@ else:
                 "Verträge",
                 "Fotos",
                 "Kalender",
+                "Medikationen",
             ),
             index=0,
         )
     else:
         menu = st.sidebar.radio(
-            "Menü", ("Mein Kind", "Infos", "Dokumente", "Fotos", "Termine"), index=0
+            "Menü",
+            ("Mein Kind", "Infos", "Dokumente", "Fotos", "Termine", "Medikationen"),
+            index=0,
         )
 
     # Logout button at bottom of sidebar
@@ -1194,6 +1197,95 @@ else:
                     )
 
         # ---- Admin: Kalender ----
+        elif menu == "Medikationen":
+            st.subheader("Medikamentengabe-Log / Medication log")
+            children = stammdaten_manager.get_children()
+            if not children:
+                st.info(
+                    "Keine Kinder vorhanden. Bitte zuerst Stammdaten anlegen. / "
+                    "No children found. Please add master data first."
+                )
+            else:
+                selected_child = st.selectbox(
+                    "Kind auswählen / Select child",
+                    options=children,
+                    format_func=lambda item: str(item.get("name", "")),
+                    key="admin_medication_child",
+                )
+                child_id = str(selected_child.get("id", "")).strip()
+
+                with st.form("admin_medication_form"):
+                    med_datetime = st.text_input(
+                        "Zeitpunkt (ISO) / Date-time (ISO)",
+                        value=pd.Timestamp.now(tz="Europe/Berlin").strftime(
+                            "%Y-%m-%dT%H:%M"
+                        ),
+                        help="Beispiel / Example: 2026-01-15T08:30",
+                    )
+                    med_name = st.text_input("Medikament / Medication")
+                    dose = st.text_input("Dosis / Dose")
+                    given_by = st.text_input("Verabreicht von / Given by")
+                    notes = st.text_area("Notizen / Notes", height=90)
+                    consent_doc_file_id = st.text_input(
+                        "Consent-Dokument File-ID (optional) / Consent document file ID (optional)"
+                    )
+                    add_medication_submitted = st.form_submit_button(
+                        "Eintrag speichern / Save entry"
+                    )
+
+                if add_medication_submitted:
+                    if not med_name.strip() or not dose.strip() or not given_by.strip():
+                        st.error(
+                            "Bitte Medikament, Dosis und Verabreicht-von ausfüllen. / "
+                            "Please fill medication, dose, and given-by."
+                        )
+                    else:
+                        try:
+                            stammdaten_manager.add_medication(
+                                child_id,
+                                {
+                                    "date_time": med_datetime.strip(),
+                                    "med_name": med_name.strip(),
+                                    "dose": dose.strip(),
+                                    "given_by": given_by.strip(),
+                                    "notes": notes.strip(),
+                                    "consent_doc_file_id": consent_doc_file_id.strip(),
+                                },
+                                created_by=user_email,
+                            )
+                            st.success("Eintrag gespeichert. / Entry saved.")
+                            _trigger_rerun()
+                        except Exception as exc:
+                            st.error(
+                                "Eintrag konnte nicht gespeichert werden. / Could not save entry."
+                            )
+                            st.info(str(exc))
+
+                medication_records = stammdaten_manager.get_medications_by_child_id(
+                    child_id
+                )
+                st.markdown("**Einträge / Entries**")
+                if medication_records:
+                    for record in medication_records:
+                        consent_id = str(record.get("consent_doc_file_id", "")).strip()
+                        st.write(
+                            f"- **{record.get('date_time', '—')}** · "
+                            f"{record.get('med_name', '—')} · "
+                            f"{record.get('dose', '—')} · "
+                            f"{record.get('given_by', '—')}"
+                        )
+                        if record.get("notes"):
+                            st.caption(f"Notiz / Note: {record.get('notes')}")
+                        if consent_id:
+                            st.caption(f"Consent Doc File ID: `{consent_id}`")
+                        else:
+                            st.warning(
+                                "Hinweis: Kein Consent-Dokument verknüpft (optional). / "
+                                "Note: No consent document linked (optional)."
+                            )
+                else:
+                    st.caption("Noch keine Einträge vorhanden. / No entries yet.")
+
         elif menu == "Kalender":
             st.subheader("Neuer Termin / New event")
             title = st.text_input("Titel / Title")
@@ -1433,6 +1525,36 @@ else:
                     st.write("Keine Fotos vorhanden. / No photos available.")
             else:
                 st.write("Keine Fotos verfügbar. / No photos available.")
+        elif menu == "Medikationen":
+            st.subheader("Medikamentengabe / Medication log")
+            if child and child.get("id"):
+                child_id = str(child.get("id", "")).strip()
+                medication_records = stammdaten_manager.get_medications_by_child_id(
+                    child_id
+                )
+                if medication_records:
+                    for record in medication_records:
+                        st.write(
+                            f"- **{record.get('date_time', '—')}** · "
+                            f"{record.get('med_name', '—')} · "
+                            f"{record.get('dose', '—')} · "
+                            f"{record.get('given_by', '—')}"
+                        )
+                        if record.get("notes"):
+                            st.caption(f"Notiz / Note: {record.get('notes')}")
+                        if not str(record.get("consent_doc_file_id", "")).strip():
+                            st.caption(
+                                "Hinweis: Kein Consent-Dokument hinterlegt. / "
+                                "Note: No consent document linked."
+                            )
+                else:
+                    st.write(
+                        "Keine Medikamenten-Einträge vorhanden. / "
+                        "No medication entries available."
+                    )
+            else:
+                st.write("Keine Kinderdaten gefunden. / No child data found.")
+
         elif menu == "Termine":
             st.subheader("Termine / Events")
             try:

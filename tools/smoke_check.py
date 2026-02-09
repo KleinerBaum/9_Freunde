@@ -43,7 +43,7 @@ def _require_str(mapping: dict[str, Any], key: str, path: str) -> str:
 
 def _validate_secrets_schema(
     secrets: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     service_account_info_raw = secrets.get("gcp_service_account")
     if not isinstance(service_account_info_raw, dict):
         raise ValueError("Bereich [gcp_service_account] fehlt oder ist ungültig.")
@@ -56,9 +56,15 @@ def _validate_secrets_schema(
         _require_str(service_account_info_raw, key, "gcp_service_account")
 
     _require_str(gcp_raw, "drive_contracts_folder_id", "gcp")
-    _require_str(gcp_raw, "stammdaten_sheet_id", "gcp")
 
-    return service_account_info_raw, gcp_raw
+    sheet_id_value = gcp_raw.get("stammdaten_sheet_id")
+    spreadsheet_id = (
+        str(sheet_id_value).strip()
+        if isinstance(sheet_id_value, str) and str(sheet_id_value).strip()
+        else "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A"
+    )
+
+    return service_account_info_raw, gcp_raw, spreadsheet_id
 
 
 def _drive_check(
@@ -123,7 +129,7 @@ def _sheets_header_check(
 def run(secrets_path: Path) -> int:
     try:
         secrets = _load_secrets(secrets_path)
-        service_account_info, gcp = _validate_secrets_schema(secrets)
+        service_account_info, gcp, spreadsheet_id = _validate_secrets_schema(secrets)
         _print_status(True, f"Secrets geladen aus {secrets_path}.")
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         _print_status(False, f"Secrets-Check fehlgeschlagen: {error}")
@@ -137,7 +143,6 @@ def run(secrets_path: Path) -> int:
         return 1
 
     try:
-        spreadsheet_id = str(gcp["stammdaten_sheet_id"]).strip()
         _sheets_header_check(service_account_info, spreadsheet_id)
     except (HttpError, ValueError) as error:
         _print_status(False, f"Sheets-Check fehlgeschlagen: {error}")

@@ -89,7 +89,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
    - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos.
    - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente.
-   - `stammdaten_sheet_id`: die ID des Google Sheets für Stammdaten.
+   - `stammdaten_sheet_id` (optional): überschreibt die Standard-Tabelle `Stammdaten_Eltern_2026` (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
    - `calendar_id` (optional): die Kalender-ID für den Google Kalender der Einrichtung.
 
 ### API-Inventur (Stand: aktuell im Code)
@@ -185,7 +185,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 
 1. **Google Sheets API aktivieren**
 2. **Service Account mit dem Stammdaten-Sheet teilen** (Editor-Rechte)
-3. **Sheet-ID in `gcp.stammdaten_sheet_id` setzen**
+3. Optional **Sheet-ID über `gcp.stammdaten_sheet_id` setzen**, falls eine andere Tabelle als die Standard-Tabelle genutzt werden soll (`Stammdaten_Eltern_2026`, ID `1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
 4. Optional **Tabname für die Admin-Ansicht** über `gcp.stammdaten_sheet_tab` setzen (Default: `Stammdaten_Eltern_2026`).
 
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
@@ -220,7 +220,7 @@ universe_domain = "googleapis.com"
 calendar_id = "kita-kalender@group.calendar.google.com"
 drive_photos_root_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
 drive_contracts_folder_id = "1ZaYxWvUtSrQpOnMlKjIhGfEdCb"
-stammdaten_sheet_id = "1SheetIdForStammdaten"
+stammdaten_sheet_id = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A" # optional; Default ist dieser Wert
 
 [gcp_optional_apis]
 sheets_spreadsheet_id = "<optional>"
@@ -257,7 +257,7 @@ Pflicht (Google-Modus):
 - `[gcp]`
   - `drive_photos_root_folder_id`
   - `drive_contracts_folder_id`
-  - `stammdaten_sheet_id`
+  - `stammdaten_sheet_id` (optional, Default: `1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`)
 
 Optional:
 - `gcp.calendar_id`

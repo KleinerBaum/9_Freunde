@@ -205,6 +205,8 @@ Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine
 
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
+In derselben Admin-Ansicht steht außerdem ein **Export/Backup-Block (CSV + JSON)** bereit. Für zentrale Tabs (`children`, `parents`, optional `attendance`, `daily_logs`, `messages`) werden Download-Buttons angeboten. Leere Tabs werden als Hinweis angezeigt (kein Crash), und CSV-Exporte enthalten konsistente Header-/Spaltenreihenfolge basierend auf der Header-Zeile des jeweiligen Tabs.
+
 Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`
 - Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`

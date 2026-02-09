@@ -883,9 +883,6 @@ else:
                 export_tabs: list[tuple[str, str]] = [
                     ("children", app_config.google.children_tab),
                     ("parents", app_config.google.parents_tab),
-                    ("attendance", "attendance"),
-                    ("daily_logs", "daily_logs"),
-                    ("messages", "messages"),
                 ]
                 st.markdown("**Export / Backup (CSV + JSON)**")
                 for export_key, tab_name in export_tabs:

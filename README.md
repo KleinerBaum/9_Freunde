@@ -196,11 +196,15 @@ Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine
 
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
-Pflicht-Tab für Kinder:
-- `children` mit mindestens den Spalten `child_id`, `name`, `parent_email` (optional `folder_id`, `photo_folder_id`, `download_consent`)
+Pflicht-Tab für Kinder (`children`):
+- Basis: `child_id`, `name`, `parent_email`
+- Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`
+
+Empfohlener Eltern-Tab (`parents`):
+- Basis: `parent_id`, `email`, `name`, `phone`
+- Erweitert (automatisch ergänzt): `phone2`, `address`, `preferred_language`, `emergency_contact_name`, `emergency_contact_phone`, `notifications_opt_in`
 
 Optional:
-- `parents` (`parent_id`, `email`, `name`, `phone`)
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
 
 ### Beispiel für das finale `secrets.toml`

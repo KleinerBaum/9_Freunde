@@ -317,21 +317,59 @@ else:
             # Formular zum Hinzufügen eines neuen Kindes
             st.write("**Neues Kind anlegen:**")
             with st.form(key="new_child_form"):
-                name = st.text_input("Name des Kindes")
-                parent_email = st.text_input("E-Mail Elternteil")
-                submitted = st.form_submit_button("Hinzufügen")
+                name = st.text_input("Name des Kindes / Child name")
+                parent_email = st.text_input("E-Mail Elternteil / Parent email")
+                birthdate = st.text_input("Geburtsdatum (YYYY-MM-DD) / Birthdate")
+                start_date = st.text_input("Startdatum (YYYY-MM-DD) / Start date")
+                group = st.text_input("Gruppe / Group", value="Igel")
+                primary_caregiver = st.text_input(
+                    "Bezugserzieher:in / Primary caregiver"
+                )
+                allergies = st.text_input("Allergien / Allergies")
+                notes_parent_visible = st.text_area(
+                    "Hinweise für Eltern sichtbar / Parent-visible notes",
+                    height=80,
+                )
+                notes_internal = st.text_area(
+                    "Interne Hinweise (nur Leitung) / Internal notes",
+                    height=80,
+                )
+                pickup_password = st.text_input(
+                    "Abhol-Kennwort (optional) / Pickup password",
+                    type="password",
+                )
+                status = st.selectbox("Status", options=["active", "archived"], index=0)
+                submitted = st.form_submit_button("Hinzufügen / Add child")
             if submitted:
                 if name.strip() == "" or parent_email.strip() == "":
-                    st.error("Bitte Name und Eltern-E-Mail angeben.")
+                    st.error(
+                        "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
+                    )
                 else:
                     try:
-                        stammdaten_manager.add_child(name.strip(), parent_email.strip())
+                        new_child_id = stammdaten_manager.add_child(
+                            name.strip(), parent_email.strip()
+                        )
+                        stammdaten_manager.update_child(
+                            new_child_id,
+                            {
+                                "birthdate": birthdate.strip(),
+                                "start_date": start_date.strip(),
+                                "group": group.strip(),
+                                "primary_caregiver": primary_caregiver.strip(),
+                                "allergies": allergies.strip(),
+                                "notes_parent_visible": notes_parent_visible.strip(),
+                                "notes_internal": notes_internal.strip(),
+                                "pickup_password": pickup_password.strip(),
+                                "status": status,
+                            },
+                        )
                         st.success(
                             f"Kind '{name}' hinzugefügt. / Child '{name}' added."
                         )
                         _trigger_rerun()
                     except Exception as e:
-                        st.error(f"Fehler beim Speichern: {e}")
+                        st.error(f"Fehler beim Speichern / Save error: {e}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
                 selected_child_name = st.selectbox(
@@ -352,6 +390,50 @@ else:
                     edit_parent_email = st.text_input(
                         "E-Mail Elternteil / Parent email",
                         value=selected_child.get("parent_email", ""),
+                    )
+                    edit_birthdate = st.text_input(
+                        "Geburtsdatum (YYYY-MM-DD) / Birthdate",
+                        value=selected_child.get("birthdate", ""),
+                    )
+                    edit_start_date = st.text_input(
+                        "Startdatum (YYYY-MM-DD) / Start date",
+                        value=selected_child.get("start_date", ""),
+                    )
+                    edit_group = st.text_input(
+                        "Gruppe / Group",
+                        value=selected_child.get("group", ""),
+                    )
+                    edit_primary_caregiver = st.text_input(
+                        "Bezugserzieher:in / Primary caregiver",
+                        value=selected_child.get("primary_caregiver", ""),
+                    )
+                    edit_allergies = st.text_input(
+                        "Allergien / Allergies",
+                        value=selected_child.get("allergies", ""),
+                    )
+                    edit_notes_parent_visible = st.text_area(
+                        "Hinweise für Eltern sichtbar / Parent-visible notes",
+                        value=selected_child.get("notes_parent_visible", ""),
+                        height=80,
+                    )
+                    edit_notes_internal = st.text_area(
+                        "Interne Hinweise (nur Leitung) / Internal notes",
+                        value=selected_child.get("notes_internal", ""),
+                        height=80,
+                    )
+                    edit_pickup_password = st.text_input(
+                        "Abhol-Kennwort (optional) / Pickup password",
+                        value=selected_child.get("pickup_password", ""),
+                        type="password",
+                    )
+                    status_options = ["active", "archived"]
+                    current_status = str(selected_child.get("status", "active")).strip()
+                    if current_status not in status_options:
+                        current_status = "active"
+                    edit_status = st.selectbox(
+                        "Status",
+                        options=status_options,
+                        index=status_options.index(current_status),
                     )
                     current_download_consent = (
                         str(selected_child.get("download_consent", "pixelated"))
@@ -386,6 +468,15 @@ else:
                                 {
                                     "name": edit_name.strip(),
                                     "parent_email": edit_parent_email.strip(),
+                                    "birthdate": edit_birthdate.strip(),
+                                    "start_date": edit_start_date.strip(),
+                                    "group": edit_group.strip(),
+                                    "primary_caregiver": edit_primary_caregiver.strip(),
+                                    "allergies": edit_allergies.strip(),
+                                    "notes_parent_visible": edit_notes_parent_visible.strip(),
+                                    "notes_internal": edit_notes_internal.strip(),
+                                    "pickup_password": edit_pickup_password.strip(),
+                                    "status": edit_status,
                                     "download_consent": edit_download_consent,
                                 },
                             )
@@ -713,9 +804,22 @@ else:
             st.subheader("Mein Kind - Übersicht")
             if child:
                 st.write(f"**Name:** {child.get('name')}")
-                # Weitere Infos könnten hier angezeigt werden (z.B. Geburtstag, Notizen)
+                if child.get("birthdate"):
+                    st.write(f"**Geburtsdatum / Birthdate:** {child.get('birthdate')}")
+                if child.get("start_date"):
+                    st.write(f"**Startdatum / Start date:** {child.get('start_date')}")
+                if child.get("group"):
+                    st.write(f"**Gruppe / Group:** {child.get('group')}")
+                if child.get("primary_caregiver"):
+                    st.write(
+                        f"**Bezugserzieher:in / Primary caregiver:** {child.get('primary_caregiver')}"
+                    )
+                if child.get("allergies"):
+                    st.write(f"**Allergien / Allergies:** {child.get('allergies')}")
+                if child.get("notes_parent_visible"):
+                    st.info(f"Hinweise / Notes:\n\n{child.get('notes_parent_visible')}")
             else:
-                st.write("Keine Kinderdaten gefunden.")
+                st.write("Keine Kinderdaten gefunden. / No child data found.")
         elif menu == "Dokumente":
             st.subheader("Dokumente Ihres Kindes")
             if child and child.get("folder_id"):

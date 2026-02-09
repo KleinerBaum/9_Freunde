@@ -72,6 +72,17 @@ def _normalize_active_flag(value: str | bool | None) -> bool:
     return str(value or "false").strip().lower() == "true"
 
 
+PHOTO_STATUS_OPTIONS = ("draft", "published", "archived")
+DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
+
+
+def _normalize_photo_status(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in PHOTO_STATUS_OPTIONS:
+        return normalized
+    return DEFAULT_PARENT_VISIBILITY_STATUS
+
+
 def _active_flag_to_string(value: bool) -> str:
     return "true" if value else "false"
 
@@ -1254,9 +1265,22 @@ else:
                             raise ValueError(
                                 "Kein Foto-Ordner für dieses Kind vorhanden. / No photo folder configured for this child."
                             )
-                        photo_agent.upload_photo(image_file, photo_folder_id)
+                        file_id = photo_agent.upload_photo(image_file, photo_folder_id)
+                        stammdaten_manager.upsert_photo_meta(
+                            file_id,
+                            {
+                                "child_id": child_id,
+                                "album": "",
+                                "status": "draft",
+                                "uploaded_at": pd.Timestamp.now(
+                                    tz="Europe/Berlin"
+                                ).isoformat(),
+                                "uploaded_by": user_email,
+                                "retention_until": "",
+                            },
+                        )
                         st.success(
-                            f"Foto für {selected_name} hochgeladen. / Photo uploaded for {selected_name}."
+                            f"Foto für {selected_name} hochgeladen (Status: draft). / Photo uploaded for {selected_name} (status: draft)."
                         )
                         st.image(
                             image_file,
@@ -1267,6 +1291,77 @@ else:
                         st.error(
                             f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
                         )
+
+                st.markdown("### Foto-Status verwalten / Manage photo status")
+                child_id = str(sel_child.get("id", "")).strip()
+                if app_config.storage_mode == "google":
+                    current_photo_folder_id = ensure_child_photo_folder(child_id)
+                else:
+                    current_photo_folder_id = str(
+                        sel_child.get("photo_folder_id")
+                        or sel_child.get("folder_id")
+                        or ""
+                    )
+
+                child_photos = (
+                    drive_agent.list_files(
+                        current_photo_folder_id, mime_type_filter="image/"
+                    )
+                    if current_photo_folder_id
+                    else []
+                )
+                if child_photos:
+                    for child_photo in child_photos:
+                        meta = (
+                            stammdaten_manager.get_photo_meta_by_file_id(
+                                str(child_photo.get("id", ""))
+                            )
+                            or {}
+                        )
+                        current_status = _normalize_photo_status(meta.get("status"))
+                        col_file, col_status = st.columns([2, 2])
+                        with col_file:
+                            st.write(f"**{child_photo.get('name', 'photo')}**")
+                            st.caption(f"ID: {child_photo.get('id', '-')}")
+                        with col_status:
+                            selected_status = st.selectbox(
+                                "Status / Status",
+                                options=list(PHOTO_STATUS_OPTIONS),
+                                index=list(PHOTO_STATUS_OPTIONS).index(current_status),
+                                key=f"admin_photo_status_{child_photo.get('id', '')}",
+                            )
+                        if selected_status != current_status:
+                            try:
+                                stammdaten_manager.upsert_photo_meta(
+                                    str(child_photo.get("id", "")),
+                                    {
+                                        "child_id": child_id,
+                                        "status": selected_status,
+                                        "uploaded_by": str(meta.get("uploaded_by", ""))
+                                        or user_email,
+                                        "uploaded_at": str(meta.get("uploaded_at", ""))
+                                        or pd.Timestamp.now(
+                                            tz="Europe/Berlin"
+                                        ).isoformat(),
+                                        "album": str(meta.get("album", "")),
+                                        "retention_until": str(
+                                            meta.get("retention_until", "")
+                                        ),
+                                    },
+                                )
+                                st.success(
+                                    "Foto-Status aktualisiert. / Photo status updated."
+                                )
+                                _trigger_rerun()
+                            except Exception as exc:
+                                st.error(
+                                    f"Foto-Status konnte nicht gespeichert werden. / Could not save photo status: {exc}"
+                                )
+                else:
+                    st.caption(
+                        "Keine Fotos für dieses Kind gefunden. / No photos found for this child."
+                    )
+
                 if app_config.storage_mode == "google":
                     st.info(
                         "Fotos werden in `photos/<child_id>/`-Ordnern abgelegt. Eltern sehen nur den eigenen Ordner. / "
@@ -1536,6 +1631,18 @@ else:
                         if photo_folder_id
                         else []
                     )
+                    published_photos: list[dict[str, str]] = []
+                    for photo in photos:
+                        file_id = str(photo.get("id", "")).strip()
+                        if not file_id:
+                            continue
+                        meta = stammdaten_manager.get_photo_meta_by_file_id(file_id)
+                        status = _normalize_photo_status(
+                            None if meta is None else meta.get("status")
+                        )
+                        if status == "published":
+                            published_photos.append(photo)
+                    photos = published_photos
                 except Exception as exc:
                     photos = []
                     st.error(
@@ -1604,7 +1711,9 @@ else:
                             key=f"download_photo_{file_id}_{active_consent_mode}",
                         )
                 else:
-                    st.write("Keine Fotos vorhanden. / No photos available.")
+                    st.write(
+                        "Keine veröffentlichten Fotos vorhanden. / No published photos available."
+                    )
             else:
                 st.write("Keine Fotos verfügbar. / No photos available.")
         elif menu == "Medikationen":

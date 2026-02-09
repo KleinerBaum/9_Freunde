@@ -69,6 +69,16 @@ MEDICATIONS_REQUIRED_COLUMNS = [
     "created_by",
 ]
 
+PHOTO_META_REQUIRED_COLUMNS = [
+    "file_id",
+    "child_id",
+    "album",
+    "status",
+    "uploaded_at",
+    "uploaded_by",
+    "retention_until",
+]
+
 
 class SheetsRepositoryError(RuntimeError):
     """Fehler beim Zugriff auf Google Sheets."""
@@ -133,6 +143,10 @@ def _pickup_authorizations_tab() -> str:
 
 def _medications_tab() -> str:
     return _google_config().medications_tab
+
+
+def _photo_meta_tab() -> str:
+    return _google_config().photo_meta_tab
 
 
 def _values_get(range_name: str) -> list[list[str]]:
@@ -264,6 +278,34 @@ def _ensure_medications_header_columns(required_columns: list[str]) -> list[str]
 
     if changed:
         _values_update(f"{_medications_tab()}!A1:ZZ1", [header])
+
+    return header
+
+
+def _ensure_photo_meta_header_columns(required_columns: list[str]) -> list[str]:
+    rows = _values_get(f"{_photo_meta_tab()}!A:ZZ")
+    if not rows:
+        header = [
+            "file_id",
+            "child_id",
+            "album",
+            "status",
+            "uploaded_at",
+            "uploaded_by",
+            "retention_until",
+        ]
+        _values_update(f"{_photo_meta_tab()}!A1", [header])
+        rows = [[*header]]
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{_photo_meta_tab()}!A1:ZZ1", [header])
 
     return header
 
@@ -548,3 +590,77 @@ def add_medication(medication_dict: dict[str, Any]) -> str:
     get_medications.clear()
     get_medications_by_child_id.clear()
     return med_id
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_photo_meta_records() -> list[dict[str, str]]:
+    _ensure_photo_meta_header_columns(PHOTO_META_REQUIRED_COLUMNS)
+    rows = _values_get(f"{_photo_meta_tab()}!A:ZZ")
+    return _to_records(rows)
+
+
+@st.cache_data(ttl=DEFAULT_CACHE_TTL_SECONDS, show_spinner=False)
+def get_photo_meta_by_file_id(file_id: str) -> dict[str, str] | None:
+    normalized_file_id = file_id.strip()
+    for record in get_photo_meta_records():
+        if record.get("file_id", "").strip() == normalized_file_id:
+            return record
+    return None
+
+
+def add_photo_meta(meta_dict: dict[str, Any]) -> str:
+    file_id = str(meta_dict.get("file_id", "")).strip()
+    if not file_id:
+        raise ValueError("file_id ist erforderlich.")
+
+    if get_photo_meta_by_file_id(file_id):
+        raise ValueError(f"photo_meta mit file_id='{file_id}' existiert bereits.")
+
+    payload = {**meta_dict, "file_id": file_id}
+    header = _ensure_photo_meta_header_columns(PHOTO_META_REQUIRED_COLUMNS)
+    row_values = [str(payload.get(column, "")).strip() for column in header]
+    _values_append(f"{_photo_meta_tab()}!A:ZZ", [row_values])
+
+    get_photo_meta_records.clear()
+    get_photo_meta_by_file_id.clear()
+    return file_id
+
+
+def upsert_photo_meta(file_id: str, patch_dict: dict[str, Any]) -> None:
+    normalized_file_id = file_id.strip()
+    if not normalized_file_id:
+        raise ValueError("file_id ist erforderlich.")
+
+    _ensure_photo_meta_header_columns(PHOTO_META_REQUIRED_COLUMNS)
+
+    try:
+        row_index, header = _get_row_index_by_id(
+            _photo_meta_tab(),
+            "file_id",
+            normalized_file_id,
+        )
+    except KeyError:
+        payload = {"file_id": normalized_file_id}
+        payload.update({key: str(value).strip() for key, value in patch_dict.items()})
+        row_values = [
+            str(payload.get(column, "")).strip()
+            for column in PHOTO_META_REQUIRED_COLUMNS
+        ]
+        _values_append(f"{_photo_meta_tab()}!A:ZZ", [row_values])
+    else:
+        existing_rows = _values_get(f"{_photo_meta_tab()}!A{row_index}:ZZ{row_index}")
+        existing_row = existing_rows[0] if existing_rows else []
+        current_payload = {
+            column: str(existing_row[index]).strip()
+            if index < len(existing_row)
+            else ""
+            for index, column in enumerate(header)
+        }
+        current_payload.update(
+            {key: str(value).strip() for key, value in patch_dict.items()}
+        )
+        row_values = [current_payload.get(column, "") for column in header]
+        _values_update(f"{_photo_meta_tab()}!A{row_index}:ZZ{row_index}", [row_values])
+
+    get_photo_meta_records.clear()
+    get_photo_meta_by_file_id.clear()

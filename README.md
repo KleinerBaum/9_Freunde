@@ -199,6 +199,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
    - `gcp.consents_tab` (Default: `consents`)
    - `gcp.pickup_authorizations_tab` (Default: `pickup_authorizations`)
    - `gcp.medications_tab` (Default: `medications`)
+   - `gcp.photo_meta_tab` (Default: `photo_meta`)
    - `gcp.content_pages_tab` (Default: `content_pages`)
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
@@ -253,6 +254,7 @@ parents_tab = "parents"                         # optional; Default: parents
 consents_tab = "consents"                       # optional; Default: consents
 pickup_authorizations_tab = "pickup_authorizations"  # optional; Default: pickup_authorizations
 medications_tab = "medications" # optional; Default: medications
+photo_meta_tab = "photo_meta" # optional; Default: photo_meta
 content_pages_tab = "content_pages" # optional; Default: content_pages
 
 [gcp_optional_apis]
@@ -280,6 +282,14 @@ enable_web_search = true            # optional
 ```
 
 Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.
+
+## Foto-Freigabe-Workflow (Draft/Published/Archived)
+
+- Beim Upload wird pro Foto ein Metadatensatz im Tab `photo_meta` angelegt (`status=draft`).
+- Admins können den Status je Foto in der UI auf `draft`, `published` oder `archived` setzen.
+- Eltern sehen ausschließlich Fotos mit Status `published`.
+- Bestehende Fotos ohne Metadaten bleiben kompatibel und werden defensiv als `draft` behandelt.
+- Download-Consent (`pixelated`/`unpixelated`) und Verpixelungslogik beim Download bleiben unverändert.
 
 ## Fehlerbehebung
 

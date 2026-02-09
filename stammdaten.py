@@ -38,6 +38,7 @@ class StammdatenManager:
         self.children_file = self.config.local.children_file
         self.pickup_authorizations_file = self.config.local.pickup_authorizations_file
         self.medications_file = self.config.local.medications_file
+        self.photo_meta_file = self.config.local.photo_meta_file
 
         if self.storage_mode != "google":
             self.children_file.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,8 @@ class StammdatenManager:
                 self.pickup_authorizations_file.write_text("[]", encoding="utf-8")
             if not self.medications_file.exists():
                 self.medications_file.write_text("[]", encoding="utf-8")
+            if not self.photo_meta_file.exists():
+                self.photo_meta_file.write_text("[]", encoding="utf-8")
 
     def _read_local_children(self) -> list[dict[str, Any]]:
         if not self.children_file.exists():
@@ -84,6 +87,18 @@ class StammdatenManager:
     def _write_local_medications(self, medications: list[dict[str, Any]]) -> None:
         self.medications_file.write_text(
             json.dumps(medications, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _read_local_photo_meta(self) -> list[dict[str, Any]]:
+        if not self.photo_meta_file.exists():
+            return []
+        data = json.loads(self.photo_meta_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_photo_meta(self, records: list[dict[str, Any]]) -> None:
+        self.photo_meta_file.write_text(
+            json.dumps(records, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
@@ -310,6 +325,60 @@ class StammdatenManager:
             reverse=True,
         )
         return normalized_records
+
+    def get_photo_meta_records(self) -> list[dict[str, Any]]:
+        """Liefert alle Foto-Metadaten."""
+        if self.storage_mode == "google":
+            records = sheets_repo.get_photo_meta_records()
+        else:
+            records = self._read_local_photo_meta()
+        return [
+            {key: str(value).strip() for key, value in record.items()}
+            for record in records
+        ]
+
+    def get_photo_meta_by_file_id(self, file_id: str) -> dict[str, Any] | None:
+        """Liefert Foto-Metadaten zu einer File-ID."""
+        normalized_file_id = file_id.strip()
+        if self.storage_mode == "google":
+            record = sheets_repo.get_photo_meta_by_file_id(normalized_file_id)
+            if not record:
+                return None
+            return {key: str(value).strip() for key, value in record.items()}
+
+        for record in self._read_local_photo_meta():
+            if str(record.get("file_id", "")).strip() == normalized_file_id:
+                return {key: str(value).strip() for key, value in record.items()}
+        return None
+
+    def upsert_photo_meta(self, file_id: str, patch_data: dict[str, Any]) -> None:
+        """Legt Foto-Metadaten an oder aktualisiert bestehende Einträge."""
+        normalized_file_id = file_id.strip()
+        if not normalized_file_id:
+            raise ValueError("file_id ist erforderlich.")
+
+        normalized_patch = {
+            key: str(value).strip() for key, value in patch_data.items()
+        }
+
+        if self.storage_mode == "google":
+            sheets_repo.upsert_photo_meta(normalized_file_id, normalized_patch)
+            return
+
+        records = self._read_local_photo_meta()
+        for index, record in enumerate(records):
+            if str(record.get("file_id", "")).strip() == normalized_file_id:
+                merged_record = {
+                    **record,
+                    **normalized_patch,
+                    "file_id": normalized_file_id,
+                }
+                records[index] = merged_record
+                self._write_local_photo_meta(records)
+                return
+
+        records.append({"file_id": normalized_file_id, **normalized_patch})
+        self._write_local_photo_meta(records)
 
     def add_medication(
         self,

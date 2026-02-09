@@ -7,6 +7,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache).
 - **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
+- **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 
 
@@ -42,6 +43,7 @@ Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben wer
 Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
 
 - `data/children.json` für Stammdaten
+- `data/content_pages.json` für Infos-Seiten (Fallback im Local-Mode)
 - `data/calendar_events.json` für Termine
 - `data/drive/` für Dokumente und Fotos
 
@@ -191,6 +193,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
    - `gcp.children_tab` (Default: `children`)
    - `gcp.parents_tab` (Default: `parents`)
    - `gcp.consents_tab` (Default: `consents`)
+   - `gcp.content_pages_tab` (Default: `content_pages`)
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
 
@@ -234,6 +237,7 @@ stammdaten_sheet_id = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A" # optional;
 children_tab = "children"   # optional; Default: children
 parents_tab = "parents"     # optional; Default: parents
 consents_tab = "consents"   # optional; Default: consents
+content_pages_tab = "content_pages" # optional; Default: content_pages
 
 [gcp_optional_apis]
 sheets_spreadsheet_id = "<optional>"

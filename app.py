@@ -26,6 +26,7 @@ from services.drive_service import (
     list_files_in_folder,
     upload_bytes_to_folder,
 )
+from services.content_repo import ContentRepository, ContentRepositoryError
 from services.sheets_repo import SheetsRepositoryError
 from services.sheets_service import SheetsServiceError, read_sheet_values
 from services.photos_service import get_download_bytes
@@ -184,6 +185,22 @@ def _run_google_connection_check(
     return checks
 
 
+def _page_title(page: object, language: str) -> str:
+    title_de = str(getattr(page, "title_de", "")).strip()
+    title_en = str(getattr(page, "title_en", "")).strip()
+    if language == "en":
+        return title_en or title_de or "Untitled"
+    return title_de or title_en or "Ohne Titel"
+
+
+def _page_body(page: object, language: str) -> str:
+    body_de = str(getattr(page, "body_md_de", "")).strip()
+    body_en = str(getattr(page, "body_md_en", "")).strip()
+    if language == "en":
+        return body_en or body_de
+    return body_de or body_en
+
+
 # Validate required secrets early and fail with clear UI guidance
 validate_config_or_stop()
 app_config = get_app_config()
@@ -205,6 +222,7 @@ stammdaten_manager = st.session_state.stammdaten_manager
 drive_agent = st.session_state.drive_agent
 doc_agent = st.session_state.doc_agent
 photo_agent = st.session_state.photo_agent
+content_repo = ContentRepository()
 
 # Check if user is logged in
 if "user" not in st.session_state or st.session_state.get("user") is None:
@@ -259,6 +277,7 @@ else:
             (
                 "Stammdaten",
                 "Stammdaten Sheet",
+                "Infos verwalten",
                 "Dokumente",
                 "Verträge",
                 "Fotos",
@@ -268,7 +287,7 @@ else:
         )
     else:
         menu = st.sidebar.radio(
-            "Menü", ("Mein Kind", "Dokumente", "Fotos", "Termine"), index=0
+            "Menü", ("Mein Kind", "Infos", "Dokumente", "Fotos", "Termine"), index=0
         )
 
     # Logout button at bottom of sidebar
@@ -553,6 +572,128 @@ else:
                             dataframe = pd.DataFrame(normalized_rows, columns=header)
                             st.dataframe(dataframe, use_container_width=True)
 
+        # ---- Admin: Infos verwalten ----
+        elif menu == "Infos verwalten":
+            st.subheader("Infos verwalten / Manage info pages")
+            language = st.radio(
+                "Sprache / Language",
+                options=["de", "en"],
+                horizontal=True,
+                format_func=lambda value: "Deutsch" if value == "de" else "English",
+            )
+
+            try:
+                pages = content_repo.list_pages()
+            except ContentRepositoryError as exc:
+                st.error(
+                    "Inhalte konnten nicht geladen werden. / Could not load content pages."
+                )
+                st.info(str(exc))
+                pages = []
+
+            st.write("**Bestehende Seiten / Existing pages**")
+            if pages:
+                overview_df = pd.DataFrame(
+                    [
+                        {
+                            "slug": page.slug,
+                            "title": _page_title(page, language),
+                            "audience": page.audience,
+                            "published": page.published,
+                            "updated_at": page.updated_at,
+                        }
+                        for page in pages
+                    ]
+                )
+                st.dataframe(overview_df, use_container_width=True)
+            else:
+                st.caption("Noch keine Seiten vorhanden. / No pages yet.")
+
+            selected_slug = st.selectbox(
+                "Seite bearbeiten / Edit page",
+                options=[""] + [page.slug for page in pages],
+                format_func=lambda value: "Neue Seite anlegen / Create new page"
+                if value == ""
+                else value,
+            )
+            selected_page = (
+                content_repo.get_page(selected_slug) if selected_slug else None
+            )
+
+            with st.form("content_page_form"):
+                slug_value = st.text_input(
+                    "Slug (z. B. packing_list)",
+                    value=selected_page.slug if selected_page else "",
+                    help="Eindeutige Kennung der Seite / Unique page identifier",
+                )
+                title_de = st.text_input(
+                    "Titel (DE)",
+                    value=selected_page.title_de if selected_page else "",
+                )
+                title_en = st.text_input(
+                    "Title (EN)",
+                    value=selected_page.title_en if selected_page else "",
+                )
+                body_md_de = st.text_area(
+                    "Inhalt (Markdown, DE)",
+                    value=selected_page.body_md_de if selected_page else "",
+                    height=180,
+                )
+                body_md_en = st.text_area(
+                    "Content (Markdown, EN)",
+                    value=selected_page.body_md_en if selected_page else "",
+                    height=180,
+                )
+                audience = st.selectbox(
+                    "Zielgruppe / Audience",
+                    options=["both", "parent", "admin"],
+                    index=["both", "parent", "admin"].index(selected_page.audience)
+                    if selected_page
+                    else 0,
+                )
+                published = st.checkbox(
+                    "Veröffentlicht / Published",
+                    value=selected_page.published if selected_page else True,
+                )
+                save_page = st.form_submit_button("Speichern / Save")
+
+            if save_page:
+                try:
+                    content_repo.upsert_page(
+                        {
+                            "slug": slug_value,
+                            "title_de": title_de,
+                            "title_en": title_en,
+                            "body_md_de": body_md_de,
+                            "body_md_en": body_md_en,
+                            "audience": audience,
+                            "published": published,
+                        }
+                    )
+                    st.success("Seite gespeichert. / Page saved.")
+                    _trigger_rerun()
+                except ContentRepositoryError as exc:
+                    st.error("Speichern fehlgeschlagen. / Save failed.")
+                    st.info(str(exc))
+
+            if selected_page is not None:
+                if st.button("Seite löschen / Delete page"):
+                    try:
+                        content_repo.delete_page(selected_page.slug)
+                        st.success("Seite gelöscht. / Page deleted.")
+                        _trigger_rerun()
+                    except ContentRepositoryError as exc:
+                        st.error("Löschen fehlgeschlagen. / Delete failed.")
+                        st.info(str(exc))
+
+                st.write("**Vorschau / Preview**")
+                st.markdown(f"### {_page_title(selected_page, language)}")
+                body_preview = _page_body(selected_page, language)
+                if body_preview:
+                    st.markdown(body_preview)
+                else:
+                    st.caption("Kein Inhalt vorhanden. / No content available.")
+
         # ---- Admin: Dokumente ----
         elif menu == "Dokumente":
             st.subheader("Dokumente generieren und verwalten")
@@ -820,6 +961,48 @@ else:
                     st.info(f"Hinweise / Notes:\n\n{child.get('notes_parent_visible')}")
             else:
                 st.write("Keine Kinderdaten gefunden. / No child data found.")
+        elif menu == "Infos":
+            st.subheader("Infos / Information")
+            language = st.radio(
+                "Sprache / Language",
+                options=["de", "en"],
+                horizontal=True,
+                format_func=lambda value: "Deutsch" if value == "de" else "English",
+                key="parent_infos_language",
+            )
+            try:
+                pages = [
+                    page
+                    for page in content_repo.list_pages()
+                    if page.published and page.audience in {"parent", "both"}
+                ]
+            except ContentRepositoryError as exc:
+                pages = []
+                st.error(
+                    "Infos konnten nicht geladen werden. / Could not load info pages."
+                )
+                st.info(str(exc))
+
+            if not pages:
+                st.info(
+                    "Derzeit sind keine veröffentlichten Infos verfügbar. / "
+                    "No published info pages are currently available."
+                )
+            else:
+                selected_slug = st.selectbox(
+                    "Seite auswählen / Select page",
+                    options=[page.slug for page in pages],
+                )
+                selected_page = next(
+                    page for page in pages if page.slug == selected_slug
+                )
+                st.markdown(f"### {_page_title(selected_page, language)}")
+                page_content = _page_body(selected_page, language)
+                if page_content:
+                    st.markdown(page_content)
+                else:
+                    st.caption("Kein Inhalt vorhanden. / No content available.")
+
         elif menu == "Dokumente":
             st.subheader("Dokumente Ihres Kindes")
             if child and child.get("folder_id"):

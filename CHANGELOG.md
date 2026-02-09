@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- Neuer Infos-Bereich für Eltern (`Infos`) mit read-only Darstellung veröffentlichter Seiten aus `content_pages` (Filter: `published=true` und `audience in {parent,both}`) inkl. DE/EN-Sprachumschaltung.
+- Neuer Admin-Bereich `Infos verwalten` mit einfachem CRUD-Flow (Liste → Edit/Create → Preview) für Markdown-Inhalte (`title_*`, `body_md_*`, `audience`, `published`).
+- Neues Repository `services/content_repo.py` für `content_pages` inkl. Google-Sheets-Header-Auto-Setup und lokalem JSON-Fallback (`data/content_pages.json`).
+
+### Changed
+- Konfiguration erweitert um `gcp.content_pages_tab` (Default `content_pages`) und lokalen Pfad `local.content_pages_file`.
+
+### Added
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.
 
 ### Changed

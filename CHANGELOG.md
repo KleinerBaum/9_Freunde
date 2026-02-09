@@ -3,9 +3,13 @@
 ## Unreleased
 
 ### Added
-- Admin-Ansicht **"Stammdaten Sheet"** um Export/Backup-Funktionen erweitert: zentrale Tabs (`children`, `parents`) sowie optionale Tabs (`attendance`, `daily_logs`, `messages`) können jetzt direkt als **CSV** und **JSON** heruntergeladen werden.
+- Foto-Freigabe-Workflow erweitert: neuer Schema-Tab `photo_meta` (konfigurierbar über `gcp.photo_meta_tab`, Default `photo_meta`) inkl. lokalem Fallback `data/photo_meta.json`.
+- Admin-Bereich **Fotos** um Statusverwaltung pro Datei erweitert (`draft`/`published`/`archived`).
 
 ### Changed
+- Eltern sehen in **Fotos** nur noch Bilder mit Status `published`; bestehende Bilder ohne Metadaten bleiben kompatibel und werden als `draft` behandelt.
+- Foto-Upload legt jetzt automatisch Metadaten (`file_id`, `child_id`, `status`, `uploaded_at`, `uploaded_by`) an; Consent/Verpixelungs-Download bleibt unverändert.
+- Admin-Ansicht **"Stammdaten Sheet"** um Export/Backup-Funktionen erweitert: zentrale Tabs (`children`, `parents`) sowie optionale Tabs (`attendance`, `daily_logs`, `messages`) können jetzt direkt als **CSV** und **JSON** heruntergeladen werden.
 - Export-Handling für Google-Sheets-Tabellen robust gemacht: leere Tabs oder fehlende Header führen zu klaren DE/EN-Hinweisen statt Absturz; CSV-Dateien nutzen konsistente Spaltenreihenfolge anhand der Header-Zeile.
 
 ### Changed

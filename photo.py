@@ -6,7 +6,7 @@ from storage import DriveAgent
 
 
 class PhotoAgent:
-    def upload_photo(self, image_file: Any, folder_id: str) -> bool:
+    def upload_photo(self, image_file: Any, folder_id: str) -> str:
         """Speichert ein hochgeladenes Foto im zugewiesenen Kind-Ordner."""
         img_bytes = image_file.getvalue()
 
@@ -17,8 +17,10 @@ class PhotoAgent:
             mime_type = "image/jpeg"
 
         drive_agent = DriveAgent()
-        drive_agent.upload_file(file_name, img_bytes, mime_type, folder_id)
-        return True
+        file_id = drive_agent.upload_file(file_name, img_bytes, mime_type, folder_id)
+        if not file_id:
+            raise RuntimeError("Upload fehlgeschlagen: keine file_id erhalten.")
+        return str(file_id)
 
     def face_detection_enabled(self) -> bool:
         """Face-Recognition ist im MVP deaktiviert."""

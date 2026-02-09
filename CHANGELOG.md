@@ -48,6 +48,7 @@
 - Stammdaten-Backend von Firebase/Firestore auf Google Sheets umgestellt: neuer `services/sheets_repo.py` (Read/Append/Update inkl. Cache + Cache-Invalidierung), `StammdatenManager` liest/schreibt im Google-Modus über Sheets (`children`/`parents`), Parent-Ansicht lädt ausschließlich das zugeordnete Kind über E-Mail, und die Admin-UI unterstützt jetzt zusätzlich das Bearbeiten bestehender Kind-Datensätze.
 - Firebase-Initialisierung aus Auth/Storage entfernt und `firebase-admin` aus `requirements.txt` entfernt, damit die App ohne Firebase-Abhängigkeit lauffähig ist.
 ### Changed
+- `services/google_clients.py` als Service-Account-Client-Factory überarbeitet: Drive-, Sheets- und optional Calendar-Client werden nun direkt aus `st.secrets["gcp_service_account"]` erzeugt und mit `@st.cache_resource` stabil über Streamlit-Reruns gecacht.
 - Zentrale Secrets-Validierung erweitert: Im Google-Modus werden jetzt `gcp.drive_photos_root_folder_id`, `gcp.drive_contracts_folder_id` und `gcp.stammdaten_sheet_id` als Pflicht-Keys geprüft; `gcp.calendar_id` sowie `app.admin_emails`/`auth.admin_emails` bleiben optional (mit Formatprüfung).
 - README-Secrets-Vorlage auf die neue GCP-Key-Struktur aktualisiert (inkl. Drive-Ordner-IDs und Stammdaten-Sheet-ID, ohne echte Werte).
 

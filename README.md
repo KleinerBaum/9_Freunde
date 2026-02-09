@@ -75,6 +75,9 @@ Dann werden die bereits dokumentierten `gcp_service_account`- und `gcp`-Einträg
 
 Im Google-Modus müssen vor dem Start der App externe Dienste (Google APIs, OpenAI, Firebase) eingerichtet und Zugangsdaten hinterlegt werden. Im lokalen Prototyp-Modus sind Google/Firebase nicht erforderlich. Diese sensiblen Informationen gehören **nicht** in den Code, sondern in die Konfiguration (z. B. `.streamlit/secrets.toml`).
 
+### Google Client Factory (Service Account)
+Die Datei `services/google_clients.py` stellt gecachte Factory-Funktionen für Google-Clients bereit: `get_drive_client()`, `get_sheets_client()` und optional `get_calendar_client()`. Alle Clients werden mit `Credentials.from_service_account_info(st.secrets["gcp_service_account"])` erzeugt und via `@st.cache_resource` über Streamlit-Reruns hinweg wiederverwendet.
+
 ### Google Cloud / Dienstkonten (Drive & Calendar)
 Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie wie folgt vor:
 1. **Google Cloud Projekt:** Erstellen Sie ein Google Cloud Projekt in der Google Cloud Console (oder verwenden Sie ein vorhandenes für die Einrichtung der APIs).

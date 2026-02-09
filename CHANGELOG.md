@@ -7,6 +7,7 @@
 - Admin-Bereich **Fotos** um Statusverwaltung pro Datei erweitert (`draft`/`published`/`archived`).
 
 ### Changed
+- Google-Sheets-Fehlerbehandlung für Abholberechtigungen robuster gemacht: fehlt der konfigurierte Tab `pickup_authorizations`, wird er automatisch angelegt und die Header-Zeile initialisiert, statt mit `HttpError 400` abzustürzen; zusätzlich klare DE/EN-Hinweise für 400-Range-Parse-Fehler und 404-Sheet-ID-Fehler ergänzt.
 - Eltern sehen in **Fotos** nur noch Bilder mit Status `published`; bestehende Bilder ohne Metadaten bleiben kompatibel und werden als `draft` behandelt.
 - Foto-Upload legt jetzt automatisch Metadaten (`file_id`, `child_id`, `status`, `uploaded_at`, `uploaded_by`) an; Consent/Verpixelungs-Download bleibt unverändert.
 - Admin-Ansicht **"Stammdaten Sheet"** um Export/Backup-Funktionen erweitert: zentrale Tabs (`children`, `parents`) sowie optionale Tabs (`attendance`, `daily_logs`, `messages`) können jetzt direkt als **CSV** und **JSON** heruntergeladen werden.

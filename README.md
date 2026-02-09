@@ -198,6 +198,8 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
    - `gcp.parents_tab` (Default: `parents`)
    - `gcp.consents_tab` (Default: `consents`)
    - `gcp.pickup_authorizations_tab` (Default: `pickup_authorizations`)
+
+Der Tab `pickup_authorizations` wird bei Bedarf automatisch erstellt, wenn er im Spreadsheet noch fehlt. Bei nicht auflösbaren Range-/Tab-Problemen zeigt die App eine klare DE/EN-Fehlermeldung mit Hinweis auf `gcp.pickup_authorizations_tab`.
    - `gcp.medications_tab` (Default: `medications`)
    - `gcp.photo_meta_tab` (Default: `photo_meta`)
    - `gcp.content_pages_tab` (Default: `content_pages`)

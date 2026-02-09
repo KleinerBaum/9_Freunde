@@ -96,6 +96,7 @@ def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
 def _run_google_connection_check() -> list[tuple[str, bool, str]]:
     """Prüft Drive-, Calendar- und Sheets-Verbindung mit lesenden Testaufrufen."""
     checks: list[tuple[str, bool, str]] = []
+    app_config = get_app_config()
 
     try:
         drive_client = get_drive_client()
@@ -123,39 +124,54 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
             )
         )
 
-    try:
-        calendar_client = _get_calendar_client()
-        calendar_client.events().list(
-            calendarId=_get_calendar_id(),
-            maxResults=1,
-            singleEvents=True,
-            orderBy="startTime",
-        ).execute()
-        checks.append(
-            (
-                "Google Kalender Zugriff / Google Calendar access",
-                True,
-                "Kalender-Events erfolgreich gelesen. / Successfully read calendar events.",
-            )
-        )
-    except Exception as exc:  # pragma: no cover - runtime external dependency
+    calendar_id = ""
+    if app_config.google is not None and isinstance(app_config.google.calendar_id, str):
+        calendar_id = app_config.google.calendar_id.strip()
+
+    if app_config.storage_mode == "google" and not calendar_id:
         checks.append(
             (
                 "Google Kalender Zugriff / Google Calendar access",
                 False,
-                "Kalender-Test fehlgeschlagen. Prüfen Sie, ob die in `calendar_id` "
-                "konfigurierte Kalender-ID mit dem Service-Account geteilt ist "
-                "(mindestens "
-                '"Änderungen an Terminen vornehmen"/"Make changes to events"). '
-                f"Fehler: {exc}",
+                "`gcp.calendar_id` fehlt. Hinterlegen Sie die Kalender-ID unter "
+                "`Settings → Secrets → [gcp].calendar_id`. / Missing "
+                "`gcp.calendar_id`. Add the calendar ID at "
+                "`Settings → Secrets → [gcp].calendar_id`.",
             )
         )
+    else:
+        try:
+            calendar_client = _get_calendar_client()
+            calendar_client.events().list(
+                calendarId=_get_calendar_id(),
+                maxResults=1,
+                singleEvents=True,
+                orderBy="startTime",
+            ).execute()
+            checks.append(
+                (
+                    "Google Kalender Zugriff / Google Calendar access",
+                    True,
+                    "Kalender-Events erfolgreich gelesen. / Successfully read calendar events.",
+                )
+            )
+        except Exception as exc:  # pragma: no cover - runtime external dependency
+            checks.append(
+                (
+                    "Google Kalender Zugriff / Google Calendar access",
+                    False,
+                    "Kalender-Test fehlgeschlagen. Prüfen Sie, ob die in `calendar_id` "
+                    "konfigurierte Kalender-ID mit dem Service-Account geteilt ist "
+                    "(mindestens "
+                    '"Änderungen an Terminen vornehmen"/"Make changes to events"). '
+                    f"Fehler: {exc}",
+                )
+            )
 
     def _quote_sheet_tab_for_a1(tab_name: str) -> str:
         escaped = tab_name.replace("'", "''")
         return f"'{escaped}'"
 
-    app_config = get_app_config()
     if app_config.google is not None:
         sheet_id = app_config.google.stammdaten_sheet_id
         sheet_tab = app_config.google.stammdaten_sheet_tab or "children"

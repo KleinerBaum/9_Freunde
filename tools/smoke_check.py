@@ -26,6 +26,10 @@ def _print_status(ok: bool, message: str) -> None:
     print(f"[{prefix}] {message}")
 
 
+def _print_warning(message: str) -> None:
+    print(f"[WARN] {message}")
+
+
 def _load_secrets(secrets_path: Path) -> dict[str, Any]:
     with secrets_path.open("rb") as file:
         data = tomllib.load(file)
@@ -43,7 +47,7 @@ def _require_str(mapping: dict[str, Any], key: str, path: str) -> str:
 
 def _validate_secrets_schema(
     secrets: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], str, str]:
+) -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
     service_account_info_raw = secrets.get("gcp_service_account")
     if not isinstance(service_account_info_raw, dict):
         raise ValueError("Bereich [gcp_service_account] fehlt oder ist ungültig.")
@@ -71,7 +75,14 @@ def _validate_secrets_schema(
         else "children"
     )
 
-    return service_account_info_raw, gcp_raw, spreadsheet_id, sheet_tab
+    calendar_id_value = gcp_raw.get("calendar_id")
+    calendar_id = (
+        str(calendar_id_value).strip()
+        if isinstance(calendar_id_value, str) and str(calendar_id_value).strip()
+        else ""
+    )
+
+    return service_account_info_raw, gcp_raw, spreadsheet_id, sheet_tab, calendar_id
 
 
 def _drive_check(
@@ -144,10 +155,20 @@ def _sheets_header_check(
 def run(secrets_path: Path) -> int:
     try:
         secrets = _load_secrets(secrets_path)
-        service_account_info, gcp, spreadsheet_id, sheet_tab = _validate_secrets_schema(
-            secrets
+        service_account_info, gcp, spreadsheet_id, sheet_tab, calendar_id = (
+            _validate_secrets_schema(secrets)
         )
         _print_status(True, f"Secrets geladen aus {secrets_path}.")
+        if calendar_id:
+            _print_status(
+                True,
+                "Optionaler Key gcp.calendar_id gesetzt (Kalender-Checks möglich).",
+            )
+        else:
+            _print_warning(
+                "Optionaler Key gcp.calendar_id fehlt. In Google-Modus wird der Kalender-Check in der App fehlschlagen. "
+                "Quick fix: Settings → Secrets → [gcp].calendar_id setzen."
+            )
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         _print_status(False, f"Secrets-Check fehlgeschlagen: {error}")
         return 1
@@ -171,7 +192,7 @@ def run(secrets_path: Path) -> int:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Smoke-Checks für Secrets, Google Drive (Contracts) und Google Sheets (children header).",
+        description="Smoke-Checks für Secrets, Google Drive (Contracts), Google Sheets (children header) und optionalen Hinweis zu gcp.calendar_id.",
     )
     parser.add_argument(
         "--secrets",

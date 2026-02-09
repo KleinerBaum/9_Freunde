@@ -203,6 +203,7 @@ Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**,
 Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`
 - Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`
+- Admin-Formulare „Neues Kind anlegen“ und „Kind bearbeiten“ nutzen für `birthdate` und `start_date` den Streamlit-Datumspicker (`st.date_input`) und speichern ISO-Werte (`YYYY-MM-DD`) oder leer bei optionalen Feldern.
 
 Empfohlener Eltern-Tab (`parents`):
 - Basis: `parent_id`, `email`, `name`, `phone`

@@ -3,6 +3,7 @@
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
+- **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache).
@@ -196,6 +197,7 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
    - `gcp.parents_tab` (Default: `parents`)
    - `gcp.consents_tab` (Default: `consents`)
    - `gcp.pickup_authorizations_tab` (Default: `pickup_authorizations`)
+   - `gcp.medications_tab` (Default: `medications`)
    - `gcp.content_pages_tab` (Default: `content_pages`)
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
@@ -213,6 +215,11 @@ Empfohlener Eltern-Tab (`parents`):
 
 Optional:
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
+
+Pflicht-Tab für Medikamenten-Log (`medications`):
+- `med_id` (uuid), `child_id`, `date_time`, `med_name`, `dose`, `given_by`, `notes`, `consent_doc_file_id` (optional), `created_at`, `created_by`
+- Fehlende Header-Spalten werden beim ersten Zugriff automatisch ergänzt.
+- Soft-Gate: Fehlt `consent_doc_file_id`, wird nur ein Hinweis angezeigt (kein Blocker beim Speichern).
 
 ### Beispiel für das finale `secrets.toml`
 Die App validiert beim Start zentral folgende Pflichtstruktur:
@@ -242,6 +249,7 @@ children_tab = "children"                       # optional; Default: children
 parents_tab = "parents"                         # optional; Default: parents
 consents_tab = "consents"                       # optional; Default: consents
 pickup_authorizations_tab = "pickup_authorizations"  # optional; Default: pickup_authorizations
+medications_tab = "medications" # optional; Default: medications
 content_pages_tab = "content_pages" # optional; Default: content_pages
 
 [gcp_optional_apis]

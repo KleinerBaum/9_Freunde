@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- Medikamentengabe-Log als neues Teilschema ergänzt: neuer Google-Sheets-Tab `medications` (konfigurierbar über `gcp.medications_tab`, Header-Auto-Setup) und lokaler Fallback `data/medications.json`.
+- Neuer Admin-Menüpunkt **"Medikationen"**: Einträge pro Kind erstellen und anzeigen (`date_time`, `med_name`, `dose`, `given_by`, `notes`, optional `consent_doc_file_id`) inkl. auditierbarer Felder `created_at`/`created_by`.
+- Eltern-Menüpunkt **"Medikationen"** (read-only): zeigt nur Einträge des eigenen Kindes.
+
+### Changed
+- Soft-Gate für Consent-Link implementiert: Fehlt `consent_doc_file_id`, zeigt die UI einen Hinweis (DE/EN), blockiert das Speichern jedoch nicht.
+
 ### Changed
 - App-Branding ergänzt: `images/logo.png` wird jetzt als Streamlit-Seitenlogo angezeigt und zusätzlich in generierte DOCX-Dokumente (Berichte/Verträge) eingebettet, sofern die Datei vorhanden ist.
 - Abholberechtigte als neues Stammdaten-Teilschema ergänzt: neuer Google-Sheets-Tab `pickup_authorizations` (konfigurierbar über `gcp.pickup_authorizations_tab`, Header-Auto-Setup), lokaler Fallback `data/pickup_authorizations.json`, Admin-CRUD (Add/Edit/Aktiv-Inaktiv) pro Kind sowie Eltern-Read-only-Ansicht aktiver Einträge in „Mein Kind“.

@@ -37,6 +37,7 @@ class StammdatenManager:
         self.storage_mode = self.config.storage_mode
         self.children_file = self.config.local.children_file
         self.pickup_authorizations_file = self.config.local.pickup_authorizations_file
+        self.medications_file = self.config.local.medications_file
 
         if self.storage_mode != "google":
             self.children_file.parent.mkdir(parents=True, exist_ok=True)
@@ -44,6 +45,8 @@ class StammdatenManager:
                 self.children_file.write_text("[]", encoding="utf-8")
             if not self.pickup_authorizations_file.exists():
                 self.pickup_authorizations_file.write_text("[]", encoding="utf-8")
+            if not self.medications_file.exists():
+                self.medications_file.write_text("[]", encoding="utf-8")
 
     def _read_local_children(self) -> list[dict[str, Any]]:
         if not self.children_file.exists():
@@ -69,6 +72,18 @@ class StammdatenManager:
     ) -> None:
         self.pickup_authorizations_file.write_text(
             json.dumps(pickup_authorizations, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _read_local_medications(self) -> list[dict[str, Any]]:
+        if not self.medications_file.exists():
+            return []
+        data = json.loads(self.medications_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+
+    def _write_local_medications(self, medications: list[dict[str, Any]]) -> None:
+        self.medications_file.write_text(
+            json.dumps(medications, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
@@ -271,3 +286,58 @@ class StammdatenManager:
                 self._write_local_pickup_authorizations(local_records)
                 return
         raise KeyError(f"Abholberechtigung mit ID '{pickup_id}' wurde nicht gefunden.")
+
+    def get_medications_by_child_id(self, child_id: str) -> list[dict[str, Any]]:
+        """Liefert Medikamenten-Einträge für ein Kind (neueste zuerst)."""
+        normalized_child_id = child_id.strip()
+        if self.storage_mode == "google":
+            medications = sheets_repo.get_medications_by_child_id(normalized_child_id)
+        else:
+            medications = [
+                record
+                for record in self._read_local_medications()
+                if str(record.get("child_id", "")).strip() == normalized_child_id
+            ]
+
+        normalized_records: list[dict[str, Any]] = []
+        for medication in medications:
+            normalized_records.append(
+                {key: str(value).strip() for key, value in medication.items()}
+            )
+
+        normalized_records.sort(
+            key=lambda item: item.get("date_time", ""),
+            reverse=True,
+        )
+        return normalized_records
+
+    def add_medication(
+        self,
+        child_id: str,
+        medication_data: dict[str, Any],
+        *,
+        created_by: str,
+    ) -> str:
+        """Legt einen auditierbaren Medikamenten-Eintrag an."""
+        payload = {
+            "child_id": child_id.strip(),
+            "date_time": str(medication_data.get("date_time", "")).strip(),
+            "med_name": str(medication_data.get("med_name", "")).strip(),
+            "dose": str(medication_data.get("dose", "")).strip(),
+            "given_by": str(medication_data.get("given_by", "")).strip(),
+            "notes": str(medication_data.get("notes", "")).strip(),
+            "consent_doc_file_id": str(
+                medication_data.get("consent_doc_file_id", "")
+            ).strip(),
+            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+            "created_by": created_by.strip(),
+        }
+
+        if self.storage_mode == "google":
+            return sheets_repo.add_medication(payload)
+
+        med_id = uuid.uuid4().hex
+        local_records = self._read_local_medications()
+        local_records.append({"med_id": med_id, **payload})
+        self._write_local_medications(local_records)
+        return med_id

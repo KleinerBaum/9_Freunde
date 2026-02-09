@@ -3,6 +3,7 @@
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
+- **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.

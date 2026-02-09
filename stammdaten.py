@@ -145,8 +145,14 @@ class StammdatenManager:
         children.sort(key=lambda item: item.get("name", ""))
         return children
 
-    def add_child(self, name: str, parent_email: str) -> str:
+    def add_child(
+        self,
+        name: str,
+        parent_email: str,
+        extra_data: dict[str, Any] | None = None,
+    ) -> str:
         """Fügt ein Kind hinzu und erstellt optional einen Drive-Ordner."""
+        additional_child_data = extra_data or {}
         folder_id: str | None = None
         try:
             drive_agent = DriveAgent()
@@ -167,6 +173,7 @@ class StammdatenManager:
                 "parent_email": parent_email,
                 "status": "active",
             }
+            child_data.update(additional_child_data)
             if folder_id:
                 child_data["folder_id"] = folder_id
                 child_data["photo_folder_id"] = folder_id
@@ -180,6 +187,7 @@ class StammdatenManager:
             "download_consent": DEFAULT_DOWNLOAD_CONSENT,
             "status": "active",
         }
+        child_data.update(additional_child_data)
         if folder_id:
             child_data["folder_id"] = folder_id
             child_data["photo_folder_id"] = folder_id

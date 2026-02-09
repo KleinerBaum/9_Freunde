@@ -96,8 +96,8 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - **Lokal (Entwicklung):** Speichern Sie die JSON-Datei z. B. als `service_account.json` im Projekt (nicht einchecken in Git!). Legen Sie im `.streamlit/secrets.toml` eine Referenz oder die Inhalte ab.
    - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Nutzen Sie für `private_key` bevorzugt einen mehrzeiligen TOML-String mit `"""..."""`, damit echte Zeilenumbrüche erhalten bleiben, und vermeiden Sie zusätzliche umschließende Quotes (z. B. `'"..."'`).
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
-   - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos.
-   - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente.
+   - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos (alternativ akzeptiert die App auch eine vollständige Drive-Ordner-URL und extrahiert die ID automatisch).
+   - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente (alternativ auch als vollständige Drive-Ordner-URL möglich).
    - `stammdaten_sheet_id` (optional): überschreibt die Standard-Tabelle `Stammdaten_Eltern_2026` (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
    - `calendar_id` (optional): die Kalender-ID für den Google Kalender der Einrichtung.
 

@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Mapping
+from urllib.parse import parse_qs, urlparse
 
 import streamlit as st
 from streamlit.errors import StreamlitSecretNotFoundError
@@ -127,6 +128,45 @@ def _normalize_private_key(private_key: str) -> str:
             "'-----END PRIVATE KEY-----' enden."
         )
     return trimmed_key + "\n"
+
+
+def _normalize_drive_folder_id(raw_value: str, *, key_path: str) -> str:
+    """Akzeptiert Drive-Ordner-ID oder URL und gibt immer die Ordner-ID zurück."""
+    normalized_value = _strip_outer_quotes(raw_value)
+    if not normalized_value:
+        raise ConfigError(f"Ungültiger Wert für {key_path}: leerer String.")
+
+    if normalized_value.startswith(("http://", "https://")):
+        parsed = urlparse(normalized_value)
+        folder_id_candidates: list[str] = []
+
+        path_segments = [segment for segment in parsed.path.split("/") if segment]
+        if "folders" in path_segments:
+            folders_index = path_segments.index("folders")
+            if folders_index + 1 < len(path_segments):
+                folder_id_candidates.append(path_segments[folders_index + 1])
+
+        query_id = parse_qs(parsed.query).get("id", [""])[0]
+        if query_id:
+            folder_id_candidates.append(query_id)
+
+        folder_id = next(
+            (
+                candidate.strip()
+                for candidate in folder_id_candidates
+                if candidate.strip()
+            ),
+            "",
+        )
+        if not folder_id:
+            raise ConfigError(
+                "Ungültiger Google-Drive-Ordnerwert für "
+                f"{key_path}. Bitte die reine Ordner-ID oder eine gültige "
+                "Drive-Ordner-URL eintragen (z. B. .../folders/<ID>)."
+            )
+        return folder_id
+
+    return normalized_value
 
 
 def _require_mapping(raw_value: Any, path: str) -> Mapping[str, Any]:
@@ -253,8 +293,14 @@ def _load_google_config(secrets: Mapping[str, Any]) -> GoogleConfig:
             f"{missing_joined}."
         )
 
-    drive_photos_root_folder_id = str(gcp["drive_photos_root_folder_id"]).strip()
-    drive_contracts_folder_id = str(gcp["drive_contracts_folder_id"]).strip()
+    drive_photos_root_folder_id = _normalize_drive_folder_id(
+        str(gcp["drive_photos_root_folder_id"]),
+        key_path="gcp.drive_photos_root_folder_id",
+    )
+    drive_contracts_folder_id = _normalize_drive_folder_id(
+        str(gcp["drive_contracts_folder_id"]),
+        key_path="gcp.drive_contracts_folder_id",
+    )
     sheet_id_raw = gcp.get("stammdaten_sheet_id")
     stammdaten_sheet_id = (
         str(sheet_id_raw).strip()

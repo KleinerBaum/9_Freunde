@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Google-Ordnerkonfiguration robuster gemacht: `gcp.drive_photos_root_folder_id` und `gcp.drive_contracts_folder_id` akzeptieren jetzt zusätzlich vollständige Drive-Ordner-URLs (`.../folders/<ID>` oder `...?id=<ID>`); die App extrahiert automatisch die Ordner-ID und liefert bei ungültigen URLs eine klare Fehlermeldung.
 - Google-Verbindungscheck in `app.py` prüft `gcp.calendar_id` jetzt explizit vor dem API-Aufruf und zeigt bei fehlender Kalender-ID eine konkrete DE/EN-Quick-Fix-Meldung mit Zielpfad `Settings → Secrets → [gcp].calendar_id`.
 - `tools/smoke_check.py` weist `gcp.calendar_id` jetzt als optionalen, aber geprüften Key aus (`[WARN]` statt Fehler bei Fehlen) mit verständlichem Quick-Fix-Hinweis.
 - README-Fehlerbehebung um einen Quick-Fix-Abschnitt für fehlendes `gcp.calendar_id` ergänzt.

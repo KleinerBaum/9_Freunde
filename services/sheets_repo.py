@@ -88,8 +88,45 @@ class SheetsRepositoryError(RuntimeError):
         self.status_code = status_code
 
 
+def _http_error_message(exc: HttpError) -> str:
+    details = getattr(exc, "error_details", None)
+    if isinstance(details, list) and details:
+        message = details[0].get("message")
+        if isinstance(message, str):
+            return message
+
+    content = getattr(exc, "content", b"")
+    if isinstance(content, bytes):
+        decoded_content = content.decode("utf-8", errors="ignore")
+        if decoded_content:
+            return decoded_content
+
+    return str(exc)
+
+
+def _is_missing_sheet_range_error(exc: HttpError) -> bool:
+    status = getattr(exc.resp, "status", None)
+    if status != 400:
+        return False
+
+    error_message = _http_error_message(exc).lower()
+    return "unable to parse range" in error_message
+
+
 def _translate_http_error(exc: HttpError) -> SheetsRepositoryError:
     status = getattr(exc.resp, "status", None)
+    error_message = _http_error_message(exc)
+
+    if _is_missing_sheet_range_error(exc):
+        return SheetsRepositoryError(
+            "Tabellenblatt/Range nicht gefunden (400: Unable to parse range). "
+            "Bitte 'gcp.pickup_authorizations_tab' prüfen oder den Tab im "
+            "Stammdaten-Sheet anlegen. / Sheet/tab name not found (400: Unable "
+            "to parse range). Check 'gcp.pickup_authorizations_tab' or create "
+            "the tab in the master-data spreadsheet.",
+            status_code=status,
+        )
+
     if status == 403:
         return SheetsRepositoryError(
             "Kein Zugriff auf das Stammdaten-Sheet (403). Bitte den Service-Account "
@@ -99,10 +136,18 @@ def _translate_http_error(exc: HttpError) -> SheetsRepositoryError:
             status_code=status,
         )
 
+    if status == 404:
+        return SheetsRepositoryError(
+            "Google-Sheet nicht gefunden (404). Bitte die konfigurierte "
+            "'gcp.stammdaten_sheet_id' prüfen. / Google spreadsheet not found "
+            "(404). Verify the configured 'gcp.stammdaten_sheet_id'.",
+            status_code=status,
+        )
+
     return SheetsRepositoryError(
         "Google-Sheets-Anfrage fehlgeschlagen. Bitte Konfiguration und Berechtigungen "
         "prüfen. / Google Sheets request failed. Please verify configuration and "
-        "permissions.",
+        f"permissions. Details: {error_message}",
         status_code=status,
     )
 
@@ -200,6 +245,23 @@ def _values_append(range_name: str, values: list[list[str]]) -> None:
         raise _translate_http_error(exc) from exc
 
 
+def _create_sheet_if_missing(tab_name: str) -> None:
+    service = get_sheets_client()
+    try:
+        (
+            service.spreadsheets()
+            .batchUpdate(
+                spreadsheetId=_sheet_id(),
+                body={"requests": [{"addSheet": {"properties": {"title": tab_name}}}]},
+            )
+            .execute()
+        )
+    except HttpError as exc:
+        if "already exists" in _http_error_message(exc).lower():
+            return
+        raise _translate_http_error(exc) from exc
+
+
 def _ensure_children_header_columns(required_columns: list[str]) -> list[str]:
     rows = _values_get(f"{_children_tab()}!A:ZZ")
     if not rows:
@@ -243,10 +305,18 @@ def _ensure_parents_header_columns(required_columns: list[str]) -> list[str]:
 def _ensure_pickup_authorizations_header_columns(
     required_columns: list[str],
 ) -> list[str]:
-    rows = _values_get(f"{_pickup_authorizations_tab()}!A:ZZ")
+    tab_name = _pickup_authorizations_tab()
+    try:
+        rows = _values_get(f"{tab_name}!A:ZZ")
+    except SheetsRepositoryError as exc:
+        if exc.status_code != 400 or "Unable to parse range" not in str(exc):
+            raise
+        _create_sheet_if_missing(tab_name)
+        rows = []
+
     if not rows:
         header = ["pickup_id", "child_id", "name", "relationship", "phone"]
-        _values_update(f"{_pickup_authorizations_tab()}!A1", [header])
+        _values_update(f"{tab_name}!A1", [header])
         rows = [[*header]]
 
     header = [str(col).strip() for col in rows[0]]
@@ -257,7 +327,7 @@ def _ensure_pickup_authorizations_header_columns(
             changed = True
 
     if changed:
-        _values_update(f"{_pickup_authorizations_tab()}!A1:ZZ1", [header])
+        _values_update(f"{tab_name}!A1:ZZ1", [header])
 
     return header
 

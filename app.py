@@ -460,11 +460,9 @@ else:
                     )
                 else:
                     try:
-                        new_child_id = stammdaten_manager.add_child(
-                            name.strip(), parent_email.strip()
-                        )
-                        stammdaten_manager.update_child(
-                            new_child_id,
+                        stammdaten_manager.add_child(
+                            name.strip(),
+                            parent_email.strip(),
                             {
                                 "birthdate": _optional_date_to_iso(birthdate),
                                 "start_date": _optional_date_to_iso(start_date),
@@ -485,15 +483,11 @@ else:
                         st.error(f"Fehler beim Speichern / Save error: {e}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
-                selected_child_name = st.selectbox(
+                selected_child = st.selectbox(
                     "Kind auswählen / Select child",
-                    options=[child.get("name", "") for child in children],
+                    options=children,
+                    format_func=lambda child: str(child.get("name", "")),
                     key="edit_child_select",
-                )
-                selected_child = next(
-                    child
-                    for child in children
-                    if child.get("name") == selected_child_name
                 )
                 with st.form(key="edit_child_form"):
                     left_col, right_col = st.columns(2)
@@ -617,15 +611,11 @@ else:
 
             if children:
                 st.write("**Abholberechtigte / Pickup authorizations:**")
-                selected_pickup_child_name = st.selectbox(
+                pickup_child = st.selectbox(
                     "Kind für Abholberechtigungen / Child for pickup authorizations",
-                    options=[child.get("name", "") for child in children],
+                    options=children,
+                    format_func=lambda child: str(child.get("name", "")),
                     key="pickup_child_select",
-                )
-                pickup_child = next(
-                    child
-                    for child in children
-                    if child.get("name") == selected_pickup_child_name
                 )
                 pickup_child_id = str(pickup_child.get("id", "")).strip()
                 pickup_records = (
@@ -726,15 +716,11 @@ else:
                             )
 
                 if pickup_records:
-                    selected_pickup_name = st.selectbox(
+                    selected_pickup_record = st.selectbox(
                         "Abholberechtigte bearbeiten / Edit pickup authorization",
-                        options=[record.get("name", "") for record in pickup_records],
+                        options=pickup_records,
+                        format_func=lambda record: str(record.get("name", "")),
                         key="pickup_edit_select",
-                    )
-                    selected_pickup_record = next(
-                        record
-                        for record in pickup_records
-                        if record.get("name") == selected_pickup_name
                     )
                     with st.form(key="pickup_edit_form"):
                         pickup_edit_col_left, pickup_edit_col_right = st.columns(2)
@@ -1089,13 +1075,10 @@ else:
                 st.warning("Keine Kinder vorhanden. Bitte zuerst Stammdaten anlegen.")
             else:
                 # Formular für Dokumentenerstellung
-                child_names = [child.get("name") for child in children]
-                selected_name = st.selectbox(
-                    "Für welches Kind soll ein Dokument erstellt werden?", child_names
-                )
-                # find selected child data
-                sel_child = next(
-                    child for child in children if child.get("name") == selected_name
+                sel_child = st.selectbox(
+                    "Für welches Kind soll ein Dokument erstellt werden?",
+                    options=children,
+                    format_func=lambda child: str(child.get("name", "")),
                 )
                 doc_notes = st.text_area("Stichpunkte oder Notizen für das Dokument:")
                 save_to_drive = st.checkbox(
@@ -1240,12 +1223,10 @@ else:
             if not children:
                 st.warning("Bitte legen Sie zuerst Kinder-Stammdaten an.")
             else:
-                child_names = [child.get("name") for child in children]
-                selected_name = st.selectbox(
-                    "Foto hochladen für Kind / Upload photo for child", child_names
-                )
-                sel_child = next(
-                    child for child in children if child.get("name") == selected_name
+                sel_child = st.selectbox(
+                    "Foto hochladen für Kind / Upload photo for child",
+                    options=children,
+                    format_func=lambda child: str(child.get("name", "")),
                 )
                 image_file = st.file_uploader(
                     "Foto auswählen / Select photo", type=["jpg", "jpeg", "png"]
@@ -1280,7 +1261,8 @@ else:
                             },
                         )
                         st.success(
-                            f"Foto für {selected_name} hochgeladen (Status: draft). / Photo uploaded for {selected_name} (status: draft)."
+                            f"Foto für {sel_child.get('name', '')} hochgeladen (Status: draft). / "
+                            f"Photo uploaded for {sel_child.get('name', '')} (status: draft)."
                         )
                         st.image(
                             image_file,

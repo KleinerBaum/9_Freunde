@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- Stammdaten-UI verwendet bei Kind-/Abholberechtigten-Auswahl jetzt Datensatzobjekte statt reiner Namen (`selectbox(..., options=<records>, format_func=...)`), damit gleichnamige Einträge eindeutig bearbeitet werden können.
+- Kind-Anlage im `StammdatenManager` kann zusätzliche Felder jetzt direkt in einem Schritt speichern (`add_child(..., extra_data=...)`), wodurch der bisherige direkte Add-then-Update-Flow in der Admin-UI entfällt.
+
 ### Added
 - Local-Storage-Parität für Stammdaten erweitert: neue lokale Dateien `data/parents.json` und `data/consents.json` werden über `LocalConfig` bereitgestellt und im `StammdatenManager` initialisiert.
 

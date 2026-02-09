@@ -106,10 +106,16 @@ def _run_google_connection_check(
             )
         )
 
+    def _quote_sheet_tab_for_a1(tab_name: str) -> str:
+        escaped = tab_name.replace("'", "''")
+        return f"'{escaped}'"
+
     app_config = get_app_config()
     if app_config.google is not None:
         sheet_id = app_config.google.stammdaten_sheet_id
-        check_range = "children!A1:A1"
+        sheet_tab = app_config.google.stammdaten_sheet_tab or "children"
+        quoted_tab = _quote_sheet_tab_for_a1(sheet_tab)
+        check_range = f"{quoted_tab}!A1:A1"
         max_attempts = 3
         last_error: Exception | None = None
 
@@ -120,9 +126,9 @@ def _run_google_connection_check(
                     (
                         "Google Sheets Zugriff / Google Sheets access",
                         True,
-                        "Sheets-Lesezugriff erfolgreich (Range children!A1:A1). / "
+                        f"Sheets-Lesezugriff erfolgreich (Range {check_range}). / "
                         "Successfully read from Google Sheets "
-                        "(range children!A1:A1).",
+                        f"(range {check_range}).",
                     )
                 )
                 break
@@ -143,18 +149,18 @@ def _run_google_connection_check(
                 time.sleep(2 ** (attempt - 1))
 
         if last_error is not None:
-            status_code: int | None = None
+            status_code_value: int | None = None
             if isinstance(last_error, HttpError):
-                status_code = int(getattr(last_error.resp, "status", 0) or 0)
+                status_code_value = int(getattr(last_error.resp, "status", 0) or 0)
 
-            if status_code == 403:
+            if status_code_value == 403:
                 message = (
                     "Sheets-Test fehlgeschlagen (403). Die Tabelle ist vermutlich nicht "
                     "mit dem Service-Account geteilt oder die Berechtigung fehlt. / "
                     "Sheets check failed (403). The sheet is likely not shared with the "
                     "service account or permissions are missing."
                 )
-            elif status_code == 404:
+            elif status_code_value == 404:
                 message = (
                     "Sheets-Test fehlgeschlagen (404). Die konfigurierte "
                     "`stammdaten_sheet_id` scheint falsch zu sein. / "

@@ -43,7 +43,7 @@ def _require_str(mapping: dict[str, Any], key: str, path: str) -> str:
 
 def _validate_secrets_schema(
     secrets: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], str]:
+) -> tuple[dict[str, Any], dict[str, Any], str, str]:
     service_account_info_raw = secrets.get("gcp_service_account")
     if not isinstance(service_account_info_raw, dict):
         raise ValueError("Bereich [gcp_service_account] fehlt oder ist ungültig.")
@@ -64,7 +64,14 @@ def _validate_secrets_schema(
         else "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A"
     )
 
-    return service_account_info_raw, gcp_raw, spreadsheet_id
+    sheet_tab_value = gcp_raw.get("stammdaten_sheet_tab")
+    sheet_tab = (
+        str(sheet_tab_value).strip()
+        if isinstance(sheet_tab_value, str) and str(sheet_tab_value).strip()
+        else "children"
+    )
+
+    return service_account_info_raw, gcp_raw, spreadsheet_id, sheet_tab
 
 
 def _drive_check(
@@ -95,8 +102,13 @@ def _drive_check(
     )
 
 
+def _quote_sheet_tab_for_a1(tab_name: str) -> str:
+    escaped = tab_name.replace("'", "''")
+    return f"'{escaped}'"
+
+
 def _sheets_header_check(
-    service_account_info: dict[str, Any], spreadsheet_id: str
+    service_account_info: dict[str, Any], spreadsheet_id: str, sheet_tab: str
 ) -> None:
     sheets_scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
     creds = service_account.Credentials.from_service_account_info(
@@ -108,7 +120,10 @@ def _sheets_header_check(
     response = (
         sheets.spreadsheets()
         .values()
-        .get(spreadsheetId=spreadsheet_id, range="children!1:1")
+        .get(
+            spreadsheetId=spreadsheet_id,
+            range=f"{_quote_sheet_tab_for_a1(sheet_tab)}!1:1",
+        )
         .execute()
     )
     values = response.get("values", [])
@@ -129,7 +144,9 @@ def _sheets_header_check(
 def run(secrets_path: Path) -> int:
     try:
         secrets = _load_secrets(secrets_path)
-        service_account_info, gcp, spreadsheet_id = _validate_secrets_schema(secrets)
+        service_account_info, gcp, spreadsheet_id, sheet_tab = _validate_secrets_schema(
+            secrets
+        )
         _print_status(True, f"Secrets geladen aus {secrets_path}.")
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         _print_status(False, f"Secrets-Check fehlgeschlagen: {error}")
@@ -143,7 +160,7 @@ def run(secrets_path: Path) -> int:
         return 1
 
     try:
-        _sheets_header_check(service_account_info, spreadsheet_id)
+        _sheets_header_check(service_account_info, spreadsheet_id, sheet_tab)
     except (HttpError, ValueError) as error:
         _print_status(False, f"Sheets-Check fehlgeschlagen: {error}")
         return 1

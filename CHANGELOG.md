@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- App-Branding ergänzt: `images/logo.png` wird jetzt als Streamlit-Seitenlogo angezeigt und zusätzlich in generierte DOCX-Dokumente (Berichte/Verträge) eingebettet, sofern die Datei vorhanden ist.
+
 ### Added
 - Neuer Infos-Bereich für Eltern (`Infos`) mit read-only Darstellung veröffentlichter Seiten aus `content_pages` (Filter: `published=true` und `audience in {parent,both}`) inkl. DE/EN-Sprachumschaltung.
 - Neuer Admin-Bereich `Infos verwalten` mit einfachem CRUD-Flow (Liste → Edit/Create → Preview) für Markdown-Inhalte (`title_*`, `body_md_*`, `audience`, `published`).

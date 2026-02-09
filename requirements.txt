@@ -10,3 +10,4 @@ reportlab
 PyPDF2
 opencv-python-headless
 Pillow
+odfpy

@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Changed
+- Stammdaten-Lokalspeicher von mehreren JSON-Dateien auf eine zentrale ODS-Arbeitsmappe umgestellt (`data/stammdaten.ods`); lokale Reads/Writes für `children`, `parents`, `consents`, `pickup_authorizations`, `medications` und `photo_meta` laufen jetzt über `odfpy` + `pandas` mit Header-Selbstheilung.
+- `StammdatenManager` migriert beim ersten Start bestehende Legacy-JSON-Dateien automatisch in die ODS-Datei, sodass vorhandene lokale Daten erhalten bleiben.
 - Stammdaten-UI verwendet bei Kind-/Abholberechtigten-Auswahl jetzt Datensatzobjekte statt reiner Namen (`selectbox(..., options=<records>, format_func=...)`), damit gleichnamige Einträge eindeutig bearbeitet werden können.
 - Kind-Anlage im `StammdatenManager` kann zusätzliche Felder jetzt direkt in einem Schritt speichern (`add_child(..., extra_data=...)`), wodurch der bisherige direkte Add-then-Update-Flow in der Admin-UI entfällt.
 

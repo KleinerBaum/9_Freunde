@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -45,6 +46,22 @@ def _trigger_rerun() -> None:
     experimental_rerun_fn = getattr(st, "experimental_rerun", None)
     if callable(experimental_rerun_fn):
         experimental_rerun_fn()
+
+
+def _parse_optional_iso_date(value: str) -> date | None:
+    normalized = value.strip()
+    if not normalized:
+        return None
+    try:
+        return date.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+
+def _optional_date_to_iso(value: date | None) -> str:
+    if value is None:
+        return ""
+    return value.isoformat()
 
 
 @st.cache_data(show_spinner=False)
@@ -336,28 +353,45 @@ else:
             # Formular zum Hinzufügen eines neuen Kindes
             st.write("**Neues Kind anlegen:**")
             with st.form(key="new_child_form"):
-                name = st.text_input("Name des Kindes / Child name")
-                parent_email = st.text_input("E-Mail Elternteil / Parent email")
-                birthdate = st.text_input("Geburtsdatum (YYYY-MM-DD) / Birthdate")
-                start_date = st.text_input("Startdatum (YYYY-MM-DD) / Start date")
-                group = st.text_input("Gruppe / Group", value="Igel")
-                primary_caregiver = st.text_input(
-                    "Bezugserzieher:in / Primary caregiver"
-                )
-                allergies = st.text_input("Allergien / Allergies")
-                notes_parent_visible = st.text_area(
-                    "Hinweise für Eltern sichtbar / Parent-visible notes",
-                    height=80,
-                )
-                notes_internal = st.text_area(
-                    "Interne Hinweise (nur Leitung) / Internal notes",
-                    height=80,
-                )
-                pickup_password = st.text_input(
-                    "Abhol-Kennwort (optional) / Pickup password",
-                    type="password",
-                )
-                status = st.selectbox("Status", options=["active", "archived"], index=0)
+                left_col, right_col = st.columns(2)
+                with left_col:
+                    name = st.text_input("Name des Kindes / Child name")
+                    parent_email = st.text_input("E-Mail Elternteil / Parent email")
+                    birthdate = st.date_input(
+                        "Geburtsdatum / Birthdate",
+                        value=None,
+                        format="YYYY-MM-DD",
+                    )
+                    start_date = st.date_input(
+                        "Startdatum / Start date",
+                        value=None,
+                        format="YYYY-MM-DD",
+                    )
+                    status = st.selectbox(
+                        "Status", options=["active", "archived"], index=0
+                    )
+                with right_col:
+                    group = st.text_input("Gruppe / Group", value="Igel")
+                    primary_caregiver = st.text_input(
+                        "Bezugserzieher:in / Primary caregiver"
+                    )
+                    allergies = st.text_input("Allergien / Allergies")
+                    pickup_password = st.text_input(
+                        "Abhol-Kennwort (optional) / Pickup password",
+                        type="password",
+                    )
+
+                notes_col_left, notes_col_right = st.columns(2)
+                with notes_col_left:
+                    notes_parent_visible = st.text_area(
+                        "Hinweise für Eltern sichtbar / Parent-visible notes",
+                        height=110,
+                    )
+                with notes_col_right:
+                    notes_internal = st.text_area(
+                        "Interne Hinweise (nur Leitung) / Internal notes",
+                        height=110,
+                    )
                 submitted = st.form_submit_button("Hinzufügen / Add child")
             if submitted:
                 if name.strip() == "" or parent_email.strip() == "":
@@ -372,8 +406,8 @@ else:
                         stammdaten_manager.update_child(
                             new_child_id,
                             {
-                                "birthdate": birthdate.strip(),
-                                "start_date": start_date.strip(),
+                                "birthdate": _optional_date_to_iso(birthdate),
+                                "start_date": _optional_date_to_iso(start_date),
                                 "group": group.strip(),
                                 "primary_caregiver": primary_caregiver.strip(),
                                 "allergies": allergies.strip(),
@@ -402,49 +436,62 @@ else:
                     if child.get("name") == selected_child_name
                 )
                 with st.form(key="edit_child_form"):
-                    edit_name = st.text_input(
-                        "Name des Kindes / Child name",
-                        value=selected_child.get("name", ""),
-                    )
-                    edit_parent_email = st.text_input(
-                        "E-Mail Elternteil / Parent email",
-                        value=selected_child.get("parent_email", ""),
-                    )
-                    edit_birthdate = st.text_input(
-                        "Geburtsdatum (YYYY-MM-DD) / Birthdate",
-                        value=selected_child.get("birthdate", ""),
-                    )
-                    edit_start_date = st.text_input(
-                        "Startdatum (YYYY-MM-DD) / Start date",
-                        value=selected_child.get("start_date", ""),
-                    )
-                    edit_group = st.text_input(
-                        "Gruppe / Group",
-                        value=selected_child.get("group", ""),
-                    )
-                    edit_primary_caregiver = st.text_input(
-                        "Bezugserzieher:in / Primary caregiver",
-                        value=selected_child.get("primary_caregiver", ""),
-                    )
-                    edit_allergies = st.text_input(
-                        "Allergien / Allergies",
-                        value=selected_child.get("allergies", ""),
-                    )
-                    edit_notes_parent_visible = st.text_area(
-                        "Hinweise für Eltern sichtbar / Parent-visible notes",
-                        value=selected_child.get("notes_parent_visible", ""),
-                        height=80,
-                    )
-                    edit_notes_internal = st.text_area(
-                        "Interne Hinweise (nur Leitung) / Internal notes",
-                        value=selected_child.get("notes_internal", ""),
-                        height=80,
-                    )
-                    edit_pickup_password = st.text_input(
-                        "Abhol-Kennwort (optional) / Pickup password",
-                        value=selected_child.get("pickup_password", ""),
-                        type="password",
-                    )
+                    left_col, right_col = st.columns(2)
+                    with left_col:
+                        edit_name = st.text_input(
+                            "Name des Kindes / Child name",
+                            value=selected_child.get("name", ""),
+                        )
+                        edit_parent_email = st.text_input(
+                            "E-Mail Elternteil / Parent email",
+                            value=selected_child.get("parent_email", ""),
+                        )
+                        edit_birthdate = st.date_input(
+                            "Geburtsdatum / Birthdate",
+                            value=_parse_optional_iso_date(
+                                selected_child.get("birthdate", "")
+                            ),
+                            format="YYYY-MM-DD",
+                        )
+                        edit_start_date = st.date_input(
+                            "Startdatum / Start date",
+                            value=_parse_optional_iso_date(
+                                selected_child.get("start_date", "")
+                            ),
+                            format="YYYY-MM-DD",
+                        )
+                    with right_col:
+                        edit_group = st.text_input(
+                            "Gruppe / Group",
+                            value=selected_child.get("group", ""),
+                        )
+                        edit_primary_caregiver = st.text_input(
+                            "Bezugserzieher:in / Primary caregiver",
+                            value=selected_child.get("primary_caregiver", ""),
+                        )
+                        edit_allergies = st.text_input(
+                            "Allergien / Allergies",
+                            value=selected_child.get("allergies", ""),
+                        )
+                        edit_pickup_password = st.text_input(
+                            "Abhol-Kennwort (optional) / Pickup password",
+                            value=selected_child.get("pickup_password", ""),
+                            type="password",
+                        )
+
+                    notes_col_left, notes_col_right = st.columns(2)
+                    with notes_col_left:
+                        edit_notes_parent_visible = st.text_area(
+                            "Hinweise für Eltern sichtbar / Parent-visible notes",
+                            value=selected_child.get("notes_parent_visible", ""),
+                            height=110,
+                        )
+                    with notes_col_right:
+                        edit_notes_internal = st.text_area(
+                            "Interne Hinweise (nur Leitung) / Internal notes",
+                            value=selected_child.get("notes_internal", ""),
+                            height=110,
+                        )
                     status_options = ["active", "archived"]
                     current_status = str(selected_child.get("status", "active")).strip()
                     if current_status not in status_options:
@@ -487,8 +534,10 @@ else:
                                 {
                                     "name": edit_name.strip(),
                                     "parent_email": edit_parent_email.strip(),
-                                    "birthdate": edit_birthdate.strip(),
-                                    "start_date": edit_start_date.strip(),
+                                    "birthdate": _optional_date_to_iso(edit_birthdate),
+                                    "start_date": _optional_date_to_iso(
+                                        edit_start_date
+                                    ),
                                     "group": edit_group.strip(),
                                     "primary_caregiver": edit_primary_caregiver.strip(),
                                     "allergies": edit_allergies.strip(),

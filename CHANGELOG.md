@@ -9,6 +9,7 @@
 
 ### Changed
 - Konfiguration erweitert um `gcp.content_pages_tab` (Default `content_pages`) und lokalen Pfad `local.content_pages_file`.
+- Admin-Stammdatenformulare nutzen jetzt zweispaltige Layouts und Streamlit-Datumspicker für optionale Felder `birthdate`/`start_date` (Speicherung als `YYYY-MM-DD`), damit die neuen Kinderfelder konsistent in UI und Sheets gepflegt werden.
 
 ### Added
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.

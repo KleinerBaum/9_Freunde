@@ -187,6 +187,12 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 2. **Service Account mit dem Stammdaten-Sheet teilen** (Editor-Rechte)
 3. Optional **Sheet-ID über `gcp.stammdaten_sheet_id` setzen**, falls eine andere Tabelle als die Standard-Tabelle genutzt werden soll (`Stammdaten_Eltern_2026`, ID `1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
 4. Optional **Tabname für die Admin-Ansicht** über `gcp.stammdaten_sheet_tab` setzen (Default: `Stammdaten_Eltern_2026`).
+5. Optional **Tabnamen für Repository-Zugriffe** setzen:
+   - `gcp.children_tab` (Default: `children`)
+   - `gcp.parents_tab` (Default: `parents`)
+   - `gcp.consents_tab` (Default: `consents`)
+
+Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
 
 Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
 
@@ -221,6 +227,9 @@ calendar_id = "kita-kalender@group.calendar.google.com"
 drive_photos_root_folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
 drive_contracts_folder_id = "1ZaYxWvUtSrQpOnMlKjIhGfEdCb"
 stammdaten_sheet_id = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A" # optional; Default ist dieser Wert
+children_tab = "children"   # optional; Default: children
+parents_tab = "parents"     # optional; Default: parents
+consents_tab = "consents"   # optional; Default: consents
 
 [gcp_optional_apis]
 sheets_spreadsheet_id = "<optional>"

@@ -54,12 +54,7 @@ class LocalConfig:
     """Lokale Speicherorte für den Prototyp-Modus."""
 
     data_dir: Path
-    children_file: Path
-    parents_file: Path
-    consents_file: Path
-    pickup_authorizations_file: Path
-    medications_file: Path
-    photo_meta_file: Path
+    stammdaten_file: Path
     content_pages_file: Path
     calendar_file: Path
     drive_root: Path
@@ -197,12 +192,12 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
         else Path(DEFAULT_DATA_DIR)
     )
 
-    children_file = data_dir / "children.json"
-    parents_file = data_dir / "parents.json"
-    consents_file = data_dir / "consents.json"
-    pickup_authorizations_file = data_dir / "pickup_authorizations.json"
-    medications_file = data_dir / "medications.json"
-    photo_meta_file = data_dir / "photo_meta.json"
+    stammdaten_file_raw = local_section.get("stammdaten_file")
+    stammdaten_file = (
+        Path(stammdaten_file_raw)
+        if isinstance(stammdaten_file_raw, str) and stammdaten_file_raw.strip()
+        else data_dir / "stammdaten.ods"
+    )
     content_pages_file = data_dir / "content_pages.json"
     calendar_file = data_dir / "calendar_events.json"
     drive_root = data_dir / "drive"
@@ -212,12 +207,7 @@ def _load_local_config(secrets: Mapping[str, Any]) -> LocalConfig:
 
     return LocalConfig(
         data_dir=data_dir,
-        children_file=children_file,
-        parents_file=parents_file,
-        consents_file=consents_file,
-        pickup_authorizations_file=pickup_authorizations_file,
-        medications_file=medications_file,
-        photo_meta_file=photo_meta_file,
+        stammdaten_file=stammdaten_file,
         content_pages_file=content_pages_file,
         calendar_file=calendar_file,
         drive_root=drive_root,

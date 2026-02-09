@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
 from config import get_app_config
+from services.local_ods_repo import LocalODSRepository
 from services import sheets_repo
 from storage import DriveAgent
 
@@ -34,102 +36,80 @@ class StammdatenManager:
     def __init__(self) -> None:
         self.config = get_app_config()
         self.storage_mode = self.config.storage_mode
-        self.children_file = self.config.local.children_file
-        self.parents_file = self.config.local.parents_file
-        self.consents_file = self.config.local.consents_file
-        self.pickup_authorizations_file = self.config.local.pickup_authorizations_file
-        self.medications_file = self.config.local.medications_file
-        self.photo_meta_file = self.config.local.photo_meta_file
+        self.stammdaten_file = self.config.local.stammdaten_file
+        self.local_ods_repo = LocalODSRepository(self.stammdaten_file)
 
         if self.storage_mode != "google":
-            self.children_file.parent.mkdir(parents=True, exist_ok=True)
-            if not self.children_file.exists():
-                self.children_file.write_text("[]", encoding="utf-8")
-            if not self.parents_file.exists():
-                self.parents_file.write_text("[]", encoding="utf-8")
-            if not self.consents_file.exists():
-                self.consents_file.write_text("[]", encoding="utf-8")
-            if not self.pickup_authorizations_file.exists():
-                self.pickup_authorizations_file.write_text("[]", encoding="utf-8")
-            if not self.medications_file.exists():
-                self.medications_file.write_text("[]", encoding="utf-8")
-            if not self.photo_meta_file.exists():
-                self.photo_meta_file.write_text("[]", encoding="utf-8")
+            self._migrate_legacy_json_to_ods()
+            self.local_ods_repo.ensure_workbook()
+
+    def _migrate_legacy_json_to_ods(self) -> None:
+        if self.stammdaten_file.exists():
+            return
+
+        legacy_sources = {
+            "children": self.config.local.data_dir / "children.json",
+            "parents": self.config.local.data_dir / "parents.json",
+            "consents": self.config.local.data_dir / "consents.json",
+            "pickup_authorizations": self.config.local.data_dir
+            / "pickup_authorizations.json",
+            "medications": self.config.local.data_dir / "medications.json",
+            "photo_meta": self.config.local.data_dir / "photo_meta.json",
+        }
+
+        for sheet_name, source_file in legacy_sources.items():
+            records = self._read_legacy_json_records(source_file)
+            if records:
+                self.local_ods_repo.write_sheet(sheet_name, records)
+
+    @staticmethod
+    def _read_legacy_json_records(source_file: Path) -> list[dict[str, Any]]:
+        if not source_file.exists():
+            return []
+
+        data = json.loads(source_file.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return [record for record in data if isinstance(record, dict)]
 
     def _read_local_children(self) -> list[dict[str, Any]]:
-        if not self.children_file.exists():
-            return []
-        data = json.loads(self.children_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("children")
 
     def _write_local_children(self, children: list[dict[str, Any]]) -> None:
-        self.children_file.write_text(
-            json.dumps(children, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("children", children)
 
     def _read_local_parents(self) -> list[dict[str, Any]]:
-        if not self.parents_file.exists():
-            return []
-        data = json.loads(self.parents_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("parents")
 
     def _write_local_parents(self, parents: list[dict[str, Any]]) -> None:
-        self.parents_file.write_text(
-            json.dumps(parents, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("parents", parents)
 
     def _read_local_consents(self) -> list[dict[str, Any]]:
-        if not self.consents_file.exists():
-            return []
-        data = json.loads(self.consents_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("consents")
 
     def _write_local_consents(self, consents: list[dict[str, Any]]) -> None:
-        self.consents_file.write_text(
-            json.dumps(consents, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("consents", consents)
 
     def _read_local_pickup_authorizations(self) -> list[dict[str, Any]]:
-        if not self.pickup_authorizations_file.exists():
-            return []
-        data = json.loads(self.pickup_authorizations_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("pickup_authorizations")
 
     def _write_local_pickup_authorizations(
         self,
         pickup_authorizations: list[dict[str, Any]],
     ) -> None:
-        self.pickup_authorizations_file.write_text(
-            json.dumps(pickup_authorizations, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("pickup_authorizations", pickup_authorizations)
 
     def _read_local_medications(self) -> list[dict[str, Any]]:
-        if not self.medications_file.exists():
-            return []
-        data = json.loads(self.medications_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("medications")
 
     def _write_local_medications(self, medications: list[dict[str, Any]]) -> None:
-        self.medications_file.write_text(
-            json.dumps(medications, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("medications", medications)
 
     def _read_local_photo_meta(self) -> list[dict[str, Any]]:
-        if not self.photo_meta_file.exists():
-            return []
-        data = json.loads(self.photo_meta_file.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
+        return self.local_ods_repo.read_sheet("photo_meta")
 
     def _write_local_photo_meta(self, records: list[dict[str, Any]]) -> None:
-        self.photo_meta_file.write_text(
-            json.dumps(records, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.local_ods_repo.write_sheet("photo_meta", records)
 
     def get_children(self) -> list[dict[str, Any]]:
         """Lädt alle Kinder-Datensätze."""

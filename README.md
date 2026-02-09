@@ -46,10 +46,7 @@ Enthalten sind nur die Kernabhängigkeiten:
 Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben werden.
 Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
 
-- `data/children.json` für Kinder-Stammdaten
-- `data/parents.json` für Eltern-Stammdaten
-- `data/consents.json` für Einwilligungen
-- `data/pickup_authorizations.json` für Abholberechtigungen (pro Kind, aktiv/inaktiv)
+- `data/stammdaten.ods` als zentrale Stammdaten-Datei mit Sheets `children`, `parents`, `consents`, `pickup_authorizations`, `medications`, `photo_meta`
 - `data/content_pages.json` für Infos-Seiten (Fallback im Local-Mode)
 - `data/calendar_events.json` für Termine
 - `data/drive/` für Dokumente und Fotos
@@ -62,6 +59,7 @@ mode = "local"
 
 [local]
 data_dir = "./data"
+stammdaten_file = "./data/stammdaten.ods" # optional
 
 [auth]
 admin_emails = ["leitung@example.org"]

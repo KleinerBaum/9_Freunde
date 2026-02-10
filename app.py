@@ -1823,8 +1823,8 @@ else:
 
                 if app_config.storage_mode == "google":
                     st.info(
-                        "Fotos werden im Google Drive Hauptordner in `photos/<child_id>/`-Unterordnern abgelegt. Eltern sehen nur den eigenen Ordner. / "
-                        "Photos are stored in Google Drive under `photos/<child_id>/` child folders. Parents only see their own folder."
+                        "Fotos werden im hinterlegten Google Drive Foto-Hauptordner in Unterordnern pro Kind gespeichert. Eltern sehen nur freigegebene Inhalte ihres Kindes. / "
+                        "Photos are stored in the configured Google Drive photos root folder with per-child subfolders. Parents only see shared content for their child."
                     )
                 else:
                     st.info(

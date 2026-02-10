@@ -180,7 +180,7 @@ Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
 Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check Google connection“** zur Verfügung. Der Check führt drei Testaufrufe aus:
 
 - **Drive-Test:** Ein kleiner List-Aufruf gegen die Drive API.
-- **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id` (aus `st.secrets["gcp"]["calendar_id"]`).
+- **Calendar-Test:** Ein Leseaufruf auf Events des konfigurierten `calendar_id` (aus der Mapping-kompatiblen Secrets-Sektion `gcp`, z. B. `st.secrets["gcp"].get("calendar_id")`).
 - **Sheets-Test:** Ein minimaler Read-Call auf `<stammdaten_sheet_tab>!A1:A1` (A1-quoted, z. B. bei Leerzeichen im Tabnamen) des konfigurierten `gcp.stammdaten_sheet_id` inkl. kurzer Retries mit exponentiellem Backoff (bis zu 3 Versuche) bei transienten Fehlern.
 
 Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner, Kalender nicht mit Service-Account geteilt, oder fehlende Sheet-Freigabe/ungültige `stammdaten_sheet_id` bei 403/404).

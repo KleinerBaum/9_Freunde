@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Kalender-Secrets robuster gelesen: `services/calendar_service._get_calendar_id()` akzeptiert jetzt allgemein Mapping-kompatible `gcp`-Sektionen (nicht nur `dict`) und trimmt `calendar_id` weiterhin, inkl. unverändertem Fehlertext bei fehlendem Wert.
 - Admin-Unterbereich **„Infos verwalten“** aus der App entfernt: Unter **„Stammdaten & Infos“** sind jetzt nur noch **„Übersicht“**, **„Stammdaten“**, **„Stammdaten Sheet“** und **„Medikationen“** verfügbar.
 - Admin-Bereich **Dokumente** erweitert: Für neu erstellte Berichte/Verträge/Abrechnungen sowie bereits gespeicherte DOCX-Dateien wird nun vor dem Download eine aufklappbare Textvorschau angezeigt (DE/EN-UI).
 - Drive-Fehlerbehandlung im Admin-Flow verbessert: `StammdatenManager.add_child()` zeigt beim fehlgeschlagenen Ordner-Anlegen jetzt sichtbare DE/EN-UI-Fehler inkl. Detailhinweis; Foto-Upload/Foto-Ordner-Load unterscheiden `DriveServiceError` gezielt (inkl. 403/404-Hinweis) und geben zusätzlich Troubleshooting-Tipps mit `child_id` aus.

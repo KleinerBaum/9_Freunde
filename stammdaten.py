@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import streamlit as st
 
 from config import get_app_config
 from services.local_ods_repo import LocalODSRepository
 from services import sheets_repo
+from services.drive_service import DriveServiceError
 from storage import DriveAgent
 
 DEFAULT_DOWNLOAD_CONSENT = "pixelated"
@@ -144,8 +146,22 @@ class StammdatenManager:
             folder_id = drive_agent.create_folder(
                 name, parent_folder_id=parent_folder_id
             )
+        except DriveServiceError as exc:
+            st.error(
+                "Drive-Ordner für das Kind konnte nicht erstellt werden. "
+                "Bitte Drive-Konfiguration und Freigabe des Zielordners für "
+                "den Service-Account prüfen. / Child Drive folder could not "
+                "be created. Please verify Drive configuration and folder "
+                "sharing for the service account."
+            )
+            st.info(str(exc))
         except Exception as exc:
-            print("Fehler beim Anlegen des Ordners:", exc)
+            st.error(
+                "Drive-Ordner für das Kind konnte nicht erstellt werden. "
+                "Bitte Drive-Konfiguration prüfen. / Child Drive folder "
+                "could not be created. Please verify Drive configuration."
+            )
+            st.info(f"Technisches Detail / Technical detail: {exc}")
 
         if self.storage_mode == "google":
             child_data: dict[str, Any] = {

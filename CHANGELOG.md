@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Drive-Fehlerbehandlung im Admin-Flow verbessert: `StammdatenManager.add_child()` zeigt beim fehlgeschlagenen Ordner-Anlegen jetzt sichtbare DE/EN-UI-Fehler inkl. Detailhinweis; Foto-Upload/Foto-Ordner-Load unterscheiden `DriveServiceError` gezielt (inkl. 403/404-Hinweis) und geben zusätzlich Troubleshooting-Tipps mit `child_id` aus.
 - Google-Fotoordner-Konfiguration vereinheitlicht: `StammdatenManager.add_child()` nutzt jetzt explizit `gcp.drive_photos_root_folder_id` (statt Alias), und der Admin-Hinweis in **Fotos** beschreibt neutral den konfigurierten Drive-Hauptordner mit Unterordnern pro Kind (DE/EN), ohne irreführenden Pseudo-Pfad `photos/<child_id>/`.
 - UI/Design: Globales CSS für bessere Lesbarkeit auf hellem Hintergrund ergänzt (semi-transparenter Content-Container, angepasste Textfarben, Sidebar-/Input-Kontraste und verbesserte Sichtbarkeit von Alerts/Tabellen).
 - Stammdaten: Elternfelder `emergency_contact_name`, `emergency_contact_phone`, `preferred_language` und `notifications_opt_in` sind jetzt vollständig in der UI angebunden (Admin-Formulare Add/Edit mit Upsert nach `parents`, Elternansicht "Mein Kind" read-only mit DE/EN-Labels).

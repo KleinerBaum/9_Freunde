@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Admin-Bereich **Dokumente** erweitert: Für neu erstellte Berichte/Verträge/Abrechnungen sowie bereits gespeicherte DOCX-Dateien wird nun vor dem Download eine aufklappbare Textvorschau angezeigt (DE/EN-UI).
 - Drive-Fehlerbehandlung im Admin-Flow verbessert: `StammdatenManager.add_child()` zeigt beim fehlgeschlagenen Ordner-Anlegen jetzt sichtbare DE/EN-UI-Fehler inkl. Detailhinweis; Foto-Upload/Foto-Ordner-Load unterscheiden `DriveServiceError` gezielt (inkl. 403/404-Hinweis) und geben zusätzlich Troubleshooting-Tipps mit `child_id` aus.
 - Google-Fotoordner-Konfiguration vereinheitlicht: `StammdatenManager.add_child()` nutzt jetzt explizit `gcp.drive_photos_root_folder_id` (statt Alias), und der Admin-Hinweis in **Fotos** beschreibt neutral den konfigurierten Drive-Hauptordner mit Unterordnern pro Kind (DE/EN), ohne irreführenden Pseudo-Pfad `photos/<child_id>/`.
 - UI/Design: Globales CSS für bessere Lesbarkeit auf hellem Hintergrund ergänzt (semi-transparenter Content-Container, angepasste Textfarben, Sidebar-/Input-Kontraste und verbesserte Sichtbarkeit von Alerts/Tabellen).

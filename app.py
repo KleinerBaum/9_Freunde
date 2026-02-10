@@ -53,12 +53,106 @@ def _inject_background_image() -> None:
     st.markdown(
         f"""
         <style>
+            :root {{
+                --app-overlay: rgba(255, 255, 255, 0.82);
+                --text-primary: #122033;
+                --text-secondary: #23354d;
+                --panel-background: rgba(255, 255, 255, 0.88);
+                --panel-border: rgba(18, 32, 51, 0.2);
+                --input-background: rgba(15, 23, 42, 0.92);
+                --input-text: #f8fafc;
+            }}
+
             [data-testid="stAppViewContainer"] {{
                 background-image: url("data:image/png;base64,{encoded_background}");
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
                 background-attachment: fixed;
+            }}
+
+            [data-testid="stAppViewContainer"]::before {{
+                content: "";
+                position: fixed;
+                inset: 0;
+                background: linear-gradient(
+                    180deg,
+                    rgba(255, 255, 255, 0.78) 0%,
+                    rgba(255, 255, 255, 0.88) 100%
+                );
+                z-index: 0;
+                pointer-events: none;
+            }}
+
+            .stApp {{
+                color: var(--text-primary);
+            }}
+
+            [data-testid="stAppViewBlockContainer"],
+            section[data-testid="stSidebar"] > div {{
+                position: relative;
+                z-index: 1;
+            }}
+
+            [data-testid="stAppViewBlockContainer"] {{
+                background-color: var(--app-overlay);
+                border: 1px solid var(--panel-border);
+                border-radius: 1rem;
+                backdrop-filter: blur(1px);
+                padding: 1.5rem 2rem;
+                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }}
+
+            [data-testid="stSidebar"] > div {{
+                background-color: rgba(15, 23, 42, 0.94);
+                color: #f8fafc;
+            }}
+
+            [data-testid="stSidebar"] :is(p, li, h1, h2, h3, h4, h5, label, span),
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {{
+                color: #f8fafc;
+            }}
+
+            h1, h2, h3, h4, h5, h6,
+            p,
+            li,
+            label,
+            .stMarkdown,
+            [data-testid="stMarkdownContainer"],
+            [data-testid="stText"],
+            [data-testid="stCaptionContainer"] {{
+                color: var(--text-primary);
+                text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+            }}
+
+            [data-baseweb="select"] > div,
+            [data-baseweb="input"] > div,
+            [data-testid="stDateInputField"] > div,
+            textarea,
+            input {{
+                background: var(--input-background);
+                color: var(--input-text);
+            }}
+
+            [data-baseweb="select"] span,
+            [data-baseweb="input"] input,
+            [data-testid="stDateInputField"] input,
+            textarea,
+            input {{
+                color: var(--input-text) !important;
+            }}
+
+            [data-testid="stDataFrame"] {{
+                background-color: var(--panel-background);
+                border-radius: 0.8rem;
+                border: 1px solid var(--panel-border);
+            }}
+
+            [data-testid="stAlert"] {{
+                border-radius: 0.75rem;
+                border: 1px solid var(--panel-border);
             }}
 
             [data-testid="stHeader"] {{

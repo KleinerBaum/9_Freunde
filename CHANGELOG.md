@@ -87,6 +87,7 @@
 
 ### Added
 - Admin-Healthcheck in der Sidebar um **Google Sheets Zugriff / Google Sheets access** erweitert: der Connection-Check prüft jetzt zusätzlich einen minimalen Read auf `children!A1:A1` gegen `gcp.stammdaten_sheet_id`.
+- UI-Bereinigung: Mehrere reine Hinweis-Textboxen in den Admin-Bereichen **Übersicht**, **Stammdaten**, **Stammdaten Sheet** (leerem Bereich) und **Fotos** wurden entfernt, um die Ansichten kompakter zu halten.
 
 ### Changed
 - Stammdaten-Schema für Google Sheets erweitert: `children` ergänzt um `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status` sowie `parents` um `phone2`, `address`, `preferred_language`, `emergency_contact_name`, `emergency_contact_phone`, `notifications_opt_in`; fehlende Header werden automatisch ergänzt.

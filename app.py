@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import json
+import base64
 from pathlib import Path
 
 from datetime import date
@@ -34,11 +35,39 @@ from services.photos_service import get_download_bytes
 
 # Streamlit page configuration
 LOGO_PATH = Path(__file__).resolve().parent / "images" / "logo.png"
+HEART_PATH = Path(__file__).resolve().parent / "images" / "Herz.png"
+BACKGROUND_PATH = Path(__file__).resolve().parent / "images" / "Hintergrund.png"
 st.set_page_config(
     page_title="9 Freunde App",
     page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "🤱",
     layout="wide",
 )
+
+
+def _inject_background_image() -> None:
+    """Setzt ein globales Hintergrundbild für die gesamte Streamlit-App."""
+    if not BACKGROUND_PATH.exists():
+        return
+
+    encoded_background = base64.b64encode(BACKGROUND_PATH.read_bytes()).decode("utf-8")
+    st.markdown(
+        f"""
+        <style>
+            [data-testid="stAppViewContainer"] {{
+                background-image: url("data:image/png;base64,{encoded_background}");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }}
+
+            [data-testid="stHeader"] {{
+                background: transparent;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _trigger_rerun() -> None:
@@ -300,6 +329,12 @@ def _build_export_payload(rows: list[list[str]]) -> tuple[bytes, bytes] | None:
 # Validate required secrets early and fail with clear UI guidance
 validate_config_or_stop()
 app_config = get_app_config()
+_inject_background_image()
+
+if HEART_PATH.exists():
+    col_left, col_center, col_right = st.columns([1, 2, 1])
+    with col_center:
+        st.image(str(HEART_PATH), width=180)
 
 if LOGO_PATH.exists():
     st.image(str(LOGO_PATH), width=180)

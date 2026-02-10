@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Google-Fotoordner-Konfiguration vereinheitlicht: `StammdatenManager.add_child()` nutzt jetzt explizit `gcp.drive_photos_root_folder_id` (statt Alias), und der Admin-Hinweis in **Fotos** beschreibt neutral den konfigurierten Drive-Hauptordner mit Unterordnern pro Kind (DE/EN), ohne irreführenden Pseudo-Pfad `photos/<child_id>/`.
 - UI/Design: Globales CSS für bessere Lesbarkeit auf hellem Hintergrund ergänzt (semi-transparenter Content-Container, angepasste Textfarben, Sidebar-/Input-Kontraste und verbesserte Sichtbarkeit von Alerts/Tabellen).
 - Stammdaten: Elternfelder `emergency_contact_name`, `emergency_contact_phone`, `preferred_language` und `notifications_opt_in` sind jetzt vollständig in der UI angebunden (Admin-Formulare Add/Edit mit Upsert nach `parents`, Elternansicht "Mein Kind" read-only mit DE/EN-Labels).
 - Admin-Bereich **Stammdaten** zeigt jetzt eine sortierbare **Kinder-Übersicht** als Tabelle (Name, Parent Email, Group, Birthdate, Folder Status mit `✅ Ready`/`⚠️ Missing`) statt nur einer einfachen Liste; Elternansicht **Mein Kind** zeigt Name/Geburtsdatum/Gruppe jetzt konsistent mit Fallback `-` sowie die bevorzugte Sprache aus den Elternstammdaten.

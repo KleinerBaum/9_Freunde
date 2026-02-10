@@ -137,7 +137,7 @@ class StammdatenManager:
         try:
             drive_agent = DriveAgent()
             parent_folder_id = (
-                self.config.google.photos_folder_id
+                self.config.google.drive_photos_root_folder_id
                 if self.storage_mode == "google" and self.config.google
                 else None
             )

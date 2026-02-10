@@ -44,11 +44,6 @@ class GoogleConfig:
     content_pages_tab: str
     calendar_id: str | None
 
-    @property
-    def photos_folder_id(self) -> str:
-        """Rückwärtskompatibler Alias für bestehenden Code."""
-        return self.drive_photos_root_folder_id
-
 
 @dataclass(frozen=True)
 class LocalConfig:

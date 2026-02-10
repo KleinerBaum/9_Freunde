@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Admin-UX in **„Stammdaten & Infos“** angepasst: Der separate Unterbereich **„Medikationen“** wurde entfernt und als neuer, standardmäßig eingeklappter Abschnitt **„Medikationen“** direkt in **„Stammdaten“** unterhalb von **„Abholberechtigte / Pickup authorizations“** integriert.
 - Kalender-Secrets robuster gelesen: `services/calendar_service._get_calendar_id()` akzeptiert jetzt allgemein Mapping-kompatible `gcp`-Sektionen (nicht nur `dict`) und trimmt `calendar_id` weiterhin, inkl. unverändertem Fehlertext bei fehlendem Wert.
 - Admin-Unterbereich **„Infos verwalten“** aus der App entfernt: Unter **„Stammdaten & Infos“** sind jetzt nur noch **„Übersicht“**, **„Stammdaten“**, **„Stammdaten Sheet“** und **„Medikationen“** verfügbar.
 - Admin-Bereich **Dokumente** erweitert: Für neu erstellte Berichte/Verträge/Abrechnungen sowie bereits gespeicherte DOCX-Dateien wird nun vor dem Download eine aufklappbare Textvorschau angezeigt (DE/EN-UI).

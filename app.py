@@ -57,13 +57,19 @@ def _inject_background_image() -> None:
         f"""
         <style>
             :root {{
-                --app-overlay: rgba(255, 255, 255, 0.82);
-                --text-primary: #122033;
-                --text-secondary: #23354d;
-                --panel-background: rgba(255, 255, 255, 0.88);
-                --panel-border: rgba(18, 32, 51, 0.2);
-                --input-background: rgba(15, 23, 42, 0.92);
-                --input-text: #f8fafc;
+                --app-overlay: rgba(255, 255, 255, 0.9);
+                --text-primary: #1b2a41;
+                --text-secondary: #314761;
+                --panel-background: rgba(255, 255, 255, 0.95);
+                --panel-border: rgba(120, 148, 186, 0.35);
+                --input-background: rgba(255, 255, 255, 0.98);
+                --input-text: #152238;
+                --input-border: #8fa9c9;
+                --accent-primary: #3f72af;
+                --accent-primary-hover: #2f5d93;
+                --sidebar-background: rgba(36, 55, 83, 0.95);
+                --sidebar-surface: rgba(255, 255, 255, 0.12);
+                --focus-ring: rgba(63, 114, 175, 0.35);
             }}
 
             [data-testid="stAppViewContainer"] {{
@@ -109,8 +115,9 @@ def _inject_background_image() -> None:
             }}
 
             [data-testid="stSidebar"] > div {{
-                background-color: rgba(15, 23, 42, 0.94);
+                background: linear-gradient(180deg, var(--sidebar-background) 0%, #1e3350 100%);
                 color: #f8fafc;
+                border-right: 1px solid rgba(255, 255, 255, 0.14);
             }}
 
             [data-testid="stSidebar"] :is(p, li, h1, h2, h3, h4, h5, label, span),
@@ -133,10 +140,14 @@ def _inject_background_image() -> None:
             [data-baseweb="select"] > div,
             [data-baseweb="input"] > div,
             [data-testid="stDateInputField"] > div,
+            [data-baseweb="textarea"] > div,
             textarea,
             input {{
-                background: var(--input-background);
-                color: var(--input-text);
+                background: var(--input-background) !important;
+                color: var(--input-text) !important;
+                border: 1px solid var(--input-border) !important;
+                border-radius: 0.75rem !important;
+                box-shadow: 0 2px 10px rgba(63, 114, 175, 0.1);
             }}
 
             [data-baseweb="select"] span,
@@ -145,6 +156,68 @@ def _inject_background_image() -> None:
             textarea,
             input {{
                 color: var(--input-text) !important;
+            }}
+
+            [data-baseweb="select"] > div:hover,
+            [data-baseweb="input"] > div:hover,
+            [data-testid="stDateInputField"] > div:hover,
+            [data-baseweb="textarea"] > div:hover {{
+                border-color: var(--accent-primary) !important;
+            }}
+
+            [data-baseweb="select"] > div:focus-within,
+            [data-baseweb="input"] > div:focus-within,
+            [data-testid="stDateInputField"] > div:focus-within,
+            [data-baseweb="textarea"] > div:focus-within {{
+                border-color: var(--accent-primary) !important;
+                box-shadow: 0 0 0 0.2rem var(--focus-ring) !important;
+            }}
+
+            .stButton > button,
+            [data-testid="stFormSubmitButton"] button {{
+                background: linear-gradient(135deg, var(--accent-primary) 0%, #5a8ccc 100%);
+                color: #ffffff !important;
+                border: none;
+                border-radius: 0.75rem;
+                font-weight: 600;
+                transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+                box-shadow: 0 6px 14px rgba(63, 114, 175, 0.26);
+            }}
+
+            .stButton > button:hover,
+            [data-testid="stFormSubmitButton"] button:hover {{
+                background: linear-gradient(135deg, var(--accent-primary-hover) 0%, #4f7fb8 100%);
+                transform: translateY(-1px);
+                box-shadow: 0 10px 18px rgba(47, 93, 147, 0.34);
+            }}
+
+            .stButton > button:focus-visible,
+            [data-testid="stFormSubmitButton"] button:focus-visible {{
+                box-shadow: 0 0 0 0.2rem var(--focus-ring) !important;
+                outline: none;
+            }}
+
+            .stButton > button:disabled,
+            [data-testid="stFormSubmitButton"] button:disabled {{
+                background: #9db4d3;
+                color: #eef3fb !important;
+                box-shadow: none;
+            }}
+
+            [data-testid="stSidebar"] [data-baseweb="select"] > div,
+            [data-testid="stSidebar"] [data-baseweb="input"] > div,
+            [data-testid="stSidebar"] [data-testid="stDateInputField"] > div,
+            [data-testid="stSidebar"] [data-baseweb="textarea"] > div {{
+                background: var(--sidebar-surface) !important;
+                color: #f8fafc !important;
+                border: 1px solid rgba(255, 255, 255, 0.24) !important;
+            }}
+
+            [data-testid="stSidebar"] [data-baseweb="select"] span,
+            [data-testid="stSidebar"] [data-baseweb="input"] input,
+            [data-testid="stSidebar"] textarea,
+            [data-testid="stSidebar"] input {{
+                color: #f8fafc !important;
             }}
 
             [data-testid="stDataFrame"] {{

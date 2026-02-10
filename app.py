@@ -138,6 +138,17 @@ def _language_label(value: str) -> str:
     return "-"
 
 
+def _display_or_dash(value: object) -> str:
+    normalized = str(value or "").strip()
+    return normalized if normalized else "-"
+
+
+def _folder_status_label(child_record: dict[str, str]) -> str:
+    has_photo_folder = bool(str(child_record.get("photo_folder_id", "")).strip())
+    has_drive_folder = bool(str(child_record.get("folder_id", "")).strip())
+    return "✅ Ready" if has_photo_folder or has_drive_folder else "⚠️ Missing"
+
+
 @st.cache_data(show_spinner=False)
 def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     original_bytes = drive_agent.download_file(file_id)
@@ -491,12 +502,29 @@ else:
                     "Please try again later."
                 )
 
-            # Anzeige der vorhandenen Kinder
             if not children_load_error and children:
-                for child in children:
-                    st.write(
-                        f"- **{child.get('name')}** (Eltern: {child.get('parent_email')})"
+                st.markdown("**👥 Kinder-Übersicht / Children overview**")
+                overview_rows: list[dict[str, str]] = []
+                for child_record in children:
+                    overview_rows.append(
+                        {
+                            "Name": _display_or_dash(child_record.get("name")),
+                            "Parent Email": _display_or_dash(
+                                child_record.get("parent_email")
+                            ),
+                            "Group": _display_or_dash(child_record.get("group")),
+                            "Birthdate": _display_or_dash(
+                                child_record.get("birthdate")
+                            ),
+                            "Folder Status": _folder_status_label(child_record),
+                        }
                     )
+                overview_df = pd.DataFrame(overview_rows)
+                st.dataframe(
+                    overview_df,
+                    hide_index=True,
+                    use_container_width=True,
+                )
             elif not children_load_error:
                 st.write("*Noch keine Kinder registriert.*")
 
@@ -1816,13 +1844,15 @@ else:
                     )
                     or {}
                 )
-                st.write(f"**Name:** {child.get('name')}")
-                if child.get("birthdate"):
-                    st.write(f"**Geburtsdatum / Birthdate:** {child.get('birthdate')}")
+                st.markdown("**Kinderdetails / Child details**")
+                st.write(f"**Name:** {_display_or_dash(child.get('name'))}")
+                st.write(
+                    "**Geburtsdatum / Birthdate:** "
+                    f"{_display_or_dash(child.get('birthdate'))}"
+                )
                 if child.get("start_date"):
                     st.write(f"**Startdatum / Start date:** {child.get('start_date')}")
-                if child.get("group"):
-                    st.write(f"**Gruppe / Group:** {child.get('group')}")
+                st.write(f"**Gruppe / Group:** {_display_or_dash(child.get('group'))}")
                 if child.get("primary_caregiver"):
                     st.write(
                         f"**Bezugserzieher:in / Primary caregiver:** {child.get('primary_caregiver')}"

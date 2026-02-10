@@ -3,6 +3,7 @@
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
+- **Kinder-Übersicht (Admin):** In „Stammdaten“ wird eine sortierbare Tabelle mit Name, Eltern-E-Mail, Gruppe, Geburtsdatum und Drive-Ordnerstatus (`✅ Ready`/`⚠️ Missing`) angezeigt.
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
@@ -223,7 +224,7 @@ Empfohlener Eltern-Tab (`parents`):
 - Basis: `parent_id`, `email`, `name`, `phone`
 - Erweitert (automatisch ergänzt): `phone2`, `address`, `preferred_language`, `emergency_contact_name`, `emergency_contact_phone`, `notifications_opt_in`
 - Admin kann diese Elternfelder in **"Neues Kind anlegen / Add child"** und **"Kind bearbeiten / Edit child"** pflegen; Datensätze werden per E-Mail als Upsert in `parents` gespeichert.
-- Eltern sehen die Felder read-only in **"Mein Kind - Übersicht"**: Notfallkontakt, bevorzugte Sprache und Benachrichtigungs-Opt-in.
+- Eltern sehen die Felder read-only in **"Mein Kind - Übersicht"**: Name, Geburtsdatum, Gruppe, Notfallkontakt, bevorzugte Sprache und Benachrichtigungs-Opt-in.
 
 Optional:
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)

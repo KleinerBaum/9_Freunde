@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-VALID_CONSENT_MODES = {"pixelated", "unpixelated"}
+VALID_CONSENT_MODES = {"pixelated", "unpixelated", "denied"}
 
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
@@ -62,5 +62,7 @@ def get_download_bytes(image_bytes: bytes, consent_mode: str) -> bytes:
 
     if normalized_mode == "unpixelated":
         return image_bytes
+    if normalized_mode == "denied":
+        raise PermissionError("Foto-Download ist für dieses Kind nicht erlaubt.")
 
     return pixelate_faces(image_bytes)

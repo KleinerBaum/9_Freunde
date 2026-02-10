@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Changed
+- Stammdaten-Schema (children) erweitert: neue optionale Felder `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional` werden in Google Sheets und lokalem ODS automatisch als Header ergänzt.
+- Mapping für Elternkontakt vereinheitlicht: Wenn `parent1__email` im Kinderdatensatz gesetzt ist, wird `children.parent_email` automatisch darauf synchronisiert.
+- Foto-Download-Consent harmonisiert: `children.download_consent` wird aus den Consent-Checkboxen (`consent__photo_download_pixelated`, `consent__photo_download_unpixelated`, `consent__photo_download_denied`) abgeleitet; Priorität ist `denied` > `unpixelated` > `pixelated`.
+- Eltern-/Admin-UI für Foto-Consent unterstützt jetzt zusätzlich den Modus `denied`; bei `denied` wird der Foto-Download in der Elternansicht deaktiviert.
 - Stammdaten-Workflow vereinfacht: Die Kinder-Übersicht enthält jetzt links eine Checkbox-Spalte **„Auswahl / Select“**; ausgewählte Kinder werden darunter parallel (nebeneinander) editierbar angezeigt. Der Export/Backup-Block (CSV/JSON für `children` und `parents`) wurde in diesen Bereich integriert, und der frühere Tab **„Stammdaten Sheet“** wurde entfernt.
 - Admin-UX in **„Stammdaten & Infos“** angepasst: Der separate Unterbereich **„Medikationen“** wurde entfernt und als neuer, standardmäßig eingeklappter Abschnitt **„Medikationen“** direkt in **„Stammdaten“** unterhalb von **„Abholberechtigte / Pickup authorizations“** integriert.
 - Kalender-Secrets robuster gelesen: `services/calendar_service._get_calendar_id()` akzeptiert jetzt allgemein Mapping-kompatible `gcp`-Sektionen (nicht nur `dict`) und trimmt `calendar_id` weiterhin, inkl. unverändertem Fehlertext bei fehlendem Wert.

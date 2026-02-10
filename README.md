@@ -361,6 +361,10 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
   - Ursache: Falsche ID (`drive_contracts_folder_id`, `stammdaten_sheet_id`, `calendar_id`) oder Ressource nicht im Zugriffskontext.
   - Lösung: IDs prüfen und Freigaben erneut kontrollieren.
 
+- **Fotos hochgeladen, aber Liste bleibt leer**
+  - Ursache: Uneinheitlicher MIME-Filter in Drive-Abfragen (z. B. `image/`) kann je nach API-Antwort dazu führen, dass Bilder beim Listing nicht zurückkommen.
+  - Lösung: Auf aktuelle Version aktualisieren; die App normalisiert den Filter jetzt robust und prüft Bild-MIME-Typen zusätzlich clientseitig.
+
 - **invalid_grant**
   - Ursache: Defekter Private Key, falsche Zeilenumbrüche in `private_key`, oder stark abweichende Serverzeit.
   - Lösung: Service-Account-JSON neu aus GCP exportieren, `private_key` unverändert (inkl. `\n`) übernehmen, Systemzeit/NTP prüfen.

@@ -112,26 +112,53 @@ def list_files_in_folder(
 ) -> list[dict[str, Any]]:
     drive = get_drive_client()
     q = f"'{folder_id}' in parents and trashed = false"
-    if mime_type_filter:
-        q += f" and mimeType contains '{mime_type_filter}'"
+
+    normalized_filter = (mime_type_filter or "").strip().lower()
+    query_filter = normalized_filter.rstrip("/")
+    if query_filter:
+        q += f" and mimeType contains '{query_filter}'"
+
+    files: list[dict[str, Any]] = []
+    page_token: str | None = None
 
     try:
-        res = (
-            drive.files()
-            .list(
-                q=q,
-                fields="files(id, name, mimeType, modifiedTime)",
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-                pageSize=1000,
-                orderBy="modifiedTime desc",
+        while True:
+            res = (
+                drive.files()
+                .list(
+                    q=q,
+                    fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                    corpora="allDrives",
+                    pageSize=1000,
+                    orderBy="modifiedTime desc",
+                    pageToken=page_token,
+                )
+                .execute()
             )
-            .execute()
-        )
+            files.extend(res.get("files", []))
+            page_token = res.get("nextPageToken")
+            if not page_token:
+                break
     except HttpError as exc:
         raise _translate_http_error(exc) from exc
 
-    return res.get("files", [])
+    if not normalized_filter:
+        return files
+
+    if normalized_filter.endswith("/"):
+        return [
+            item
+            for item in files
+            if str(item.get("mimeType", "")).lower().startswith(normalized_filter)
+        ]
+
+    return [
+        item
+        for item in files
+        if normalized_filter in str(item.get("mimeType", "")).lower()
+    ]
 
 
 @st.cache_data(show_spinner=False)

@@ -245,8 +245,8 @@ Die folgende Zuordnung dokumentiert, wie Felder aus dem bisherigen Schema-v1-For
 | Quelle | Ziel-Tab | Ziel-Spalte | Transformationsregel |
 |---|---|---|---|
 | `meta__record_id` | `children` | `child_id` | Falls vorhanden direkte Übernahme; sonst wird `child_id` als UUID erzeugt. |
-| `meta__created_at`, `meta__updated_at` | `children` | `notes_internal` | **Aktuell nicht persistiert als eigene Spalten**; als JSON-Metablock in `notes_internal` angehängt. |
-| `meta__import_source`, `meta__version` | `children` | `notes_internal` | **Aktuell nicht persistiert als eigene Spalten**; als JSON-Fallback (`meta`) in `notes_internal`. |
+| `meta__created_at`, `meta__updated_at` | `children` | `notes_internal` | **Out of scope** als eigene Spalten; als JSON-Metablock in `notes_internal` angehängt. |
+| `meta__import_source`, `meta__version` | `children` | `notes_internal` | **Out of scope** als eigene Spalten; als JSON-Fallback (`meta`) in `notes_internal`. |
 | `child__name` | `children` | `name` | Direkte String-Übernahme (trim). |
 | `child__birthdate` | `children` | `birthdate` | Datum auf ISO-8601 (`YYYY-MM-DD`) normalisieren; ungültige Werte leer speichern. |
 | `child__start_date` | `children` | `start_date` | Datum auf ISO-8601 (`YYYY-MM-DD`) normalisieren. |
@@ -266,14 +266,14 @@ Die folgende Zuordnung dokumentiert, wie Felder aus dem bisherigen Schema-v1-For
 | `parent1__emergency_contact_phone` | `parents` | `emergency_contact_phone` | Direkte Übernahme. |
 | `parent1__notifications_opt_in` | `parents` | `notifications_opt_in` | Bool-Normalisierung (`true/1/ja` → `true`, sonst `false`). |
 | `parent2__*` | `parents` | wie `parent1__*` | Zweiter Eltern-Datensatz als eigener Upsert; Beziehung zum Kind über `parent_email`-Logik und/oder interne Zuordnung. |
-| `pa1__*`, `pa2__*`, `pa3__*`, `pa4__*` | `pickup_authorizations` | `name`, `phone`, `relation`, `is_active`, `notes` | Je Präfix ein Datensatz. Bool-Normalisierung für `is_active`; ohne Namen kein Datensatz. |
+| `pa1__*`, `pa2__*`, `pa3__*`, `pa4__*` | `pickup_authorizations` | `name`, `phone`, `relationship`, `active`, `valid_from`, `valid_to`, `created_at`, `created_by` | Je Präfix ein Datensatz. Bool-Normalisierung für `active`; `notes` ist **out of scope** (keine Persistenz im Pickup-Schema). |
 | `consent__photo_download_pixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Bool-Normalisierung; wirkt nur, wenn keine höhere Priorität greift. |
 | `consent__photo_download_unpixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Priorität vor `pixelated`: bei `true` → `unpixelated`, außer `denied=true`. |
 | `consent__photo_download_denied` | `children` (optional zusätzlich `consents`) | `download_consent` | Höchste Priorität: bei `true` immer `denied`. |
-| weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Aktuell nicht verpflichtend persistiert**; interimistisch eigener `consents`-Tab, alternativ JSON-Fallback in `children.notes_internal`. |
-| `sign__parent1_name`, `sign__parent1_date` | optional `consents` | z. B. `sign_parent1_name`, `sign_parent1_date` | **Aktuell nicht persistiert im Standard-Schema**; bevorzugt im `consents`-Tab ablegen. |
-| `sign__parent2_name`, `sign__parent2_date` | optional `consents` | z. B. `sign_parent2_name`, `sign_parent2_date` | **Aktuell nicht persistiert im Standard-Schema**; alternativ JSON-Fallback in `children.notes_internal`. |
-| `sign__place`, `sign__signature_ref` | optional `consents` | z. B. `sign_place`, `sign_signature_ref` | **Nicht persistiert im Pflichtschema**; bis zur finalen Signatur-Implementierung in separatem Tab oder JSON-Fallback führen. |
+| weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Out of scope** für das produktive Pflichtschema (nur Download-Consent wird aktiv ausgewertet); optional im `consents`-Tab oder JSON-Fallback in `children.notes_internal`. |
+| `sign__parent1_name`, `sign__parent1_date` | optional `consents` | z. B. `sign_parent1_name`, `sign_parent1_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); bevorzugt im `consents`-Tab ablegen. |
+| `sign__parent2_name`, `sign__parent2_date` | optional `consents` | z. B. `sign_parent2_name`, `sign_parent2_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); alternativ JSON-Fallback in `children.notes_internal`. |
+| `sign__place`, `sign__signature_ref` | optional `consents` | z. B. `sign_place`, `sign_signature_ref` | **Out of scope** bis zur finalen Signatur-Implementierung; in separatem Tab oder JSON-Fallback führen. |
 
 ### Nicht persistierte Felder (explizit)
 

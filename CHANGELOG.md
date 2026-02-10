@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- Neues Modul `services/registration_form_service.py` ergänzt: `extract_acroform_fields(pdf_bytes)` liest ACROForm-Felder via `PyPDF2.PdfReader(...).get_fields()`, normalisiert Strings/Checkboxen und bricht mit klaren Fehlern bei fehlenden Feldern oder fehlender/nicht unterstützter `meta__schema_version` ab.
+- Neues Dataclass-Modell `RegistrationPayload` plus Parser `parse_registration_payload(fields)` ergänzt, das strukturierte Bereiche (`child`, `parents`, `pickup_authorizations`, `consents`, `meta`, `errors`) liefert und Pflichtfeld-Validierung ohne Schreiboperationen durchführt.
+- Unit-Tests `tests/test_registration_form_service.py` ergänzt (Normalisierung, Schema-Validierung, Fehlerpfade, Pflichtfeldprüfung).
+
 ### Changed
 - Mapping-Schicht für Schema-v1 erweitert: neue zentrale Funktion `map_schema_v1_payload_to_tab_records()` mappt Payloads vollständig auf `children`, `parents`, `pickup_authorizations` und `consents` (inkl. `parent2__*`, `pa1..pa4__*`, `consent__privacy_notice_ack`, `consent__excursions`, `consent__emergency_treatment`, `consent__whatsapp_group`, `sign__*`, `meta__*`). `pa1..pa4` werden als geordnete Liste von Abholberechtigungen serialisiert; pro Präfix entsteht ein Datensatz bei befüllten Kernfeldern. Unit-Tests für Prioritäten und Defaults ergänzt.
 - Schema-v1/Pflichtspalten konsolidiert: `CONSENTS_REQUIRED_COLUMNS` und ein zentrales `REQUIRED_COLUMNS_BY_SHEET` wurden im Google-Sheets-Repository ergänzt; das lokale ODS-Repository verwendet nun exakt dieselbe Feldabdeckung und Reihenfolge. README-Mapping für `pa*`, `consent__*`, `sign__*` und `meta__*` präzisiert (inkl. explizitem **out of scope**-Status nicht-produktiv unterstützter Felder).

@@ -21,7 +21,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 - **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
-- **Admin-Navigation gebündelt:** Die Bereiche **„Stammdaten & Infos“** (inkl. Übersicht, Stammdaten, Stammdaten Sheet) sowie **„Dokumente & Verträge“** reduzieren die Sidebar-Einträge und strukturieren zusammengehörige Aufgaben logisch; **„Medikationen“** ist direkt im Bereich **„Stammdaten“** als eingeklappter Abschnitt integriert.
+- **Admin-Navigation gebündelt:** Die Bereiche **„Stammdaten & Infos“** (inkl. Übersicht und Stammdaten) sowie **„Dokumente & Verträge“** reduzieren die Sidebar-Einträge und strukturieren zusammengehörige Aufgaben logisch; **„Medikationen“** ist direkt im Bereich **„Stammdaten“** als eingeklappter Abschnitt integriert.
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 
 
@@ -218,9 +218,9 @@ Der Tab `pickup_authorizations` wird bei Bedarf automatisch erstellt, wenn er im
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
 
-Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei falschem Tabnamen zeigt die App weiterhin eine klare Hinweismeldung (DE/EN); ein leerer Bereich bleibt bewusst ohne zusätzliche Info-Box.
+Im Admin-Bereich **"Stammdaten"** enthält die Kinder-Übersicht links eine Spalte **"Auswahl / Select"** mit Checkboxen. Für alle ausgewählten Kinder erscheinen darunter parallel editierbare Stammdaten-Formulare (nebeneinander) inklusive Elternfeldern.
 
-In derselben Admin-Ansicht steht außerdem ein **Export/Backup-Block (CSV + JSON)** bereit. Für die zentralen Tabs (`children`, `parents`) werden Download-Buttons angeboten. Leere Tabs werden als Hinweis angezeigt (kein Crash), und CSV-Exporte enthalten konsistente Header-/Spaltenreihenfolge basierend auf der Header-Zeile des jeweiligen Tabs.
+Unterhalb dieses Bereichs steht zusätzlich ein **Export/Backup-Block (CSV + JSON)** bereit. Für die zentralen Tabs (`children`, `parents`) werden Download-Buttons angeboten. Leere Tabs werden als Hinweis angezeigt (kein Crash), und CSV-Exporte enthalten konsistente Header-/Spaltenreihenfolge basierend auf der Header-Zeile des jeweiligen Tabs.
 
 Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`

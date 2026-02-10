@@ -1719,6 +1719,28 @@ else:
                             caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
                             use_container_width=True,
                         )
+                    except DriveServiceError as exc:
+                        st.error(
+                            "Foto-Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe "
+                            "für den Service-Account (403/404) und die Drive-ID. / "
+                            "Photo upload failed. Verify folder sharing for the service "
+                            "account (403/404) and the Drive ID."
+                        )
+                        st.info(str(exc))
+                    except ValueError as exc:
+                        st.error(
+                            f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
+                        )
+                        st.warning(
+                            "Hinweis: Bitte prüfen Sie den Kind-Datensatz in den "
+                            "Stammdaten und stellen Sie sicher, dass der Service-Account "
+                            "Zugriff auf den Hauptordner hat. / Hint: Check the child "
+                            "record in master data and ensure the service account has "
+                            "access to the root folder."
+                        )
+                        st.info(
+                            f"Betroffene child_id / Affected child_id: {child_id or '-'}"
+                        )
                     except Exception as exc:
                         st.error(
                             f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
@@ -1726,13 +1748,30 @@ else:
 
                 st.markdown("### Foto-Status verwalten / Manage photo status")
                 child_id = str(sel_child.get("id", "")).strip()
-                if app_config.storage_mode == "google":
-                    current_photo_folder_id = ensure_child_photo_folder(child_id)
-                else:
-                    current_photo_folder_id = str(
-                        sel_child.get("photo_folder_id")
-                        or sel_child.get("folder_id")
-                        or ""
+                try:
+                    if app_config.storage_mode == "google":
+                        current_photo_folder_id = ensure_child_photo_folder(child_id)
+                    else:
+                        current_photo_folder_id = str(
+                            sel_child.get("photo_folder_id")
+                            or sel_child.get("folder_id")
+                            or ""
+                        )
+                except DriveServiceError as exc:
+                    current_photo_folder_id = ""
+                    st.error(
+                        "Foto-Ordner konnte nicht geladen werden. Bitte prüfen Sie "
+                        "Freigaben und Drive-Konfiguration. / Could not load photo "
+                        "folder. Please verify sharing and Drive configuration."
+                    )
+                    st.info(str(exc))
+                    st.warning(
+                        "Bitte Kind-Stammdaten und Service-Account-Zugriff auf den "
+                        "Hauptordner prüfen. / Please check child master data and "
+                        "service account access to the root folder."
+                    )
+                    st.info(
+                        f"Betroffene child_id / Affected child_id: {child_id or '-'}"
                     )
 
                 child_photos = (

@@ -20,7 +20,7 @@ class DriveServiceError(RuntimeError):
         self.status_code = status_code
 
 
-def _translate_http_error(exc: HttpError) -> DriveServiceError:
+def translate_http_error(exc: HttpError) -> DriveServiceError:
     status = getattr(exc.resp, "status", None)
     if status in (403, 404):
         return DriveServiceError(
@@ -47,7 +47,7 @@ def create_folder(name: str, parent_id: str | None = None) -> str:
             .execute()
         )
     except HttpError as exc:
-        raise _translate_http_error(exc) from exc
+        raise translate_http_error(exc) from exc
 
     return created["id"]
 
@@ -103,7 +103,7 @@ def upload_bytes_to_folder(
             .execute()
         )
     except HttpError as exc:
-        raise _translate_http_error(exc) from exc
+        raise translate_http_error(exc) from exc
 
     return created["id"]
 
@@ -144,7 +144,7 @@ def list_files_in_folder(
             if not page_token:
                 break
     except HttpError as exc:
-        raise _translate_http_error(exc) from exc
+        raise translate_http_error(exc) from exc
 
     if not normalized_filter:
         return files
@@ -170,4 +170,4 @@ def download_file(file_id: str) -> bytes:
         request = drive.files().get_media(fileId=file_id, supportsAllDrives=True)
         return request.execute()
     except HttpError as exc:
-        raise _translate_http_error(exc) from exc
+        raise translate_http_error(exc) from exc

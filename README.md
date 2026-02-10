@@ -363,6 +363,10 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
   - Ursache: Ressource nicht mit Service-Account geteilt oder falsche Rolle.
   - Lösung: Drive-Ordner/Sheet/Kalender explizit mit `client_email` des Service-Accounts teilen.
 
+- **Admin-Foto-Upload zeigt jetzt gezielte Drive-Hinweise**
+  - Bei 403/404 meldet die UI explizit Freigabe-/ID-Probleme und zeigt technische Details aus `DriveServiceError`.
+  - Fehlt ein `photo_folder_id`, erscheint zusätzlich ein Hinweis zur Prüfung von Kind-Stammdaten und Service-Account-Zugriff (inkl. betroffener `child_id`).
+
 - **404 File not found / Requested entity was not found**
   - Ursache: Falsche ID (`drive_contracts_folder_id`, `stammdaten_sheet_id`, `calendar_id`) oder Ressource nicht im Zugriffskontext.
   - Lösung: IDs prüfen und Freigaben erneut kontrollieren.

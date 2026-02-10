@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+from googleapiclient.errors import HttpError
 
 from config import get_app_config
 from services.drive_service import (
     create_folder as create_google_folder,
     download_file as download_google_file,
     list_files_in_folder,
+    translate_http_error,
     upload_bytes_to_folder,
 )
 
@@ -46,7 +48,10 @@ class DriveAgent:
     ) -> list[dict[str, Any]]:
         """Gibt eine Liste der Dateien in einem Ordner zurück."""
         if self.storage_mode == "google":
-            return list_files_in_folder(folder_id, mime_type_filter)
+            try:
+                return list_files_in_folder(folder_id, mime_type_filter)
+            except HttpError as exc:
+                raise translate_http_error(exc) from exc
 
         index = self._read_index()
         files: list[dict[str, Any]] = []
@@ -84,12 +89,15 @@ class DriveAgent:
     ) -> str | None:
         """Lädt eine Datei hoch und gibt die File-ID zurück."""
         if self.storage_mode == "google":
-            return upload_bytes_to_folder(
-                parent_folder_id,
-                name,
-                content_bytes,
-                mime_type,
-            )
+            try:
+                return upload_bytes_to_folder(
+                    parent_folder_id,
+                    name,
+                    content_bytes,
+                    mime_type,
+                )
+            except HttpError as exc:
+                raise translate_http_error(exc) from exc
 
         folder_id = parent_folder_id or "root"
         folder_path = self.local_drive_root / folder_id

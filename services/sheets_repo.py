@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from services.google_clients import get_sheets_client
 
 DEFAULT_CACHE_TTL_SECONDS = 15
 DEFAULT_DOWNLOAD_CONSENT = "pixelated"
+LOGGER = logging.getLogger(__name__)
 CHILDREN_REQUIRED_COLUMNS = [
     "child_id",
     "name",
@@ -53,8 +55,11 @@ PARENTS_REQUIRED_COLUMNS = [
 CONSENTS_REQUIRED_COLUMNS = [
     "consent_id",
     "child_id",
-    "consent_type",
-    "status",
+    "privacy_notice_ack",
+    "excursions",
+    "emergency_treatment",
+    "whatsapp_group",
+    "photo_download",
 ]
 
 
@@ -540,11 +545,15 @@ def _normalize_bool_text(value: Any, *, default: str = "false") -> str:
     return "true" if _normalize_checkbox_flag(value) else default
 
 
-def _consent_status(value: Any) -> str:
-    normalized = str(value or "").strip()
-    if not normalized:
-        return "false"
-    return "true" if _normalize_checkbox_flag(value) else normalized
+def _redact_payload_for_log(payload: dict[str, Any]) -> dict[str, str]:
+    redacted: dict[str, str] = {}
+    for key in payload:
+        lowered = key.lower()
+        if any(token in lowered for token in ("name", "email", "phone", "address")):
+            redacted[key] = "***REDACTED***"
+            continue
+        redacted[key] = "<set>" if str(payload[key] or "").strip() else "<empty>"
+    return redacted
 
 
 def _build_pickup_authorization_records(
@@ -555,9 +564,18 @@ def _build_pickup_authorization_records(
     records: list[dict[str, str]] = []
     for index in range(1, 5):
         prefix = f"pa{index}__"
+        is_enabled = _normalize_checkbox_flag(payload.get(f"{prefix}enabled"))
+        name = str(payload.get(f"{prefix}name", "")).strip()
+        if not is_enabled or not name:
+            continue
+
         candidate = {
-            "name": str(payload.get(f"{prefix}name", "")).strip(),
-            "relationship": str(payload.get(f"{prefix}relationship", "")).strip(),
+            "name": name,
+            "relationship": str(
+                payload.get(f"{prefix}relationship")
+                or payload.get(f"{prefix}relation")
+                or ""
+            ).strip(),
             "phone": str(payload.get(f"{prefix}phone", "")).strip(),
             "valid_from": str(payload.get(f"{prefix}valid_from", "")).strip(),
             "valid_to": str(payload.get(f"{prefix}valid_to", "")).strip(),
@@ -567,20 +585,6 @@ def _build_pickup_authorization_records(
             "created_at": str(payload.get(f"{prefix}created_at", "")).strip(),
             "created_by": str(payload.get(f"{prefix}created_by", "")).strip(),
         }
-        if not any(
-            candidate[field]
-            for field in (
-                "name",
-                "relationship",
-                "phone",
-                "valid_from",
-                "valid_to",
-                "created_at",
-                "created_by",
-            )
-        ):
-            continue
-
         records.append({"child_id": child_id, **candidate})
     return records
 
@@ -595,17 +599,22 @@ def map_schema_v1_payload_to_tab_records(
     Die Funktion liefert normalisierte Datensätze für `children`, `parents`,
     `pickup_authorizations` und `consents`.
 
-    `pa1..pa4` werden als Liste in `pickup_authorizations` serialisiert:
-    pro Präfix genau ein Datensatz in aufsteigender Reihenfolge, falls mindestens
-    eines der Kernfelder (`name`, `relationship`, `phone`, `valid_from`,
-    `valid_to`, `created_at`, `created_by`) belegt ist.
+    `pa1..pa4` werden als Liste in `pickup_authorizations` serialisiert,
+    sofern `pa{i}__enabled` gesetzt und `pa{i}__name` befüllt ist.
     """
 
-    resolved_child_id = str(
-        payload.get("meta__record_id") or payload.get("child_id") or child_id or ""
-    ).strip()
+    LOGGER.debug(
+        "Mapping schema-v1 payload to tab records (redacted): %s",
+        _redact_payload_for_log(payload),
+    )
+
+    provided_child_id = str(payload.get("child__child_id") or child_id or "").strip()
+    resolved_child_id = provided_child_id or uuid4().hex
 
     parent1_email = str(payload.get("parent1__email", "")).strip()
+    internal_notes = str(
+        payload.get("child__notes_internal") or payload.get("notes_internal") or ""
+    ).strip()
     children_record = {
         "child_id": resolved_child_id,
         "name": str(payload.get("child__name") or payload.get("name") or "").strip(),
@@ -625,9 +634,7 @@ def map_schema_v1_payload_to_tab_records(
             or payload.get("notes_parent_visible")
             or ""
         ).strip(),
-        "notes_internal": str(
-            payload.get("child__notes_internal") or payload.get("notes_internal") or ""
-        ).strip(),
+        "notes_internal": internal_notes,
         "pickup_password": str(
             payload.get("child__pickup_password")
             or payload.get("pickup_password")
@@ -638,12 +645,55 @@ def map_schema_v1_payload_to_tab_records(
         ).strip()
         or "active",
         "download_consent": _derive_download_consent(payload),
+        "primary_caregiver": str(
+            payload.get("child__primary_caregiver")
+            or payload.get("primary_caregiver")
+            or ""
+        ).strip(),
+        "doctor_name": str(
+            payload.get("child__doctor_name") or payload.get("doctor_name") or ""
+        ).strip(),
+        "doctor_phone": str(
+            payload.get("child__doctor_phone") or payload.get("doctor_phone") or ""
+        ).strip(),
+        "health_insurance": str(
+            payload.get("child__health_insurance")
+            or payload.get("health_insurance")
+            or ""
+        ).strip(),
+        "medication_regular": str(
+            payload.get("child__medication_regular")
+            or payload.get("medication_regular")
+            or ""
+        ).strip(),
+        "dietary": str(
+            payload.get("child__dietary") or payload.get("dietary") or ""
+        ).strip(),
+        "languages_at_home": str(
+            payload.get("child__languages_at_home")
+            or payload.get("languages_at_home")
+            or ""
+        ).strip(),
+        "sleep_habits": str(
+            payload.get("child__sleep_habits") or payload.get("sleep_habits") or ""
+        ).strip(),
+        "care_notes_optional": str(
+            payload.get("child__care_notes_optional")
+            or payload.get("care_notes_optional")
+            or ""
+        ).strip(),
     }
 
     parents_records: list[dict[str, str]] = []
     for prefix in ("parent1", "parent2"):
         email = str(payload.get(f"{prefix}__email") or "").strip()
+        if not email:
+            continue
+
         record = {
+            "parent_id": str(
+                payload.get(f"{prefix}__parent_id") or uuid4().hex
+            ).strip(),
             "email": email,
             "name": str(payload.get(f"{prefix}__name") or "").strip(),
             "phone": str(payload.get(f"{prefix}__phone") or "").strip(),
@@ -653,33 +703,39 @@ def map_schema_v1_payload_to_tab_records(
                 payload.get(f"{prefix}__preferred_language") or ""
             ).strip(),
             "emergency_contact_name": str(
-                payload.get(f"{prefix}__emergency_contact_name") or ""
+                payload.get("parent1__emergency_contact_name") or ""
             ).strip(),
             "emergency_contact_phone": str(
-                payload.get(f"{prefix}__emergency_contact_phone") or ""
+                payload.get("parent1__emergency_contact_phone") or ""
             ).strip(),
             "notifications_opt_in": _normalize_bool_text(
                 payload.get(f"{prefix}__notifications_opt_in"),
                 default="false",
             ),
         }
-        if any(record.values()):
-            parents_records.append(record)
+        parents_records.append(record)
 
-    consent_records: list[dict[str, str]] = []
-    for key, raw_value in payload.items():
-        if (
-            key.startswith("consent__")
-            or key.startswith("sign__")
-            or key.startswith("meta__")
-        ):
-            consent_records.append(
-                {
-                    "child_id": resolved_child_id,
-                    "consent_type": key,
-                    "status": _consent_status(raw_value),
-                }
-            )
+    consent_records = {
+        "consent_id": str(payload.get("consent__consent_id") or uuid4().hex).strip(),
+        "child_id": resolved_child_id,
+        "privacy_notice_ack": _normalize_bool_text(
+            payload.get("consent__privacy_notice_ack"),
+            default="false",
+        ),
+        "excursions": _normalize_bool_text(
+            payload.get("consent__excursions"),
+            default="false",
+        ),
+        "emergency_treatment": _normalize_bool_text(
+            payload.get("consent__emergency_treatment"),
+            default="false",
+        ),
+        "whatsapp_group": _normalize_bool_text(
+            payload.get("consent__whatsapp_group"),
+            default="false",
+        ),
+        "photo_download": _derive_download_consent(payload),
+    }
 
     return {
         "children": children_record,

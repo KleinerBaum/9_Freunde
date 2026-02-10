@@ -44,10 +44,13 @@ def test_normalize_download_consent_accepts_denied() -> None:
 
 def test_map_schema_v1_payload_to_tab_records_maps_children_and_parents() -> None:
     payload = {
-        "meta__record_id": "child-42",
+        "child__child_id": "child-42",
         "child__name": "Lina",
         "child__birthdate": "2021-03-01",
         "child__status": "active",
+        "child__primary_caregiver": "Eva",
+        "child__doctor_name": "Praxis",
+        "child__dietary": "vegetarisch",
         "parent_email": "fallback@example.com",
         "parent1__email": "p1@example.com",
         "parent1__name": "Parent One",
@@ -64,11 +67,15 @@ def test_map_schema_v1_payload_to_tab_records_maps_children_and_parents() -> Non
     assert mapped["children"]["name"] == "Lina"
     assert mapped["children"]["parent_email"] == "p1@example.com"
     assert mapped["children"]["download_consent"] == "pixelated"
+    assert mapped["children"]["primary_caregiver"] == "Eva"
+    assert mapped["children"]["doctor_name"] == "Praxis"
+    assert mapped["children"]["dietary"] == "vegetarisch"
 
     assert mapped["parents"][0]["email"] == "p1@example.com"
     assert mapped["parents"][0]["notifications_opt_in"] == "true"
     assert mapped["parents"][1]["email"] == "p2@example.com"
     assert mapped["parents"][1]["notifications_opt_in"] == "false"
+    assert mapped["parents"][0]["parent_id"]
 
 
 def test_map_schema_v1_payload_to_tab_records_uses_child_id_argument_as_fallback() -> (
@@ -82,52 +89,55 @@ def test_map_schema_v1_payload_to_tab_records_uses_child_id_argument_as_fallback
     assert mapped["children"]["child_id"] == "fallback-id"
 
 
+def test_map_schema_v1_payload_to_tab_records_generates_child_id_without_input() -> (
+    None
+):
+    mapped = sheets_repo.map_schema_v1_payload_to_tab_records(
+        {"child__name": "No Meta"}
+    )
+
+    assert mapped["children"]["child_id"]
+
+
 def test_map_schema_v1_payload_to_tab_records_serializes_pa1_to_pa4_in_order() -> None:
     payload = {
-        "meta__record_id": "child-99",
+        "child__child_id": "child-99",
+        "pa1__enabled": "true",
         "pa1__name": "Grandma",
-        "pa1__relationship": "grandparent",
-        "pa1__active": "",
+        "pa1__relation": "grandparent",
+        "pa2__enabled": "false",
         "pa2__name": "Neighbor",
         "pa2__phone": "12345",
-        "pa2__active": "false",
+        "pa4__enabled": "x",
         "pa4__name": "Uncle",
         "pa4__created_by": "admin@example.com",
-        "pa4__active": "x",
     }
 
     mapped = sheets_repo.map_schema_v1_payload_to_tab_records(payload)
 
     pickup = mapped["pickup_authorizations"]
-    assert [entry["name"] for entry in pickup] == ["Grandma", "Neighbor", "Uncle"]
+    assert [entry["name"] for entry in pickup] == ["Grandma", "Uncle"]
     assert pickup[0]["child_id"] == "child-99"
     assert pickup[0]["active"] == "true"
-    assert pickup[1]["active"] == "true"
-    assert pickup[2]["active"] == "true"
+    assert pickup[0]["relationship"] == "grandparent"
 
 
-def test_map_schema_v1_payload_to_tab_records_maps_consents_sign_and_meta() -> None:
+def test_map_schema_v1_payload_to_tab_records_maps_consents() -> None:
     payload = {
-        "meta__record_id": "child-7",
+        "child__child_id": "child-7",
         "consent__privacy_notice_ack": "yes",
         "consent__excursions": "no",
         "consent__emergency_treatment": "1",
         "consent__whatsapp_group": "0",
-        "sign__parent1_name": "Signer One",
-        "sign__parent2_date": "2025-01-15",
-        "meta__updated_at": "2025-01-16T10:15:00Z",
+        "consent__photo_download_unpixelated": "true",
     }
 
     mapped = sheets_repo.map_schema_v1_payload_to_tab_records(payload)
 
-    records = {
-        record["consent_type"]: record["status"] for record in mapped["consents"]
-    }
-    assert records["consent__privacy_notice_ack"] == "true"
-    assert records["consent__excursions"] == "no"
-    assert records["consent__emergency_treatment"] == "true"
-    assert records["consent__whatsapp_group"] == "0"
-    assert records["sign__parent1_name"] == "Signer One"
-    assert records["sign__parent2_date"] == "2025-01-15"
-    assert records["meta__updated_at"] == "2025-01-16T10:15:00Z"
-    assert all(record["child_id"] == "child-7" for record in mapped["consents"])
+    records = mapped["consents"]
+    assert records["child_id"] == "child-7"
+    assert records["privacy_notice_ack"] == "true"
+    assert records["excursions"] == "false"
+    assert records["emergency_treatment"] == "true"
+    assert records["whatsapp_group"] == "false"
+    assert records["photo_download"] == "unpixelated"

@@ -14,6 +14,9 @@ def test_consents_schema_v1_required_columns_supported() -> None:
     assert sheets_repo.CONSENTS_REQUIRED_COLUMNS == [
         "consent_id",
         "child_id",
-        "consent_type",
-        "status",
+        "privacy_notice_ack",
+        "excursions",
+        "emergency_treatment",
+        "whatsapp_group",
+        "photo_download",
     ]

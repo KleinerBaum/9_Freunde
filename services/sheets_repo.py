@@ -50,6 +50,14 @@ PARENTS_REQUIRED_COLUMNS = [
 ]
 
 
+CONSENTS_REQUIRED_COLUMNS = [
+    "consent_id",
+    "child_id",
+    "consent_type",
+    "status",
+]
+
+
 PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS = [
     "pickup_id",
     "child_id",
@@ -86,6 +94,16 @@ PHOTO_META_REQUIRED_COLUMNS = [
     "uploaded_by",
     "retention_until",
 ]
+
+
+REQUIRED_COLUMNS_BY_SHEET: dict[str, list[str]] = {
+    "children": CHILDREN_REQUIRED_COLUMNS,
+    "parents": PARENTS_REQUIRED_COLUMNS,
+    "consents": CONSENTS_REQUIRED_COLUMNS,
+    "pickup_authorizations": PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS,
+    "medications": MEDICATIONS_REQUIRED_COLUMNS,
+    "photo_meta": PHOTO_META_REQUIRED_COLUMNS,
+}
 
 
 class SheetsRepositoryError(RuntimeError):
@@ -380,6 +398,34 @@ def _ensure_pickup_authorizations_header_columns(
 
     if not rows:
         header = ["pickup_id", "child_id", "name", "relationship", "phone"]
+        _values_update(f"{tab_name}!A1", [header])
+        rows = [[*header]]
+
+    header = [str(col).strip() for col in rows[0]]
+    changed = False
+    for column in required_columns:
+        if column not in header:
+            header.append(column)
+            changed = True
+
+    if changed:
+        _values_update(f"{tab_name}!A1:ZZ1", [header])
+
+    return header
+
+
+def _ensure_consents_header_columns(required_columns: list[str]) -> list[str]:
+    tab_name = _consents_tab()
+    try:
+        rows = _values_get(f"{tab_name}!A:ZZ")
+    except SheetsRepositoryError as exc:
+        if exc.status_code != 400 or "Unable to parse range" not in str(exc):
+            raise
+        _create_sheet_if_missing(tab_name)
+        rows = []
+
+    if not rows:
+        header = ["consent_id", "child_id", "consent_type", "status"]
         _values_update(f"{tab_name}!A1", [header])
         rows = [[*header]]
 

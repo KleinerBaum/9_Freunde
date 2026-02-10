@@ -8,25 +8,7 @@ from odf.opendocument import OpenDocumentSpreadsheet, load
 from odf.table import Table, TableCell, TableRow
 from odf.text import P
 
-from services.sheets_repo import (
-    CHILDREN_REQUIRED_COLUMNS,
-    MEDICATIONS_REQUIRED_COLUMNS,
-    PARENTS_REQUIRED_COLUMNS,
-    PHOTO_META_REQUIRED_COLUMNS,
-    PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS,
-)
-
-
-CONSENTS_REQUIRED_COLUMNS = ["consent_id", "child_id", "consent_type", "status"]
-
-REQUIRED_COLUMNS_BY_SHEET: dict[str, list[str]] = {
-    "children": CHILDREN_REQUIRED_COLUMNS,
-    "parents": PARENTS_REQUIRED_COLUMNS,
-    "consents": CONSENTS_REQUIRED_COLUMNS,
-    "pickup_authorizations": PICKUP_AUTHORIZATIONS_REQUIRED_COLUMNS,
-    "medications": MEDICATIONS_REQUIRED_COLUMNS,
-    "photo_meta": PHOTO_META_REQUIRED_COLUMNS,
-}
+from services.sheets_repo import REQUIRED_COLUMNS_BY_SHEET
 
 
 class LocalODSRepository:

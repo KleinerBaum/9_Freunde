@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Changed
+- Landing-Page-Branding erweitert: `images/Herz.png` wird als zentriertes oberstes Element gerendert, und `images/Hintergrund.png` dient app-weit als fixes Hintergrundbild.
+
 - Kalenderbereich (Admin **Kalender** und Eltern **Termine / Events**) zeigt jetzt zusätzlich eine eingebettete Google-Kalender-Ansicht per IFrame (DE/EN UI bleibt erhalten).
 - Admin-Ansicht **"Stammdaten Sheet"** zeigt im Export/Backup-Bereich nur noch die Tabs `children` und `parents`; optionale Exportkarten für `attendance`, `daily_logs` und `messages` wurden entfernt.
 - Google-Ordnerkonfiguration robuster gemacht: `gcp.drive_photos_root_folder_id` und `gcp.drive_contracts_folder_id` akzeptieren jetzt zusätzlich vollständige Drive-Ordner-URLs (`.../folders/<ID>` oder `...?id=<ID>`); die App extrahiert automatisch die Ordner-ID und liefert bei ungültigen URLs eine klare Fehlermeldung.

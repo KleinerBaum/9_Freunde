@@ -17,7 +17,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Landing-Page-Branding:** Oberhalb der Inhalte wird zusätzlich `images/Herz.png` zentriert dargestellt; `images/Hintergrund.png` wird als globales Hintergrundbild der gesamten App verwendet.
 - **Überarbeitetes Dark-Element-Theme (DE/EN):** Dunkle UI-Elemente (Buttons, Inputs, Sidebar) wurden auf eine kontraststarke, nutzerfreundliche und stylische Farbpalette umgestellt; helle Eingabeflächen mit klaren Fokuszuständen verbessern die Lesbarkeit deutlich. / Dark UI elements (buttons, inputs, sidebar) now use a higher-contrast, user-friendly, stylish palette; lighter input surfaces and clear focus states significantly improve readability.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache) sowie eingebetteter Kalenderansicht per IFrame im UI.
-- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`) mit lokaler Verpixelung erkannter Gesichter.
+- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`, optional `denied`) mit lokaler Verpixelung erkannter Gesichter bzw. vollständiger Download-Sperre bei `denied`.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 - **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
@@ -224,7 +224,9 @@ Unterhalb dieses Bereichs steht zusätzlich ein **Export/Backup-Block (CSV + JSO
 
 Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`
-- Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`
+- Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`, `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional`
+- Mapping-Regel: Falls `parent1__email` gesetzt ist, wird `children.parent_email` automatisch auf diesen Wert synchronisiert.
+- Consent-Regel: `children.download_consent` wird aus `consent__photo_download_pixelated`, `consent__photo_download_unpixelated`, `consent__photo_download_denied` abgeleitet (`denied` > `unpixelated` > `pixelated`).
 - Admin-Formulare „Neues Kind anlegen“ und „Kind bearbeiten“ nutzen für `birthdate` und `start_date` den Streamlit-Datumspicker (`st.date_input`) und speichern ISO-Werte (`YYYY-MM-DD`) oder leer bei optionalen Feldern.
 
 Empfohlener Eltern-Tab (`parents`):

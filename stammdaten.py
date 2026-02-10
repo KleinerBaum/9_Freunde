@@ -19,13 +19,21 @@ DEFAULT_DOWNLOAD_CONSENT = "pixelated"
 
 def _normalize_download_consent(value: Any) -> str:
     normalized = str(value or "").strip().lower()
-    if normalized in {"pixelated", "unpixelated"}:
+    if normalized in {"pixelated", "unpixelated", "denied"}:
         return normalized
     return DEFAULT_DOWNLOAD_CONSENT
 
 
-def _normalize_child_record(child: dict[str, Any]) -> dict[str, Any]:
+def _sync_child_parent_email(child: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(child)
+    primary_parent_email = str(normalized.get("parent1__email", "")).strip()
+    if primary_parent_email:
+        normalized["parent_email"] = primary_parent_email
+    return normalized
+
+
+def _normalize_child_record(child: dict[str, Any]) -> dict[str, Any]:
+    normalized = _sync_child_parent_email(child)
     if "id" not in normalized and "child_id" in normalized:
         normalized["id"] = normalized["child_id"]
     normalized["download_consent"] = _normalize_download_consent(
@@ -134,7 +142,7 @@ class StammdatenManager:
         extra_data: dict[str, Any] | None = None,
     ) -> str:
         """Fügt ein Kind hinzu und erstellt optional einen Drive-Ordner."""
-        additional_child_data = extra_data or {}
+        additional_child_data = _sync_child_parent_email(extra_data or {})
         folder_id: str | None = None
         try:
             drive_agent = DriveAgent()
@@ -294,7 +302,7 @@ class StammdatenManager:
         children = self._read_local_children()
         for index, child in enumerate(children):
             if child.get("id") == child_id:
-                merged_data = {**child, **new_data}
+                merged_data = _sync_child_parent_email({**child, **new_data})
                 merged_data["download_consent"] = _normalize_download_consent(
                     merged_data.get("download_consent")
                 )

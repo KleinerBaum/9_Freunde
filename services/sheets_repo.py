@@ -27,6 +27,14 @@ CHILDREN_REQUIRED_COLUMNS = [
     "notes_internal",
     "pickup_password",
     "status",
+    "doctor_name",
+    "doctor_phone",
+    "health_insurance",
+    "medication_regular",
+    "dietary",
+    "languages_at_home",
+    "sleep_habits",
+    "care_notes_optional",
 ]
 PARENTS_REQUIRED_COLUMNS = [
     "parent_id",
@@ -456,9 +464,30 @@ def _to_records(rows: list[list[str]]) -> list[dict[str, str]]:
 
 def _normalize_download_consent(value: str | None) -> str:
     normalized = str(value or "").strip().lower()
-    if normalized in {"pixelated", "unpixelated"}:
+    if normalized in {"pixelated", "unpixelated", "denied"}:
         return normalized
     return DEFAULT_DOWNLOAD_CONSENT
+
+
+def _normalize_checkbox_flag(value: Any) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {"1", "true", "yes", "ja", "on", "x"}
+
+
+def _derive_download_consent(payload: dict[str, Any]) -> str:
+    if _normalize_checkbox_flag(payload.get("consent__photo_download_denied")):
+        return "denied"
+    if _normalize_checkbox_flag(payload.get("consent__photo_download_unpixelated")):
+        return "unpixelated"
+    if _normalize_checkbox_flag(payload.get("consent__photo_download_pixelated")):
+        return "pixelated"
+    return _normalize_download_consent(str(payload.get("download_consent", "")))
+
+
+def _sync_child_parent_email(payload: dict[str, Any]) -> None:
+    primary_parent_email = str(payload.get("parent1__email", "")).strip()
+    if primary_parent_email:
+        payload["parent_email"] = primary_parent_email
 
 
 def _get_row_index_by_id(tab: str, id_field: str, value: str) -> tuple[int, list[str]]:
@@ -518,10 +547,9 @@ def add_child(child_dict: dict[str, Any]) -> str:
         **child_dict,
         "child_id": child_id,
         "status": str(child_dict.get("status") or "active").strip() or "active",
-        "download_consent": _normalize_download_consent(
-            str(child_dict.get("download_consent", ""))
-        ),
+        "download_consent": _derive_download_consent(child_dict),
     }
+    _sync_child_parent_email(payload)
 
     header = _ensure_children_header_columns(CHILDREN_REQUIRED_COLUMNS)
 
@@ -548,9 +576,8 @@ def update_child(child_id: str, patch_dict: dict[str, Any]) -> None:
     current_payload.update(
         {key: str(value).strip() for key, value in patch_dict.items()}
     )
-    current_payload["download_consent"] = _normalize_download_consent(
-        current_payload.get("download_consent")
-    )
+    _sync_child_parent_email(current_payload)
+    current_payload["download_consent"] = _derive_download_consent(current_payload)
     current_payload["status"] = str(current_payload.get("status") or "active").strip()
     if not current_payload["status"]:
         current_payload["status"] = "active"

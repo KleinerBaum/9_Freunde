@@ -793,7 +793,7 @@ def _render_child_edit_form(
         current_download_consent = (
             str(child_record.get("download_consent", "pixelated")).strip().lower()
         )
-        consent_options = ["pixelated", "unpixelated"]
+        consent_options = ["pixelated", "unpixelated", "denied"]
         if current_download_consent not in consent_options:
             current_download_consent = "pixelated"
         edit_download_consent = st.selectbox(
@@ -803,7 +803,11 @@ def _render_child_edit_form(
             format_func=lambda mode: (
                 "Downloads verpixelt / Downloads pixelated"
                 if mode == "pixelated"
-                else "Downloads unverpixelt / Downloads unpixelated"
+                else (
+                    "Downloads unverpixelt / Downloads unpixelated"
+                    if mode == "unpixelated"
+                    else "Download verweigert / Download denied"
+                )
             ),
             key=f"{key_prefix}_edit_download_consent",
         )
@@ -2371,7 +2375,7 @@ else:
                     current_download_consent = (
                         str(child.get("download_consent", "pixelated")).strip().lower()
                     )
-                    consent_options = ["pixelated", "unpixelated"]
+                    consent_options = ["pixelated", "unpixelated", "denied"]
                     if current_download_consent not in consent_options:
                         current_download_consent = "pixelated"
                     selected_download_consent = st.selectbox(
@@ -2381,7 +2385,11 @@ else:
                         format_func=lambda mode: (
                             "Downloads verpixelt / Downloads pixelated"
                             if mode == "pixelated"
-                            else "Downloads unverpixelt / Downloads unpixelated"
+                            else (
+                                "Downloads unverpixelt / Downloads unpixelated"
+                                if mode == "unpixelated"
+                                else "Download verweigert / Download denied"
+                            )
                         ),
                         key="parent_download_consent_select",
                     )
@@ -2417,16 +2425,19 @@ else:
                             caption=f"{file_name} · Vorschau / Preview",
                             width="stretch",
                         )
-                        download_bytes = _get_photo_download_bytes(
-                            file_id=file_id,
-                            consent_mode=active_consent_mode,
-                        )
-                        st.download_button(
-                            "Foto herunterladen / Download photo",
-                            data=download_bytes,
-                            file_name=file_name,
-                            key=f"download_photo_{file_id}_{active_consent_mode}",
-                        )
+                        if active_consent_mode == "denied":
+                            st.caption("Download nicht erlaubt / Download not allowed.")
+                        else:
+                            download_bytes = _get_photo_download_bytes(
+                                file_id=file_id,
+                                consent_mode=active_consent_mode,
+                            )
+                            st.download_button(
+                                "Foto herunterladen / Download photo",
+                                data=download_bytes,
+                                file_name=file_name,
+                                key=f"download_photo_{file_id}_{active_consent_mode}",
+                            )
                 else:
                     st.write(
                         "Keine veröffentlichten Fotos vorhanden. / No published photos available."

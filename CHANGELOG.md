@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Stammdaten: Elternfelder `emergency_contact_name`, `emergency_contact_phone`, `preferred_language` und `notifications_opt_in` sind jetzt vollständig in der UI angebunden (Admin-Formulare Add/Edit mit Upsert nach `parents`, Elternansicht "Mein Kind" read-only mit DE/EN-Labels).
 - Landing-Page-Branding erweitert: `images/Herz.png` wird als zentriertes oberstes Element gerendert, und `images/Hintergrund.png` dient app-weit als fixes Hintergrundbild.
 
 - Kalenderbereich (Admin **Kalender** und Eltern **Termine / Events**) zeigt jetzt zusätzlich eine eingebettete Google-Kalender-Ansicht per IFrame (DE/EN UI bleibt erhalten).

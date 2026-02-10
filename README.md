@@ -222,6 +222,8 @@ Pflicht-Tab für Kinder (`children`):
 Empfohlener Eltern-Tab (`parents`):
 - Basis: `parent_id`, `email`, `name`, `phone`
 - Erweitert (automatisch ergänzt): `phone2`, `address`, `preferred_language`, `emergency_contact_name`, `emergency_contact_phone`, `notifications_opt_in`
+- Admin kann diese Elternfelder in **"Neues Kind anlegen / Add child"** und **"Kind bearbeiten / Edit child"** pflegen; Datensätze werden per E-Mail als Upsert in `parents` gespeichert.
+- Eltern sehen die Felder read-only in **"Mein Kind - Übersicht"**: Notfallkontakt, bevorzugte Sprache und Benachrichtigungs-Opt-in.
 
 Optional:
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)

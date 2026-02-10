@@ -199,6 +199,76 @@ class StammdatenManager:
                 return _normalize_child_record(child)
         return None
 
+    def get_parents(self) -> list[dict[str, Any]]:
+        """Liefert alle Eltern-Datensätze."""
+        if self.storage_mode == "google":
+            return [
+                {key: str(value).strip() for key, value in parent.items()}
+                for parent in sheets_repo.get_parents()
+            ]
+
+        return [
+            {key: str(value).strip() for key, value in parent.items()}
+            for parent in self._read_local_parents()
+        ]
+
+    def get_parent_by_email(self, email: str) -> dict[str, Any] | None:
+        """Liefert einen Eltern-Datensatz über die E-Mail-Adresse."""
+        normalized_email = email.strip().lower()
+        if not normalized_email:
+            return None
+
+        for parent in self.get_parents():
+            if str(parent.get("email", "")).strip().lower() == normalized_email:
+                return parent
+        return None
+
+    def upsert_parent_by_email(self, email: str, parent_data: dict[str, Any]) -> str:
+        """Erstellt oder aktualisiert einen Eltern-Datensatz anhand der E-Mail."""
+        normalized_email = email.strip().lower()
+        if not normalized_email:
+            raise ValueError("E-Mail darf nicht leer sein.")
+
+        normalized_parent_data = {
+            key: str(value).strip() for key, value in parent_data.items()
+        }
+        normalized_parent_data["email"] = normalized_email
+        normalized_parent_data["notifications_opt_in"] = (
+            "true"
+            if str(normalized_parent_data.get("notifications_opt_in", "false"))
+            .strip()
+            .lower()
+            == "true"
+            else "false"
+        )
+
+        existing_parent = self.get_parent_by_email(normalized_email)
+
+        if self.storage_mode == "google":
+            if existing_parent:
+                parent_id = str(existing_parent.get("parent_id", "")).strip()
+                if not parent_id:
+                    raise KeyError(
+                        f"Eltern-Datensatz für '{normalized_email}' enthält keine parent_id."
+                    )
+                sheets_repo.update_parent(parent_id, normalized_parent_data)
+                return parent_id
+            return sheets_repo.add_parent(normalized_parent_data)
+
+        parents = self._read_local_parents()
+        if existing_parent:
+            parent_id = str(existing_parent.get("parent_id", "")).strip()
+            for index, parent in enumerate(parents):
+                if str(parent.get("parent_id", "")).strip() == parent_id:
+                    parents[index] = {**parent, **normalized_parent_data}
+                    self._write_local_parents(parents)
+                    return parent_id
+
+        parent_id = uuid.uuid4().hex
+        parents.append({"parent_id": parent_id, **normalized_parent_data})
+        self._write_local_parents(parents)
+        return parent_id
+
     def update_child(self, child_id: str, new_data: dict[str, Any]) -> None:
         """Aktualisiert Felder des Kindes mit der ID child_id."""
         if self.storage_mode == "google":

@@ -125,6 +125,19 @@ def _active_flag_to_string(value: bool) -> str:
     return "true" if value else "false"
 
 
+def _parse_opt_in_flag(value: str | bool | None) -> bool:
+    return str(value or "false").strip().lower() == "true"
+
+
+def _language_label(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized == "de":
+        return "Deutsch / German"
+    if normalized == "en":
+        return "English / Englisch"
+    return "-"
+
+
 @st.cache_data(show_spinner=False)
 def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     original_bytes = drive_agent.download_file(file_id)
@@ -518,6 +531,34 @@ else:
                         type="password",
                     )
 
+                parent_col_left, parent_col_right = st.columns(2)
+                with parent_col_left:
+                    parent_name = st.text_input("Elternteil Name / Parent name")
+                    parent_phone = st.text_input("Telefon / Phone")
+                    parent_phone2 = st.text_input("Telefon 2 / Phone 2")
+                    parent_address = st.text_input("Adresse / Address")
+                with parent_col_right:
+                    emergency_contact_name = st.text_input(
+                        "Notfallkontakt Name / Emergency contact name"
+                    )
+                    emergency_contact_phone = st.text_input(
+                        "Notfallkontakt Telefon / Emergency contact phone"
+                    )
+                    preferred_language = st.selectbox(
+                        "Bevorzugte Sprache / Preferred language",
+                        options=["de", "en"],
+                        index=0,
+                        format_func=lambda value: (
+                            "Deutsch / German"
+                            if value == "de"
+                            else "English / Englisch"
+                        ),
+                    )
+                    notifications_opt_in = st.checkbox(
+                        "Benachrichtigungen erhalten / Receive notifications",
+                        value=False,
+                    )
+
                 notes_col_left, notes_col_right = st.columns(2)
                 with notes_col_left:
                     notes_parent_visible = st.text_area(
@@ -552,6 +593,21 @@ else:
                                 "status": status,
                             },
                         )
+                        stammdaten_manager.upsert_parent_by_email(
+                            parent_email.strip(),
+                            {
+                                "name": parent_name.strip(),
+                                "phone": parent_phone.strip(),
+                                "phone2": parent_phone2.strip(),
+                                "address": parent_address.strip(),
+                                "preferred_language": preferred_language,
+                                "emergency_contact_name": emergency_contact_name.strip(),
+                                "emergency_contact_phone": emergency_contact_phone.strip(),
+                                "notifications_opt_in": _active_flag_to_string(
+                                    notifications_opt_in
+                                ),
+                            },
+                        )
                         st.success(
                             f"Kind '{name}' hinzugefügt. / Child '{name}' added."
                         )
@@ -565,6 +621,12 @@ else:
                     options=children,
                     format_func=lambda child: str(child.get("name", "")),
                     key="edit_child_select",
+                )
+                selected_parent = (
+                    stammdaten_manager.get_parent_by_email(
+                        str(selected_child.get("parent_email", "")).strip()
+                    )
+                    or {}
                 )
                 with st.form(key="edit_child_form"):
                     left_col, right_col = st.columns(2)
@@ -608,6 +670,62 @@ else:
                             "Abhol-Kennwort (optional) / Pickup password",
                             value=selected_child.get("pickup_password", ""),
                             type="password",
+                        )
+
+                    parent_col_left, parent_col_right = st.columns(2)
+                    with parent_col_left:
+                        edit_parent_name = st.text_input(
+                            "Elternteil Name / Parent name",
+                            value=str(selected_parent.get("name", "")).strip(),
+                        )
+                        edit_parent_phone = st.text_input(
+                            "Telefon / Phone",
+                            value=str(selected_parent.get("phone", "")).strip(),
+                        )
+                        edit_parent_phone2 = st.text_input(
+                            "Telefon 2 / Phone 2",
+                            value=str(selected_parent.get("phone2", "")).strip(),
+                        )
+                        edit_parent_address = st.text_input(
+                            "Adresse / Address",
+                            value=str(selected_parent.get("address", "")).strip(),
+                        )
+                    with parent_col_right:
+                        edit_emergency_contact_name = st.text_input(
+                            "Notfallkontakt Name / Emergency contact name",
+                            value=str(
+                                selected_parent.get("emergency_contact_name", "")
+                            ).strip(),
+                        )
+                        edit_emergency_contact_phone = st.text_input(
+                            "Notfallkontakt Telefon / Emergency contact phone",
+                            value=str(
+                                selected_parent.get("emergency_contact_phone", "")
+                            ).strip(),
+                        )
+                        language_options = ["de", "en"]
+                        current_parent_language = (
+                            str(selected_parent.get("preferred_language", "de"))
+                            .strip()
+                            .lower()
+                        )
+                        if current_parent_language not in language_options:
+                            current_parent_language = "de"
+                        edit_preferred_language = st.selectbox(
+                            "Bevorzugte Sprache / Preferred language",
+                            options=language_options,
+                            index=language_options.index(current_parent_language),
+                            format_func=lambda value: (
+                                "Deutsch / German"
+                                if value == "de"
+                                else "English / Englisch"
+                            ),
+                        )
+                        edit_notifications_opt_in = st.checkbox(
+                            "Benachrichtigungen erhalten / Receive notifications",
+                            value=_parse_opt_in_flag(
+                                selected_parent.get("notifications_opt_in", "false")
+                            ),
                         )
 
                     notes_col_left, notes_col_right = st.columns(2)
@@ -677,6 +795,21 @@ else:
                                     "pickup_password": edit_pickup_password.strip(),
                                     "status": edit_status,
                                     "download_consent": edit_download_consent,
+                                },
+                            )
+                            stammdaten_manager.upsert_parent_by_email(
+                                edit_parent_email.strip(),
+                                {
+                                    "name": edit_parent_name.strip(),
+                                    "phone": edit_parent_phone.strip(),
+                                    "phone2": edit_parent_phone2.strip(),
+                                    "address": edit_parent_address.strip(),
+                                    "preferred_language": edit_preferred_language,
+                                    "emergency_contact_name": edit_emergency_contact_name.strip(),
+                                    "emergency_contact_phone": edit_emergency_contact_phone.strip(),
+                                    "notifications_opt_in": _active_flag_to_string(
+                                        edit_notifications_opt_in
+                                    ),
                                 },
                             )
                             st.success(
@@ -1677,6 +1810,12 @@ else:
         if menu == "Mein Kind":
             st.subheader("Mein Kind - Übersicht")
             if child:
+                parent_record = (
+                    stammdaten_manager.get_parent_by_email(
+                        str(child.get("parent_email", "")).strip()
+                    )
+                    or {}
+                )
                 st.write(f"**Name:** {child.get('name')}")
                 if child.get("birthdate"):
                     st.write(f"**Geburtsdatum / Birthdate:** {child.get('birthdate')}")
@@ -1720,6 +1859,29 @@ else:
                         "Keine aktiven Abholberechtigten hinterlegt. / "
                         "No active pickup authorizations listed."
                     )
+
+                st.markdown("**Elterninformationen / Parent information**")
+                emergency_name = str(
+                    parent_record.get("emergency_contact_name", "")
+                ).strip()
+                emergency_phone = str(
+                    parent_record.get("emergency_contact_phone", "")
+                ).strip()
+                emergency_parts = [
+                    part for part in [emergency_name, emergency_phone] if part
+                ]
+                st.write(
+                    "**Notfallkontakt / Emergency contact:** "
+                    f"{' – '.join(emergency_parts) if emergency_parts else '-'}"
+                )
+                st.write(
+                    "**Bevorzugte Sprache / Preferred language:** "
+                    f"{_language_label(str(parent_record.get('preferred_language', '')))}"
+                )
+                st.write(
+                    "**Benachrichtigungen / Notifications:** "
+                    f"{'Ja / Yes' if _parse_opt_in_flag(parent_record.get('notifications_opt_in')) else 'Nein / No'}"
+                )
             else:
                 st.write("Keine Kinderdaten gefunden. / No child data found.")
         elif menu == "Infos":

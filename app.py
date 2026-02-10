@@ -10,6 +10,7 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
@@ -74,6 +75,14 @@ def _normalize_active_flag(value: str | bool | None) -> bool:
 
 PHOTO_STATUS_OPTIONS = ("draft", "published", "archived")
 DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
+GOOGLE_CALENDAR_EMBED_HTML = (
+    '<iframe src="https://calendar.google.com/calendar/embed?height=300&wkst=2&ctz='
+    "Europe%2FAmsterdam&showPrint=0&showTz=0&showTitle=0&src="
+    "NWRmYjdhNTI0YmEzYzYwZWJlODNmOGUyOGNkNDgzYjcxYTEyOTE0MzMxNWI3MGJkMTA2ZTJkZjUy"
+    'ZTU2ZmFkZkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%237986cb" '
+    'style="border-width:0" width="800" height="300" frameborder="0" scrolling="no">'
+    "</iframe>"
+)
 
 
 def _normalize_photo_status(value: str | None) -> str:
@@ -1589,6 +1598,9 @@ else:
                     st.caption("Noch keine Einträge vorhanden. / No entries yet.")
 
         elif admin_view == "Kalender":
+            st.subheader("Kalenderansicht / Calendar view")
+            components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
+
             st.subheader("Neuer Termin / New event")
             title = st.text_input("Titel / Title")
             event_date = st.date_input("Datum / Date")
@@ -1873,6 +1885,7 @@ else:
 
         elif menu == "Termine":
             st.subheader("Termine / Events")
+            components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
             try:
                 events = list_events(max_results=10)
             except CalendarServiceError as exc:

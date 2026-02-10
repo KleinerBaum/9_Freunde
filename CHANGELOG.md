@@ -12,6 +12,7 @@
 - Landing-Page-Branding erweitert: `images/Herz.png` wird als zentriertes oberstes Element gerendert, und `images/Hintergrund.png` dient app-weit als fixes Hintergrundbild.
 - Admin-Navigation erweitert: Unter **„Stammdaten & Infos“** gibt es jetzt den neuen Bereich **„Übersicht“** mit einer tabellarischen Kinder-Gesamtübersicht (Name, Eltern-E-Mail, Fotoanzahl, letzte Aktivität, `photo_folder_id`, `folder_id`, Ordnerstatus).
 - Admin-Fotoverwaltung verbessert: Nach Auswahl eines Kindes wird im Bereich **„Fotos“** ein direkter Link zum jeweiligen Google-Drive-Fotoordner eingeblendet (`📂 Ordner auf Google Drive öffnen / Open folder on Google Drive`).
+- Admin-Fotoverwaltung erweitert: Im Bereich **„Fotos → Foto-Status verwalten / Manage photo status“** gibt es jetzt zusätzlich einen Link auf den zentralen Google-Drive-Foto-Hauptordner (`🗂️ Gesamtordner auf Google Drive öffnen / Open all-children folder on Google Drive`) sowie eine DE/EN-Vorschau-Liste mit Bildern aus allen Kinder-Ordnern.
 
 - Kalenderbereich (Admin **Kalender** und Eltern **Termine / Events**) zeigt jetzt zusätzlich eine eingebettete Google-Kalender-Ansicht per IFrame (DE/EN UI bleibt erhalten).
 - Admin-Ansicht **"Stammdaten Sheet"** zeigt im Export/Backup-Bereich nur noch die Tabs `children` und `parents`; optionale Exportkarten für `attendance`, `daily_logs` und `messages` wurden entfernt.

@@ -6,6 +6,7 @@ import time
 import json
 import base64
 from pathlib import Path
+from typing import Any
 
 from datetime import date
 
@@ -1856,6 +1857,80 @@ else:
                         )
                         st.markdown(
                             f"[📂 Ordner auf Google Drive öffnen / Open folder on Google Drive]({drive_url})"
+                        )
+
+                    st.markdown("#### Alle Kinder-Fotos / All children photos")
+                    if app_config.storage_mode == "google" and app_config.google:
+                        all_children_drive_url = (
+                            "https://drive.google.com/drive/folders/"
+                            f"{app_config.google.drive_photos_root_folder_id}"
+                        )
+                        st.markdown(
+                            "[🗂️ Gesamtordner auf Google Drive öffnen / "
+                            "Open all-children folder on Google Drive]"
+                            f"({all_children_drive_url})"
+                        )
+
+                    all_child_photos: list[tuple[str, dict[str, Any]]] = []
+                    missing_folder_children: list[str] = []
+                    for child in children:
+                        listed_child_name = str(child.get("name", "")).strip() or "-"
+                        listed_child_folder_id = str(
+                            child.get("photo_folder_id") or child.get("folder_id") or ""
+                        ).strip()
+                        if not listed_child_folder_id:
+                            missing_folder_children.append(listed_child_name)
+                            continue
+
+                        photos_in_child_folder = drive_agent.list_files(
+                            listed_child_folder_id,
+                            mime_type_filter="image/",
+                        )
+                        for listed_photo in photos_in_child_folder:
+                            all_child_photos.append((listed_child_name, listed_photo))
+
+                    if missing_folder_children:
+                        st.caption(
+                            "Für folgende Kinder ist aktuell kein Foto-Ordner hinterlegt: "
+                            f"{', '.join(missing_folder_children)}. / "
+                            "No photo folder is currently configured for the following children: "
+                            f"{', '.join(missing_folder_children)}."
+                        )
+
+                    if all_child_photos:
+                        st.caption(
+                            "Fotos aus allen Kinder-Ordnern / Photos from all child folders: "
+                            f"{len(all_child_photos)}"
+                        )
+                        for listed_child_name, listed_photo in all_child_photos:
+                            listed_file_id = str(listed_photo.get("id", "")).strip()
+                            listed_file_name = str(listed_photo.get("name", "photo"))
+                            with st.expander(
+                                f"{listed_child_name} · {listed_file_name}",
+                                expanded=False,
+                            ):
+                                st.caption(f"ID: {listed_file_id or '-'}")
+                                try:
+                                    listed_image_bytes = drive_agent.download_file(
+                                        listed_file_id
+                                    )
+                                    st.image(
+                                        listed_image_bytes,
+                                        caption=(
+                                            "Vorschau / Preview: "
+                                            f"{listed_child_name} · {listed_file_name}"
+                                        ),
+                                        width=320,
+                                    )
+                                except Exception as exc:
+                                    st.warning(
+                                        "Bildvorschau konnte nicht geladen werden. / "
+                                        f"Could not load image preview: {exc}"
+                                    )
+                    else:
+                        st.caption(
+                            "Keine Fotos in den Kinder-Ordnern gefunden. / "
+                            "No photos found in child folders."
                         )
                 except DriveServiceError as exc:
                     current_photo_folder_id = ""

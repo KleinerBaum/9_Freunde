@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Schema-v1/Pflichtspalten konsolidiert: `CONSENTS_REQUIRED_COLUMNS` und ein zentrales `REQUIRED_COLUMNS_BY_SHEET` wurden im Google-Sheets-Repository ergänzt; das lokale ODS-Repository verwendet nun exakt dieselbe Feldabdeckung und Reihenfolge. README-Mapping für `pa*`, `consent__*`, `sign__*` und `meta__*` präzisiert (inkl. explizitem **out of scope**-Status nicht-produktiv unterstützter Felder).
 - Stammdaten-Schema (children) erweitert: neue optionale Felder `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional` werden in Google Sheets und lokalem ODS automatisch als Header ergänzt.
 - Mapping für Elternkontakt vereinheitlicht: Wenn `parent1__email` im Kinderdatensatz gesetzt ist, wird `children.parent_email` automatisch darauf synchronisiert.
 - Foto-Download-Consent harmonisiert: `children.download_consent` wird aus den Consent-Checkboxen (`consent__photo_download_pixelated`, `consent__photo_download_unpixelated`, `consent__photo_download_denied`) abgeleitet; Priorität ist `denied` > `unpixelated` > `pixelated`.

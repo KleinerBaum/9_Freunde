@@ -588,6 +588,276 @@ def _build_export_payload(rows: list[list[str]]) -> tuple[bytes, bytes] | None:
     return csv_bytes, json_bytes
 
 
+def _render_export_backup_section() -> None:
+    app_config = get_app_config()
+    if app_config.storage_mode != "google" or app_config.google is None:
+        st.info(
+            "Export/Backup ist nur im Google-Modus verfügbar. / "
+            "Export/backup is only available in Google mode."
+        )
+        return
+
+    export_tabs: list[tuple[str, str]] = [
+        ("children", app_config.google.children_tab),
+        ("parents", app_config.google.parents_tab),
+    ]
+    st.markdown("**Export / Backup (CSV + JSON)**")
+    for export_key, tab_name in export_tabs:
+        tab_range = f"{tab_name}!A:ZZ"
+        with st.container(border=True):
+            st.write(f"**{export_key}** · Tab: `{tab_name}`")
+            try:
+                export_rows = read_sheet_values(
+                    sheet_id=app_config.google.stammdaten_sheet_id,
+                    range_a1=tab_range,
+                )
+            except SheetsServiceError as exc:
+                st.warning(
+                    "Tab konnte nicht gelesen werden. Bitte Konfiguration prüfen. / "
+                    "Could not read tab. Please verify configuration."
+                )
+                st.caption(str(exc))
+                continue
+            except Exception as exc:
+                st.warning(
+                    "Tab konnte nicht gelesen werden (Berechtigung oder Tabname prüfen). / "
+                    "Could not read tab (check permissions or tab name)."
+                )
+                st.caption(str(exc))
+                continue
+
+            payload = _build_export_payload(export_rows)
+            if payload is None:
+                st.info(
+                    "Tab ist leer oder enthält keine Header-Zeile. / "
+                    "Tab is empty or does not contain a header row."
+                )
+                continue
+
+            csv_bytes, json_bytes = payload
+            csv_col, json_col = st.columns(2)
+            with csv_col:
+                st.download_button(
+                    label="CSV herunterladen / Download CSV",
+                    data=csv_bytes,
+                    file_name=f"{export_key}.csv",
+                    mime="text/csv",
+                    key=f"download_export_csv_{export_key}",
+                )
+            with json_col:
+                st.download_button(
+                    label="JSON herunterladen / Download JSON",
+                    data=json_bytes,
+                    file_name=f"{export_key}.json",
+                    mime="application/json",
+                    key=f"download_export_json_{export_key}",
+                )
+
+
+def _render_child_edit_form(
+    child_record: dict[str, str],
+    parent_record: dict[str, str],
+    key_prefix: str,
+    stammdaten_manager: StammdatenManager,
+) -> None:
+    with st.form(key=f"{key_prefix}_edit_child_form"):
+        left_col, right_col = st.columns(2)
+        with left_col:
+            edit_name = st.text_input(
+                "Name des Kindes / Child name",
+                value=child_record.get("name", ""),
+                key=f"{key_prefix}_edit_name",
+            )
+            edit_parent_email = st.text_input(
+                "E-Mail Elternteil / Parent email",
+                value=child_record.get("parent_email", ""),
+                key=f"{key_prefix}_edit_parent_email",
+            )
+            edit_birthdate = st.date_input(
+                "Geburtsdatum / Birthdate",
+                value=_parse_optional_iso_date(child_record.get("birthdate", "")),
+                format="YYYY-MM-DD",
+                key=f"{key_prefix}_edit_birthdate",
+            )
+            edit_start_date = st.date_input(
+                "Startdatum / Start date",
+                value=_parse_optional_iso_date(child_record.get("start_date", "")),
+                format="YYYY-MM-DD",
+                key=f"{key_prefix}_edit_start_date",
+            )
+        with right_col:
+            edit_group = st.text_input(
+                "Gruppe / Group",
+                value=child_record.get("group", ""),
+                key=f"{key_prefix}_edit_group",
+            )
+            edit_primary_caregiver = st.text_input(
+                "Bezugserzieher:in / Primary caregiver",
+                value=child_record.get("primary_caregiver", ""),
+                key=f"{key_prefix}_edit_primary_caregiver",
+            )
+            edit_allergies = st.text_input(
+                "Allergien / Allergies",
+                value=child_record.get("allergies", ""),
+                key=f"{key_prefix}_edit_allergies",
+            )
+            edit_pickup_password = st.text_input(
+                "Abhol-Kennwort (optional) / Pickup password",
+                value=child_record.get("pickup_password", ""),
+                type="password",
+                key=f"{key_prefix}_edit_pickup_password",
+            )
+
+        parent_col_left, parent_col_right = st.columns(2)
+        with parent_col_left:
+            edit_parent_name = st.text_input(
+                "Elternteil Name / Parent name",
+                value=str(parent_record.get("name", "")).strip(),
+                key=f"{key_prefix}_edit_parent_name",
+            )
+            edit_parent_phone = st.text_input(
+                "Telefon / Phone",
+                value=str(parent_record.get("phone", "")).strip(),
+                key=f"{key_prefix}_edit_parent_phone",
+            )
+            edit_parent_phone2 = st.text_input(
+                "Telefon 2 / Phone 2",
+                value=str(parent_record.get("phone2", "")).strip(),
+                key=f"{key_prefix}_edit_parent_phone2",
+            )
+            edit_parent_address = st.text_input(
+                "Adresse / Address",
+                value=str(parent_record.get("address", "")).strip(),
+                key=f"{key_prefix}_edit_parent_address",
+            )
+        with parent_col_right:
+            edit_emergency_contact_name = st.text_input(
+                "Notfallkontakt Name / Emergency contact name",
+                value=str(parent_record.get("emergency_contact_name", "")).strip(),
+                key=f"{key_prefix}_edit_emergency_contact_name",
+            )
+            edit_emergency_contact_phone = st.text_input(
+                "Notfallkontakt Telefon / Emergency contact phone",
+                value=str(parent_record.get("emergency_contact_phone", "")).strip(),
+                key=f"{key_prefix}_edit_emergency_contact_phone",
+            )
+            language_options = ["de", "en"]
+            current_parent_language = (
+                str(parent_record.get("preferred_language", "de")).strip().lower()
+            )
+            if current_parent_language not in language_options:
+                current_parent_language = "de"
+            edit_preferred_language = st.selectbox(
+                "Bevorzugte Sprache / Preferred language",
+                options=language_options,
+                index=language_options.index(current_parent_language),
+                format_func=lambda value: (
+                    "Deutsch / German" if value == "de" else "English / Englisch"
+                ),
+                key=f"{key_prefix}_edit_preferred_language",
+            )
+            edit_notifications_opt_in = st.checkbox(
+                "Benachrichtigungen erhalten / Receive notifications",
+                value=_parse_opt_in_flag(
+                    parent_record.get("notifications_opt_in", "false")
+                ),
+                key=f"{key_prefix}_edit_notifications_opt_in",
+            )
+
+        notes_col_left, notes_col_right = st.columns(2)
+        with notes_col_left:
+            edit_notes_parent_visible = st.text_area(
+                "Hinweise für Eltern sichtbar / Parent-visible notes",
+                value=child_record.get("notes_parent_visible", ""),
+                height=110,
+                key=f"{key_prefix}_edit_notes_parent_visible",
+            )
+        with notes_col_right:
+            edit_notes_internal = st.text_area(
+                "Interne Hinweise (nur Leitung) / Internal notes",
+                value=child_record.get("notes_internal", ""),
+                height=110,
+                key=f"{key_prefix}_edit_notes_internal",
+            )
+
+        status_options = ["active", "archived"]
+        current_status = str(child_record.get("status", "active")).strip()
+        if current_status not in status_options:
+            current_status = "active"
+        edit_status = st.selectbox(
+            "Status",
+            options=status_options,
+            index=status_options.index(current_status),
+            key=f"{key_prefix}_edit_status",
+        )
+        current_download_consent = (
+            str(child_record.get("download_consent", "pixelated")).strip().lower()
+        )
+        consent_options = ["pixelated", "unpixelated"]
+        if current_download_consent not in consent_options:
+            current_download_consent = "pixelated"
+        edit_download_consent = st.selectbox(
+            "Download-Consent / Download consent",
+            options=consent_options,
+            index=consent_options.index(current_download_consent),
+            format_func=lambda mode: (
+                "Downloads verpixelt / Downloads pixelated"
+                if mode == "pixelated"
+                else "Downloads unverpixelt / Downloads unpixelated"
+            ),
+            key=f"{key_prefix}_edit_download_consent",
+        )
+        edit_submitted = st.form_submit_button("Änderungen speichern / Save")
+
+    if not edit_submitted:
+        return
+
+    if not edit_name.strip() or not edit_parent_email.strip():
+        st.error(
+            "Bitte Name und Eltern-E-Mail angeben. / "
+            "Please provide child name and parent email."
+        )
+        return
+
+    try:
+        stammdaten_manager.update_child(
+            child_record.get("id", ""),
+            {
+                "name": edit_name.strip(),
+                "parent_email": edit_parent_email.strip(),
+                "birthdate": _optional_date_to_iso(edit_birthdate),
+                "start_date": _optional_date_to_iso(edit_start_date),
+                "group": edit_group.strip(),
+                "primary_caregiver": edit_primary_caregiver.strip(),
+                "allergies": edit_allergies.strip(),
+                "notes_parent_visible": edit_notes_parent_visible.strip(),
+                "notes_internal": edit_notes_internal.strip(),
+                "pickup_password": edit_pickup_password.strip(),
+                "status": edit_status,
+                "download_consent": edit_download_consent,
+            },
+        )
+        stammdaten_manager.upsert_parent_by_email(
+            edit_parent_email.strip(),
+            {
+                "name": edit_parent_name.strip(),
+                "phone": edit_parent_phone.strip(),
+                "phone2": edit_parent_phone2.strip(),
+                "address": edit_parent_address.strip(),
+                "preferred_language": edit_preferred_language,
+                "emergency_contact_name": edit_emergency_contact_name.strip(),
+                "emergency_contact_phone": edit_emergency_contact_phone.strip(),
+                "notifications_opt_in": _active_flag_to_string(
+                    edit_notifications_opt_in
+                ),
+            },
+        )
+        st.success("Kind wurde aktualisiert. / Child record updated.")
+        _trigger_rerun()
+    except Exception as exc:
+        st.error(f"Speichern fehlgeschlagen / Save failed: {exc}")
+
+
 # Validate required secrets early and fail with clear UI guidance
 validate_config_or_stop()
 app_config = get_app_config()
@@ -701,7 +971,6 @@ else:
                 (
                     "Übersicht",
                     "Stammdaten",
-                    "Stammdaten Sheet",
                 ),
                 horizontal=True,
                 key="admin_master_data_section",
@@ -924,222 +1193,86 @@ else:
                         st.error(f"Fehler beim Speichern / Save error: {e}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
-                selected_child = st.selectbox(
-                    "Kind auswählen / Select child",
-                    options=children,
-                    format_func=lambda child: str(child.get("name", "")),
-                    key="edit_child_select",
-                    index=None,
-                    placeholder="Kind auswählen / Select child",
+                selected_ids = set(
+                    st.session_state.get("stammdaten_selected_child_ids", [])
                 )
-                if selected_child is None:
+                selection_rows: list[dict[str, str | bool]] = []
+                for child_record in children:
+                    child_id = str(child_record.get("id", "")).strip()
+                    selection_rows.append(
+                        {
+                            "Auswahl / Select": child_id in selected_ids,
+                            "Name / Name": _display_or_dash(child_record.get("name")),
+                            "Parent Email": _display_or_dash(
+                                child_record.get("parent_email")
+                            ),
+                            "Group": _display_or_dash(child_record.get("group")),
+                            "Birthdate": _display_or_dash(
+                                child_record.get("birthdate")
+                            ),
+                            "Folder Status": _folder_status_label(child_record),
+                        }
+                    )
+
+                selection_df = st.data_editor(
+                    pd.DataFrame(selection_rows),
+                    hide_index=True,
+                    width="stretch",
+                    key="stammdaten_child_selection_table",
+                    column_config={
+                        "Auswahl / Select": st.column_config.CheckboxColumn(
+                            "Auswahl / Select"
+                        )
+                    },
+                    disabled=[
+                        "Name / Name",
+                        "Parent Email",
+                        "Group",
+                        "Birthdate",
+                        "Folder Status",
+                    ],
+                )
+                selected_children: list[dict[str, str]] = []
+                selected_child_ids: list[str] = []
+                selection_values = selection_df["Auswahl / Select"].tolist()
+                for index, selected in enumerate(selection_values):
+                    if not bool(selected):
+                        continue
+                    selected_children.append(children[index])
+                    selected_child_ids.append(
+                        str(children[index].get("id", "")).strip()
+                    )
+                st.session_state["stammdaten_selected_child_ids"] = selected_child_ids
+
+                if not selected_children:
                     st.caption(
-                        "Bitte zuerst ein Kind auswählen, um Felder zu bearbeiten. / "
-                        "Please select a child first to edit details."
+                        "Bitte mindestens ein Kind in der Tabelle auswählen. / "
+                        "Please select at least one child in the table."
                     )
                 else:
-                    selected_parent = (
-                        stammdaten_manager.get_parent_by_email(
-                            str(selected_child.get("parent_email", "")).strip()
-                        )
-                        or {}
+                    st.markdown(
+                        "**Ausgewählte Stammdaten bearbeiten / Edit selected master data**"
                     )
-                    with st.form(key="edit_child_form"):
-                        left_col, right_col = st.columns(2)
-                        with left_col:
-                            edit_name = st.text_input(
-                                "Name des Kindes / Child name",
-                                value=selected_child.get("name", ""),
+                    child_columns = st.columns(len(selected_children))
+                    for index, child_record in enumerate(selected_children):
+                        with child_columns[index]:
+                            child_name = _display_or_dash(child_record.get("name"))
+                            st.markdown(f"### {child_name}")
+                            parent_record = (
+                                stammdaten_manager.get_parent_by_email(
+                                    str(child_record.get("parent_email", "")).strip()
+                                )
+                                or {}
                             )
-                            edit_parent_email = st.text_input(
-                                "E-Mail Elternteil / Parent email",
-                                value=selected_child.get("parent_email", ""),
-                            )
-                            edit_birthdate = st.date_input(
-                                "Geburtsdatum / Birthdate",
-                                value=_parse_optional_iso_date(
-                                    selected_child.get("birthdate", "")
-                                ),
-                                format="YYYY-MM-DD",
-                            )
-                            edit_start_date = st.date_input(
-                                "Startdatum / Start date",
-                                value=_parse_optional_iso_date(
-                                    selected_child.get("start_date", "")
-                                ),
-                                format="YYYY-MM-DD",
-                            )
-                        with right_col:
-                            edit_group = st.text_input(
-                                "Gruppe / Group",
-                                value=selected_child.get("group", ""),
-                            )
-                            edit_primary_caregiver = st.text_input(
-                                "Bezugserzieher:in / Primary caregiver",
-                                value=selected_child.get("primary_caregiver", ""),
-                            )
-                            edit_allergies = st.text_input(
-                                "Allergien / Allergies",
-                                value=selected_child.get("allergies", ""),
-                            )
-                            edit_pickup_password = st.text_input(
-                                "Abhol-Kennwort (optional) / Pickup password",
-                                value=selected_child.get("pickup_password", ""),
-                                type="password",
+                            key_prefix = f"child_{str(child_record.get('id', '')).strip() or index}"
+                            _render_child_edit_form(
+                                child_record,
+                                parent_record,
+                                key_prefix,
+                                stammdaten_manager,
                             )
 
-                        parent_col_left, parent_col_right = st.columns(2)
-                        with parent_col_left:
-                            edit_parent_name = st.text_input(
-                                "Elternteil Name / Parent name",
-                                value=str(selected_parent.get("name", "")).strip(),
-                            )
-                            edit_parent_phone = st.text_input(
-                                "Telefon / Phone",
-                                value=str(selected_parent.get("phone", "")).strip(),
-                            )
-                            edit_parent_phone2 = st.text_input(
-                                "Telefon 2 / Phone 2",
-                                value=str(selected_parent.get("phone2", "")).strip(),
-                            )
-                            edit_parent_address = st.text_input(
-                                "Adresse / Address",
-                                value=str(selected_parent.get("address", "")).strip(),
-                            )
-                        with parent_col_right:
-                            edit_emergency_contact_name = st.text_input(
-                                "Notfallkontakt Name / Emergency contact name",
-                                value=str(
-                                    selected_parent.get("emergency_contact_name", "")
-                                ).strip(),
-                            )
-                            edit_emergency_contact_phone = st.text_input(
-                                "Notfallkontakt Telefon / Emergency contact phone",
-                                value=str(
-                                    selected_parent.get("emergency_contact_phone", "")
-                                ).strip(),
-                            )
-                            language_options = ["de", "en"]
-                            current_parent_language = (
-                                str(selected_parent.get("preferred_language", "de"))
-                                .strip()
-                                .lower()
-                            )
-                            if current_parent_language not in language_options:
-                                current_parent_language = "de"
-                            edit_preferred_language = st.selectbox(
-                                "Bevorzugte Sprache / Preferred language",
-                                options=language_options,
-                                index=language_options.index(current_parent_language),
-                                format_func=lambda value: (
-                                    "Deutsch / German"
-                                    if value == "de"
-                                    else "English / Englisch"
-                                ),
-                            )
-                            edit_notifications_opt_in = st.checkbox(
-                                "Benachrichtigungen erhalten / Receive notifications",
-                                value=_parse_opt_in_flag(
-                                    selected_parent.get("notifications_opt_in", "false")
-                                ),
-                            )
-
-                        notes_col_left, notes_col_right = st.columns(2)
-                        with notes_col_left:
-                            edit_notes_parent_visible = st.text_area(
-                                "Hinweise für Eltern sichtbar / Parent-visible notes",
-                                value=selected_child.get("notes_parent_visible", ""),
-                                height=110,
-                            )
-                        with notes_col_right:
-                            edit_notes_internal = st.text_area(
-                                "Interne Hinweise (nur Leitung) / Internal notes",
-                                value=selected_child.get("notes_internal", ""),
-                                height=110,
-                            )
-                        status_options = ["active", "archived"]
-                        current_status = str(
-                            selected_child.get("status", "active")
-                        ).strip()
-                        if current_status not in status_options:
-                            current_status = "active"
-                        edit_status = st.selectbox(
-                            "Status",
-                            options=status_options,
-                            index=status_options.index(current_status),
-                        )
-                        current_download_consent = (
-                            str(selected_child.get("download_consent", "pixelated"))
-                            .strip()
-                            .lower()
-                        )
-                        consent_options = ["pixelated", "unpixelated"]
-                        if current_download_consent not in consent_options:
-                            current_download_consent = "pixelated"
-                        edit_download_consent = st.selectbox(
-                            "Download-Consent / Download consent",
-                            options=consent_options,
-                            index=consent_options.index(current_download_consent),
-                            format_func=lambda mode: (
-                                "Downloads verpixelt / Downloads pixelated"
-                                if mode == "pixelated"
-                                else "Downloads unverpixelt / Downloads unpixelated"
-                            ),
-                        )
-                        edit_submitted = st.form_submit_button(
-                            "Änderungen speichern / Save"
-                        )
-                    if edit_submitted:
-                        if not edit_name.strip() or not edit_parent_email.strip():
-                            st.error(
-                                "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
-                            )
-                        else:
-                            try:
-                                stammdaten_manager.update_child(
-                                    selected_child.get("id", ""),
-                                    {
-                                        "name": edit_name.strip(),
-                                        "parent_email": edit_parent_email.strip(),
-                                        "birthdate": _optional_date_to_iso(
-                                            edit_birthdate
-                                        ),
-                                        "start_date": _optional_date_to_iso(
-                                            edit_start_date
-                                        ),
-                                        "group": edit_group.strip(),
-                                        "primary_caregiver": edit_primary_caregiver.strip(),
-                                        "allergies": edit_allergies.strip(),
-                                        "notes_parent_visible": edit_notes_parent_visible.strip(),
-                                        "notes_internal": edit_notes_internal.strip(),
-                                        "pickup_password": edit_pickup_password.strip(),
-                                        "status": edit_status,
-                                        "download_consent": edit_download_consent,
-                                    },
-                                )
-                                stammdaten_manager.upsert_parent_by_email(
-                                    edit_parent_email.strip(),
-                                    {
-                                        "name": edit_parent_name.strip(),
-                                        "phone": edit_parent_phone.strip(),
-                                        "phone2": edit_parent_phone2.strip(),
-                                        "address": edit_parent_address.strip(),
-                                        "preferred_language": edit_preferred_language,
-                                        "emergency_contact_name": edit_emergency_contact_name.strip(),
-                                        "emergency_contact_phone": edit_emergency_contact_phone.strip(),
-                                        "notifications_opt_in": _active_flag_to_string(
-                                            edit_notifications_opt_in
-                                        ),
-                                    },
-                                )
-                                st.success(
-                                    "Kind wurde aktualisiert. / Child record updated."
-                                )
-                                _trigger_rerun()
-                            except Exception as exc:
-                                st.error(
-                                    f"Speichern fehlgeschlagen / Save failed: {exc}"
-                                )
+                _render_export_backup_section()
 
             if children:
                 with st.expander(
@@ -1476,109 +1609,6 @@ else:
                                 )
                     else:
                         st.caption("Noch keine Einträge vorhanden. / No entries yet.")
-
-
-        # ---- Admin: Stammdaten Sheet ----
-        elif admin_view == "Stammdaten Sheet":
-            st.subheader(
-                "Stammdaten aus Google Sheets (read-only) / Master data from Google Sheets (read-only)"
-            )
-            if app_config.storage_mode != "google" or app_config.google is None:
-                st.info(
-                    "Google-Sheets-Ansicht ist nur im Google-Modus verfügbar. / "
-                    "Google Sheets view is only available in Google mode."
-                )
-            else:
-                export_tabs: list[tuple[str, str]] = [
-                    ("children", app_config.google.children_tab),
-                    ("parents", app_config.google.parents_tab),
-                ]
-                st.markdown("**Export / Backup (CSV + JSON)**")
-                for export_key, tab_name in export_tabs:
-                    tab_range = f"{tab_name}!A:ZZ"
-                    with st.container(border=True):
-                        st.write(f"**{export_key}** · Tab: `{tab_name}`")
-                        try:
-                            export_rows = read_sheet_values(
-                                sheet_id=app_config.google.stammdaten_sheet_id,
-                                range_a1=tab_range,
-                            )
-                        except SheetsServiceError as exc:
-                            st.warning(
-                                "Tab konnte nicht gelesen werden. Bitte Konfiguration prüfen. / "
-                                "Could not read tab. Please verify configuration."
-                            )
-                            st.caption(str(exc))
-                            continue
-                        except Exception as exc:
-                            st.warning(
-                                "Tab konnte nicht gelesen werden (Berechtigung oder Tabname prüfen). / "
-                                "Could not read tab (check permissions or tab name)."
-                            )
-                            st.caption(str(exc))
-                            continue
-
-                        payload = _build_export_payload(export_rows)
-                        if payload is None:
-                            st.info(
-                                "Tab ist leer oder enthält keine Header-Zeile. / "
-                                "Tab is empty or does not contain a header row."
-                            )
-                            continue
-
-                        csv_bytes, json_bytes = payload
-                        csv_col, json_col = st.columns(2)
-                        with csv_col:
-                            st.download_button(
-                                label="CSV herunterladen / Download CSV",
-                                data=csv_bytes,
-                                file_name=f"{export_key}.csv",
-                                mime="text/csv",
-                                key=f"download_export_csv_{export_key}",
-                            )
-                        with json_col:
-                            st.download_button(
-                                label="JSON herunterladen / Download JSON",
-                                data=json_bytes,
-                                file_name=f"{export_key}.json",
-                                mime="application/json",
-                                key=f"download_export_json_{export_key}",
-                            )
-
-                tab_name = app_config.google.stammdaten_sheet_tab
-                range_a1 = f"{tab_name}!A1:Z500"
-                try:
-                    rows = read_sheet_values(
-                        sheet_id=app_config.google.stammdaten_sheet_id,
-                        range_a1=range_a1,
-                    )
-                except SheetsServiceError as exc:
-                    st.error(
-                        "Stammdaten konnten nicht geladen werden. Bitte Konfiguration prüfen. / "
-                        "Could not load master data. Please verify configuration."
-                    )
-                    st.info(str(exc))
-                except Exception as exc:
-                    st.error(
-                        "Fehler beim Laden des Sheets. Prüfen Sie Tabnamen und Berechtigungen. / "
-                        "Failed to load sheet. Please verify tab name and permissions."
-                    )
-                    st.info(str(exc))
-                else:
-                    header, normalized_rows = _normalize_sheet_table(rows)
-                    if rows and not header:
-                        st.info(
-                            "Header-Zeile fehlt oder ist leer. / Header row is missing or empty."
-                        )
-                    else:
-                        if not normalized_rows:
-                            st.info(
-                                "Es wurden nur Header gefunden, aber keine Datenzeilen. / "
-                                "Only headers were found, but no data rows."
-                            )
-                        else:
-                            dataframe = pd.DataFrame(normalized_rows, columns=header)
-                            st.dataframe(dataframe, width="stretch")
 
         # ---- Admin: Dokumente ----
         elif admin_view == "Dokumente":

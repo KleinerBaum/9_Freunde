@@ -10,6 +10,8 @@
 - Admin-Bereich **Stammdaten** zeigt jetzt eine sortierbare **Kinder-Übersicht** als Tabelle (Name, Parent Email, Group, Birthdate, Folder Status mit `✅ Ready`/`⚠️ Missing`) statt nur einer einfachen Liste; Elternansicht **Mein Kind** zeigt Name/Geburtsdatum/Gruppe jetzt konsistent mit Fallback `-` sowie die bevorzugte Sprache aus den Elternstammdaten.
 - Stammdaten-UX überarbeitet: Der Bearbeitungsbereich zeigt Felder erst nach expliziter Kind-Auswahl (`selectbox` ohne Vorauswahl); außerdem sind **„Neues Kind anlegen / Add child“** und **„Abholberechtigte / Pickup authorizations“** per Default eingeklappt, um die Seite übersichtlicher zu halten.
 - Landing-Page-Branding erweitert: `images/Herz.png` wird als zentriertes oberstes Element gerendert, und `images/Hintergrund.png` dient app-weit als fixes Hintergrundbild.
+- Admin-Navigation erweitert: Unter **„Stammdaten & Infos“** gibt es jetzt den neuen Bereich **„Übersicht“** mit einer tabellarischen Kinder-Gesamtübersicht (Name, Eltern-E-Mail, Fotoanzahl, letzte Aktivität, `photo_folder_id`, `folder_id`, Ordnerstatus).
+- Admin-Fotoverwaltung verbessert: Nach Auswahl eines Kindes wird im Bereich **„Fotos“** ein direkter Link zum jeweiligen Google-Drive-Fotoordner eingeblendet (`📂 Ordner auf Google Drive öffnen / Open folder on Google Drive`).
 
 - Kalenderbereich (Admin **Kalender** und Eltern **Termine / Events**) zeigt jetzt zusätzlich eine eingebettete Google-Kalender-Ansicht per IFrame (DE/EN UI bleibt erhalten).
 - Admin-Ansicht **"Stammdaten Sheet"** zeigt im Export/Backup-Bereich nur noch die Tabs `children` und `parents`; optionale Exportkarten für `attendance`, `daily_logs` und `messages` wurden entfernt.

@@ -23,7 +23,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
 - **Admin-Navigation gebündelt:** Die Bereiche **„Stammdaten & Infos“** (inkl. Übersicht und Stammdaten) sowie **„Dokumente & Verträge“** reduzieren die Sidebar-Einträge und strukturieren zusammengehörige Aufgaben logisch; **„Medikationen“** ist direkt im Bereich **„Stammdaten“** als eingeklappter Abschnitt integriert.
 
-Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung). 
+Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung).
 
 ## Installation und Voraussetzungen
 
@@ -163,17 +163,17 @@ Hinweise:
 #### Setup-Checkliste (Drive & Calendar Freigaben)
 Nutzen Sie diese Checkliste exakt vor dem ersten App-Start:
 
-1. **Service-Account-E-Mail kopieren**  
+1. **Service-Account-E-Mail kopieren**
    Öffnen Sie in GCP den Service-Account und kopieren Sie `client_email` aus der JSON (`...@...iam.gserviceaccount.com`).
-2. **Ziel-Drive-Ordner freigeben (Editor)**  
+2. **Ziel-Drive-Ordner freigeben (Editor)**
    In Google Drive den Zielordner öffnen → **Freigeben** → Service-Account-E-Mail eintragen → Rolle **Editor** (`Bearbeiter`) setzen → speichern.
-3. **Ordner-ID übernehmen**  
+3. **Ordner-ID übernehmen**
    Die Ordner-ID aus der Drive-URL in `gcp.drive_photos_root_folder_id` eintragen.
-4. **Kalender mit Service-Account teilen**  
+4. **Kalender mit Service-Account teilen**
    In Google Kalender den Einrichtungs-Kalender öffnen → **Einstellungen und Freigabe** → **Für bestimmte Personen freigeben** → Service-Account-E-Mail hinzufügen → Berechtigung mindestens **Änderungen an Terminen vornehmen** (`Make changes to events`) setzen.
-5. **Kalender-ID übernehmen**  
+5. **Kalender-ID übernehmen**
    In den Kalender-Einstellungen die **Kalender-ID** kopieren und in `gcp.calendar_id` hinterlegen.
-6. **Kurztest im Google UI**  
+6. **Kurztest im Google UI**
    Prüfen, dass der Service-Account in beiden Freigabelisten sichtbar ist (Drive-Ordner + Kalender).
 
 #### Optionaler Laufzeit-Healthcheck in der App
@@ -237,6 +237,56 @@ Empfohlener Eltern-Tab (`parents`):
 
 Optional:
 - `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
+
+## Schema v1 → Tab-Mapping
+
+Die folgende Zuordnung dokumentiert, wie Felder aus dem bisherigen Schema-v1-Format (`<prefix>__<field>`) auf die Google-Sheets-Tabs gemappt werden. Nicht persistierte Felder sind explizit markiert und erhalten eine Interim-Behandlung.
+
+| Quelle | Ziel-Tab | Ziel-Spalte | Transformationsregel |
+|---|---|---|---|
+| `meta__record_id` | `children` | `child_id` | Falls vorhanden direkte Übernahme; sonst wird `child_id` als UUID erzeugt. |
+| `meta__created_at`, `meta__updated_at` | `children` | `notes_internal` | **Aktuell nicht persistiert als eigene Spalten**; als JSON-Metablock in `notes_internal` angehängt. |
+| `meta__import_source`, `meta__version` | `children` | `notes_internal` | **Aktuell nicht persistiert als eigene Spalten**; als JSON-Fallback (`meta`) in `notes_internal`. |
+| `child__name` | `children` | `name` | Direkte String-Übernahme (trim). |
+| `child__birthdate` | `children` | `birthdate` | Datum auf ISO-8601 (`YYYY-MM-DD`) normalisieren; ungültige Werte leer speichern. |
+| `child__start_date` | `children` | `start_date` | Datum auf ISO-8601 (`YYYY-MM-DD`) normalisieren. |
+| `child__group` | `children` | `group` | Direkte Übernahme (trim). |
+| `child__allergies` | `children` | `allergies` | Mehrfachwerte als kommagetrennter String speichern. |
+| `child__notes_parent_visible` | `children` | `notes_parent_visible` | Direkte Übernahme, für Eltern sichtbar. |
+| `child__notes_internal` | `children` | `notes_internal` | Direkte Übernahme; kann JSON-Fallback für nicht persistierte Felder enthalten. |
+| `child__pickup_password` | `children` | `pickup_password` | Direkte Übernahme (trim). |
+| `child__status` | `children` | `status` | Direkte Übernahme; erwartete Werte z. B. `active`/`inactive`/`archived`. |
+| `parent1__email` | `parents` + `children` | `parents.email` + `children.parent_email` | Upsert in `parents`; gleichzeitig Synchronisierung auf `children.parent_email` (Primärkontakt). |
+| `parent1__name` | `parents` | `name` | Upsert per E-Mail; Name aktualisieren. |
+| `parent1__phone` | `parents` | `phone` | String-Normalisierung (trim). |
+| `parent1__phone2` | `parents` | `phone2` | Optionales Zweittelefon, leer erlaubt. |
+| `parent1__address` | `parents` | `address` | Direkte Übernahme (trim). |
+| `parent1__preferred_language` | `parents` | `preferred_language` | Sprachkürzel/Freitext übernehmen. |
+| `parent1__emergency_contact_name` | `parents` | `emergency_contact_name` | Direkte Übernahme. |
+| `parent1__emergency_contact_phone` | `parents` | `emergency_contact_phone` | Direkte Übernahme. |
+| `parent1__notifications_opt_in` | `parents` | `notifications_opt_in` | Bool-Normalisierung (`true/1/ja` → `true`, sonst `false`). |
+| `parent2__*` | `parents` | wie `parent1__*` | Zweiter Eltern-Datensatz als eigener Upsert; Beziehung zum Kind über `parent_email`-Logik und/oder interne Zuordnung. |
+| `pa1__*`, `pa2__*`, `pa3__*`, `pa4__*` | `pickup_authorizations` | `name`, `phone`, `relation`, `is_active`, `notes` | Je Präfix ein Datensatz. Bool-Normalisierung für `is_active`; ohne Namen kein Datensatz. |
+| `consent__photo_download_pixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Bool-Normalisierung; wirkt nur, wenn keine höhere Priorität greift. |
+| `consent__photo_download_unpixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Priorität vor `pixelated`: bei `true` → `unpixelated`, außer `denied=true`. |
+| `consent__photo_download_denied` | `children` (optional zusätzlich `consents`) | `download_consent` | Höchste Priorität: bei `true` immer `denied`. |
+| weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Aktuell nicht verpflichtend persistiert**; interimistisch eigener `consents`-Tab, alternativ JSON-Fallback in `children.notes_internal`. |
+| `sign__parent1_name`, `sign__parent1_date` | optional `consents` | z. B. `sign_parent1_name`, `sign_parent1_date` | **Aktuell nicht persistiert im Standard-Schema**; bevorzugt im `consents`-Tab ablegen. |
+| `sign__parent2_name`, `sign__parent2_date` | optional `consents` | z. B. `sign_parent2_name`, `sign_parent2_date` | **Aktuell nicht persistiert im Standard-Schema**; alternativ JSON-Fallback in `children.notes_internal`. |
+| `sign__place`, `sign__signature_ref` | optional `consents` | z. B. `sign_place`, `sign_signature_ref` | **Nicht persistiert im Pflichtschema**; bis zur finalen Signatur-Implementierung in separatem Tab oder JSON-Fallback führen. |
+
+### Nicht persistierte Felder (explizit)
+
+Aktuell gelten folgende Gruppen als **nicht Teil des Pflichtschemas** und werden deshalb interimistisch behandelt:
+
+- Erweiterte `meta__*`-Felder (außer einer möglichen ID-Übernahme für `child_id`)
+  → Speicherung als JSON-Fallback in `children.notes_internal`.
+- Erweiterte `consent__*`-Felder jenseits der Download-Freigabe (`pixelated`, `unpixelated`, `denied`)
+  → bevorzugt eigener Tab `consents`; alternativ JSON-Fallback in `children.notes_internal`.
+- Alle `sign__*`-Felder (Signatur-/Ort-/Datum-Metadaten)
+  → bevorzugt eigener Tab `consents`; falls nicht vorhanden, JSON-Fallback in `children.notes_internal`.
+
+Empfehlung: Für produktive Nachvollziehbarkeit sollte der optionale Tab `consents` aktiviert und um explizite Spalten für `consent__*`/`sign__*` erweitert werden, damit weniger Daten in Freitextfeldern (`notes_internal`) liegen.
 
 Hinweis zu CRUD-Parität: Das Löschen eines Kindes ist nun auch im Google-Modus implementiert (Zeile wird im `children`-Tab entfernt).
 

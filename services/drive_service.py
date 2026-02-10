@@ -58,7 +58,9 @@ def ensure_child_photo_folder(child_id: str) -> str:
     if not child:
         raise DriveServiceError(f"Kind mit ID '{child_id}' nicht gefunden.")
 
-    existing_folder_id = str(child.get("photo_folder_id", "")).strip()
+    existing_folder_id = str(
+        child.get("photo_folder_id") or child.get("folder_id") or ""
+    ).strip()
     if existing_folder_id:
         return existing_folder_id
 

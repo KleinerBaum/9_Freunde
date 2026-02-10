@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 import json
 import base64
+from io import BytesIO
 from pathlib import Path
 
 from datetime import date
@@ -12,6 +13,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from docx import Document
 from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
@@ -190,6 +192,32 @@ def _optional_date_to_iso(value: date | None) -> str:
     if value is None:
         return ""
     return value.isoformat()
+
+
+def _extract_docx_preview_text(
+    doc_bytes: bytes,
+    *,
+    max_paragraphs: int = 12,
+) -> str:
+    """Erzeugt eine kurze Vorschau aus einem DOCX-Dokument."""
+    parsed_document = Document(BytesIO(doc_bytes))
+    preview_lines: list[str] = []
+
+    for paragraph in parsed_document.paragraphs:
+        normalized_text = paragraph.text.strip()
+        if not normalized_text:
+            continue
+        preview_lines.append(normalized_text)
+        if len(preview_lines) >= max_paragraphs:
+            break
+
+    if not preview_lines:
+        return "Keine Vorschau verfügbar. / No preview available."
+
+    if len(parsed_document.paragraphs) > max_paragraphs:
+        preview_lines.append("…")
+
+    return "\n\n".join(preview_lines)
 
 
 def _normalize_active_flag(value: str | bool | None) -> bool:
@@ -1553,6 +1581,11 @@ else:
                                 sel_child, doc_notes
                             )
                             st.success("Dokument erstellt: " + file_name)
+                            with st.expander(
+                                "Vorschau des neuen Dokuments / Preview new document",
+                                expanded=True,
+                            ):
+                                st.markdown(_extract_docx_preview_text(doc_bytes))
                             # Download-Button anzeigen
                             st.download_button(
                                 "📄 Dokument herunterladen",
@@ -1603,6 +1636,11 @@ else:
                             st.success(
                                 "Betreuungsvertrag erstellt. / Childcare contract generated."
                             )
+                            with st.expander(
+                                "Vorschau Betreuungsvertrag / Childcare contract preview",
+                                expanded=True,
+                            ):
+                                st.markdown(_extract_docx_preview_text(contract_bytes))
                             st.download_button(
                                 "📄 Vertrag herunterladen / Download contract",
                                 data=contract_bytes,
@@ -1651,6 +1689,11 @@ else:
                             st.success(
                                 "Abrechnung erstellt. / Food allowance invoice generated."
                             )
+                            with st.expander(
+                                "Vorschau Abrechnung / Invoice preview",
+                                expanded=True,
+                            ):
+                                st.markdown(_extract_docx_preview_text(invoice_bytes))
                             st.download_button(
                                 "📄 Abrechnung herunterladen / Download invoice",
                                 data=invoice_bytes,
@@ -1677,15 +1720,25 @@ else:
                         for doc in docs_list:
                             file_name = doc.get("name")
                             file_id = doc.get("id")
-                            st.markdown(f"- {file_name} ")
-                            st.download_button(
-                                "Download",
-                                data=drive_agent.download_file(file_id),
-                                file_name=file_name,
-                                key=file_id,
+                            doc_bytes = drive_agent.download_file(file_id)
+                            preview_title = (
+                                "Vorschau gespeichertes Dokument"
+                                " / Preview saved document"
                             )
+                            with st.expander(f"📄 {file_name}"):
+                                st.caption(preview_title)
+                                st.markdown(_extract_docx_preview_text(doc_bytes))
+                                st.download_button(
+                                    "Download / Herunterladen",
+                                    data=doc_bytes,
+                                    file_name=file_name,
+                                    key=file_id,
+                                )
                     else:
-                        st.write("(Keine gespeicherten Dokumente vorhanden.)")
+                        st.write(
+                            "(Keine gespeicherten Dokumente vorhanden. / "
+                            "No saved documents available.)"
+                        )
 
         # ---- Admin: Verträge ----
         elif admin_view == "Verträge":

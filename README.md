@@ -11,6 +11,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
 - **Dokumenterstellung via KI:** Automatisches Generieren von Berichten/Briefen mit OpenAI sowie Download oder Ablage dieser Dokumente.
 - **Dokumentvorlagen aus Stammdaten:** Im Bereich „Dokumente“ lassen sich zusätzlich ein **Betreuungsvertrag** sowie eine **Abrechnung der Lebensmittelpauschale** (frei wählbarer Zeitraum, aktuelles Datum, Logo) je Kind erzeugen.
+- **Dokumentvorschau vor Download:** Im Admin-Bereich „Dokumente“ werden neue und bereits in Drive gespeicherte DOCX-Dateien als Textvorschau in aufklappbaren Bereichen angezeigt, bevor der Download gestartet wird.
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.
 - **Landing-Page-Branding:** Oberhalb der Inhalte wird zusätzlich `images/Herz.png` zentriert dargestellt; `images/Hintergrund.png` wird als globales Hintergrundbild der gesamten App verwendet.
 - **Verbesserte Lesbarkeit auf hellem Hintergrund:** Ein kontraststarkes Overlay, dunklere Primärtextfarben und klarere Panel-/Input-Kontraste verbessern die Erkennbarkeit der Inhalte bei aktivem Hintergrundbild.

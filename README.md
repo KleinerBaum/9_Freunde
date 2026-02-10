@@ -4,6 +4,8 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Kinder-Übersicht (Admin):** In „Stammdaten“ wird eine sortierbare Tabelle mit Name, Eltern-E-Mail, Gruppe, Geburtsdatum und Drive-Ordnerstatus (`✅ Ready`/`⚠️ Missing`) angezeigt.
+- **Admin-Start mit Gesamtübersicht:** Unter **„Stammdaten & Infos → Übersicht“** wird direkt nach dem Login eine kompakte Tabelle mit Kind, Elternkontakt, Fotoanzahl, letzter Aktivität sowie `photo_folder_id`/`folder_id` zur schnellen Datenkontrolle angezeigt.
+- **Direktlink zum Fotoordner:** Im Admin-Bereich **„Fotos“** wird pro ausgewähltem Kind ein direkter Google-Drive-Link (`📂`) auf den aktuellen Foto-Ordner eingeblendet.
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Geführtes Bearbeiten in Stammdaten:** Editierfelder für Kinder und Abholberechtigungen werden erst nach aktiver Auswahl eines Eintrags angezeigt; die Bereiche **„Neues Kind anlegen / Add child“** und **„Abholberechtigte / Pickup authorizations“** sind standardmäßig eingeklappt.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.

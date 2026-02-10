@@ -243,6 +243,48 @@ def _folder_status_label(child_record: dict[str, str]) -> str:
     return "✅ Ready" if has_photo_folder or has_drive_folder else "⚠️ Missing"
 
 
+def _build_admin_overview_rows(
+    children: list[dict[str, str]],
+    photo_meta_records: list[dict[str, object]],
+) -> list[dict[str, str | int]]:
+    photo_count_by_child_id: dict[str, int] = {}
+    latest_activity_by_child_id: dict[str, str] = {}
+
+    for record in photo_meta_records:
+        child_id = str(record.get("child_id", "")).strip()
+        if not child_id:
+            continue
+
+        photo_count_by_child_id[child_id] = photo_count_by_child_id.get(child_id, 0) + 1
+
+        uploaded_at = str(record.get("uploaded_at", "")).strip()
+        if uploaded_at and uploaded_at > latest_activity_by_child_id.get(child_id, ""):
+            latest_activity_by_child_id[child_id] = uploaded_at
+
+    overview_rows: list[dict[str, str | int]] = []
+    for child_record in children:
+        child_id = str(child_record.get("id", "")).strip()
+        overview_rows.append(
+            {
+                "Name / Name": _display_or_dash(child_record.get("name")),
+                "Eltern E-Mail / Parent email": _display_or_dash(
+                    child_record.get("parent_email")
+                ),
+                "Fotos / Photos": photo_count_by_child_id.get(child_id, 0),
+                "Letzte Aktivität / Last activity": _display_or_dash(
+                    latest_activity_by_child_id.get(child_id)
+                ),
+                "photo_folder_id": _display_or_dash(
+                    child_record.get("photo_folder_id")
+                ),
+                "folder_id": _display_or_dash(child_record.get("folder_id")),
+                "Ordnerstatus / Folder status": _folder_status_label(child_record),
+            }
+        )
+
+    return overview_rows
+
+
 @st.cache_data(show_spinner=False)
 def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     original_bytes = drive_agent.download_file(file_id)
@@ -555,6 +597,7 @@ else:
             admin_view = st.radio(
                 "Bereich / Section",
                 (
+                    "Übersicht",
                     "Stammdaten",
                     "Stammdaten Sheet",
                     "Infos verwalten",
@@ -571,8 +614,56 @@ else:
                 key="admin_documents_section",
             )
 
+        # ---- Admin: Übersicht ----
+        if admin_view == "Übersicht":
+            st.subheader("Admin-Übersicht / Admin overview")
+            children: list[dict[str, str]] = []
+            children_load_error = False
+            try:
+                children = stammdaten_manager.get_children()
+                photo_meta_records = stammdaten_manager.get_photo_meta_records()
+            except SheetsRepositoryError as exc:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
+                    "Service-Account Zugriff auf die konfigurierte Tabelle hat "
+                    "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
+                    "verify that the service account has access to the configured "
+                    "sheet (gcp.stammdaten_sheet_id)."
+                )
+                st.caption(f"Details / Details: {exc}")
+                photo_meta_records = []
+            except Exception:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
+                    "erneut versuchen. / Master data could not be loaded right now. "
+                    "Please try again later."
+                )
+                photo_meta_records = []
+
+            if not children_load_error and children:
+                st.markdown("**👥 Kinder-Übersicht / Children overview**")
+                overview_df = pd.DataFrame(
+                    _build_admin_overview_rows(children, photo_meta_records)
+                )
+                st.dataframe(
+                    overview_df,
+                    hide_index=True,
+                    use_container_width=True,
+                )
+                st.caption(
+                    "Zeigt Name, Elternkontakt, Fotoanzahl, letzte Upload-Aktivität und "
+                    "Ordner-IDs zur Datenkontrolle. / Displays name, parent contact, "
+                    "photo count, latest upload activity, and folder IDs for data checks."
+                )
+            elif not children_load_error:
+                st.write(
+                    "*Noch keine Kinder registriert. / No children registered yet.*"
+                )
+
         # ---- Admin: Stammdaten ----
-        if admin_view == "Stammdaten":
+        elif admin_view == "Stammdaten":
             st.subheader("Kinder-Stammdaten verwalten")
             children: list[dict[str, str]] = []
             children_load_error = False
@@ -1756,6 +1847,15 @@ else:
                             sel_child.get("photo_folder_id")
                             or sel_child.get("folder_id")
                             or ""
+                        )
+
+                    if current_photo_folder_id:
+                        drive_url = (
+                            "https://drive.google.com/drive/folders/"
+                            f"{current_photo_folder_id}"
+                        )
+                        st.markdown(
+                            f"[📂 Ordner auf Google Drive öffnen / Open folder on Google Drive]({drive_url})"
                         )
                 except DriveServiceError as exc:
                     current_photo_folder_id = ""

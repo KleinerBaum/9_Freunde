@@ -240,7 +240,9 @@ Optional:
 
 ## Schema v1 → Tab-Mapping
 
-Die folgende Zuordnung dokumentiert, wie Felder aus dem bisherigen Schema-v1-Format (`<prefix>__<field>`) auf die Google-Sheets-Tabs gemappt werden. Nicht persistierte Felder sind explizit markiert und erhalten eine Interim-Behandlung.
+Die folgende Zuordnung dokumentiert, wie Felder aus dem bisherigen Schema-v1-Format (`<prefix>__<field>`) auf die Google-Sheets-Tabs gemappt werden. Die zentrale Mapping-Funktion `map_schema_v1_payload_to_tab_records()` in `services/sheets_repo.py` bildet `children`, `parents`, `pickup_authorizations` und `consents` konsistent ab.
+
+Serialisierung von Mehrfachstrukturen: `pa1__*` bis `pa4__*` werden als geordnete Liste (`pa1`→`pa4`) in `pickup_authorizations` ausgegeben. Pro Präfix wird genau ein Eintrag erzeugt, sobald mindestens eines der Kernfelder (`name`, `relationship`, `phone`, `valid_from`, `valid_to`, `created_at`, `created_by`) befüllt ist.
 
 | Quelle | Ziel-Tab | Ziel-Spalte | Transformationsregel |
 |---|---|---|---|

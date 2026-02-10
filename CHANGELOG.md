@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Admin-UI in **„Stammdaten“** um den Expander **„Anmeldung importieren (PDF) / Import registration (PDF)“** erweitert: Download der Blanko-PDF-Vorlage aus `assets/forms/`, Upload eines ausgefüllten Formulars, Parsing via `registration_form_service`, strukturierte Vorschau (Kind/Eltern/Abholberechtigte/Einwilligungen), Validierungsanzeige mit Speicher-Blockade bei Fehlern sowie Speichern in bestehende Stammdaten-Upsert-Flows inkl. Success-Feedback mit `child_id` und direkter Vorauswahl für die Bearbeitung.
 - Neues Modul `services/registration_form_service.py` ergänzt: `extract_acroform_fields(pdf_bytes)` liest ACROForm-Felder via `PyPDF2.PdfReader(...).get_fields()`, normalisiert Strings/Checkboxen und bricht mit klaren Fehlern bei fehlenden Feldern oder fehlender/nicht unterstützter `meta__schema_version` ab.
 - Neues Dataclass-Modell `RegistrationPayload` plus Parser `parse_registration_payload(fields)` ergänzt, das strukturierte Bereiche (`child`, `parents`, `pickup_authorizations`, `consents`, `meta`, `errors`) liefert und Pflichtfeld-Validierung ohne Schreiboperationen durchführt.
 - Unit-Tests `tests/test_registration_form_service.py` ergänzt (Normalisierung, Schema-Validierung, Fehlerpfade, Pflichtfeldprüfung).

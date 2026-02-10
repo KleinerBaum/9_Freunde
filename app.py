@@ -32,7 +32,15 @@ from services.calendar_service import (
 from services.drive_service import DriveServiceError, ensure_child_photo_folder
 from services.google_clients import get_drive_client
 from services.content_repo import ContentRepository, ContentRepositoryError
-from services.sheets_repo import SheetsRepositoryError
+from services.registration_form_service import (
+    RegistrationPayload,
+    extract_acroform_fields,
+    parse_registration_payload,
+)
+from services.sheets_repo import (
+    SheetsRepositoryError,
+    map_schema_v1_payload_to_tab_records,
+)
 from services.sheets_service import SheetsServiceError, read_sheet_values
 from services.photos_service import get_download_bytes
 
@@ -385,6 +393,62 @@ def _build_admin_overview_rows(
         )
 
     return overview_rows
+
+
+def _extract_registration_import_data(
+    pdf_bytes: bytes,
+) -> tuple[RegistrationPayload, dict[str, Any]]:
+    fields = extract_acroform_fields(pdf_bytes)
+    payload = parse_registration_payload(fields)
+    mapped_records = map_schema_v1_payload_to_tab_records(fields)
+    return payload, mapped_records
+
+
+def _save_registration_import(
+    stammdaten_manager: StammdatenManager,
+    *,
+    mapped_records: dict[str, Any],
+    created_by: str,
+) -> str:
+    child_record = dict(mapped_records.get("children", {}))
+    parent_records = list(mapped_records.get("parents", []))
+    pickup_records = list(mapped_records.get("pickup_authorizations", []))
+
+    child_name = str(child_record.get("name", "")).strip()
+    parent_email = str(child_record.get("parent_email", "")).strip()
+    if not child_name or not parent_email:
+        raise ValueError(
+            "Kindname und Parent-E-Mail fehlen im Import. / Child name and parent email are required."
+        )
+
+    child_id = stammdaten_manager.add_child(
+        child_name,
+        parent_email,
+        child_record,
+    )
+
+    for parent_record in parent_records:
+        email = str(parent_record.get("email", "")).strip()
+        if not email:
+            continue
+        parent_payload = {
+            key: value for key, value in parent_record.items() if key != "parent_id"
+        }
+        stammdaten_manager.upsert_parent_by_email(email, parent_payload)
+
+    for pickup_record in pickup_records:
+        pickup_payload = {
+            key: value
+            for key, value in pickup_record.items()
+            if key not in {"pickup_id", "child_id"}
+        }
+        stammdaten_manager.add_pickup_authorization(
+            child_id,
+            pickup_payload,
+            created_by=created_by,
+        )
+
+    return child_id
 
 
 @st.cache_data(show_spinner=False)
@@ -1195,6 +1259,147 @@ else:
                         _trigger_rerun()
                     except Exception as e:
                         st.error(f"Fehler beim Speichern / Save error: {e}")
+
+            with st.expander(
+                "Anmeldung importieren (PDF) / Import registration (PDF)",
+                expanded=False,
+            ):
+                template_path = (
+                    Path(__file__).resolve().parent
+                    / "assets"
+                    / "forms"
+                    / "9Freunde_Anmeldeformular_v1.pdf"
+                )
+                if template_path.exists():
+                    st.download_button(
+                        "Leere Vorlage herunterladen / Download blank template",
+                        data=template_path.read_bytes(),
+                        file_name=template_path.name,
+                        mime="application/pdf",
+                        key="registration_template_download",
+                    )
+                else:
+                    st.warning("Vorlage nicht gefunden. / Template file not found.")
+
+                uploaded_registration_pdf = st.file_uploader(
+                    "Ausgefülltes Anmeldeformular hochladen / Upload completed registration form",
+                    type=["pdf"],
+                    key="registration_import_pdf",
+                )
+
+                registration_payload: RegistrationPayload | None = None
+                mapped_registration_records: dict[str, Any] | None = None
+                import_errors: list[str] = []
+
+                if uploaded_registration_pdf is not None:
+                    try:
+                        (
+                            registration_payload,
+                            mapped_registration_records,
+                        ) = _extract_registration_import_data(
+                            uploaded_registration_pdf.getvalue()
+                        )
+                        import_errors = list(registration_payload.errors)
+                    except ValueError as exc:
+                        import_errors = [str(exc)]
+                    except Exception as exc:
+                        import_errors = [
+                            "Import konnte nicht verarbeitet werden. / Import could not be processed.",
+                            f"Details / Details: {exc}",
+                        ]
+
+                if registration_payload is not None:
+                    child_preview = registration_payload.child
+                    parent_preview = registration_payload.parents
+                    pickup_preview = registration_payload.pickup_authorizations
+                    consent_preview = registration_payload.consents
+
+                    st.markdown("**Kind-Zusammenfassung / Child summary**")
+                    st.write(
+                        {
+                            "Name": _display_or_dash(child_preview.get("name")),
+                            "Geburtsdatum / Birthdate": _display_or_dash(
+                                child_preview.get("birthdate")
+                            ),
+                            "Startdatum / Start date": _display_or_dash(
+                                child_preview.get("start_date")
+                            ),
+                            "Gruppe / Group": _display_or_dash(
+                                child_preview.get("group")
+                            ),
+                            "Parent E-Mail": _display_or_dash(
+                                child_preview.get("parent_email")
+                                or child_preview.get("parent1_email")
+                            ),
+                        }
+                    )
+
+                    st.markdown("**Eltern-Zusammenfassung / Parent summary**")
+                    if parent_preview:
+                        st.dataframe(
+                            pd.DataFrame(parent_preview),
+                            hide_index=True,
+                            width="stretch",
+                        )
+                    else:
+                        st.info("Keine Elternangaben gefunden. / No parent data found.")
+
+                    st.markdown("**Abholberechtigte / Pickup authorization list**")
+                    if pickup_preview:
+                        st.dataframe(
+                            pd.DataFrame(pickup_preview),
+                            hide_index=True,
+                            width="stretch",
+                        )
+                    else:
+                        st.info(
+                            "Keine Abholberechtigten erkannt. / No pickup authorizations detected."
+                        )
+
+                    st.markdown("**Einwilligungen / Consent summary**")
+                    st.write(consent_preview)
+
+                if import_errors:
+                    st.error(
+                        "Validierungsfehler gefunden. Speichern ist blockiert. / Validation errors found. Saving is blocked."
+                    )
+                    for error in import_errors:
+                        st.write(f"- {error}")
+                elif (
+                    uploaded_registration_pdf is not None
+                    and mapped_registration_records is not None
+                ):
+                    if st.button(
+                        "In Stammdaten speichern / Save to master data",
+                        key="registration_import_save",
+                        type="primary",
+                    ):
+                        try:
+                            imported_child_id = _save_registration_import(
+                                stammdaten_manager,
+                                mapped_records=mapped_registration_records,
+                                created_by=user_email,
+                            )
+                            st.session_state["stammdaten_selected_child_ids"] = [
+                                imported_child_id
+                            ]
+                            if hasattr(st, "toast"):
+                                st.toast(
+                                    "Anmeldung erfolgreich importiert. / Registration imported successfully."
+                                )
+                            st.success(
+                                "Import erfolgreich gespeichert. / Import saved successfully. "
+                                f"child_id: `{imported_child_id}`"
+                            )
+                            st.caption(
+                                "Direkt zur Bearbeitung vorausgewählt. / Preselected for direct editing."
+                            )
+                            _trigger_rerun()
+                        except Exception as exc:
+                            st.error(
+                                "Fehler beim Speichern des Imports. / Error while saving import."
+                            )
+                            st.caption(f"Details / Details: {exc}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
                 selected_ids = set(

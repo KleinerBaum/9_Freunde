@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -37,7 +38,7 @@ def _get_calendar_client():
 def _get_calendar_id() -> str:
     gcp_section = st.secrets.get("gcp")
     calendar_id = ""
-    if isinstance(gcp_section, dict):
+    if isinstance(gcp_section, Mapping):
         calendar_id = str(gcp_section.get("calendar_id", "")).strip()
     if not calendar_id:
         raise CalendarServiceError(

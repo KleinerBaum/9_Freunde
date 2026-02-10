@@ -623,76 +623,76 @@ else:
                 st.write("*Noch keine Kinder registriert.*")
 
             # Formular zum Hinzufügen eines neuen Kindes
-            st.write("**Neues Kind anlegen:**")
-            with st.form(key="new_child_form"):
-                left_col, right_col = st.columns(2)
-                with left_col:
-                    name = st.text_input("Name des Kindes / Child name")
-                    parent_email = st.text_input("E-Mail Elternteil / Parent email")
-                    birthdate = st.date_input(
-                        "Geburtsdatum / Birthdate",
-                        value=None,
-                        format="YYYY-MM-DD",
-                    )
-                    start_date = st.date_input(
-                        "Startdatum / Start date",
-                        value=None,
-                        format="YYYY-MM-DD",
-                    )
-                    status = st.selectbox(
-                        "Status", options=["active", "archived"], index=0
-                    )
-                with right_col:
-                    group = st.text_input("Gruppe / Group", value="Igel")
-                    primary_caregiver = st.text_input(
-                        "Bezugserzieher:in / Primary caregiver"
-                    )
-                    allergies = st.text_input("Allergien / Allergies")
-                    pickup_password = st.text_input(
-                        "Abhol-Kennwort (optional) / Pickup password",
-                        type="password",
-                    )
+            with st.expander("Neues Kind anlegen / Add child", expanded=False):
+                with st.form(key="new_child_form"):
+                    left_col, right_col = st.columns(2)
+                    with left_col:
+                        name = st.text_input("Name des Kindes / Child name")
+                        parent_email = st.text_input("E-Mail Elternteil / Parent email")
+                        birthdate = st.date_input(
+                            "Geburtsdatum / Birthdate",
+                            value=None,
+                            format="YYYY-MM-DD",
+                        )
+                        start_date = st.date_input(
+                            "Startdatum / Start date",
+                            value=None,
+                            format="YYYY-MM-DD",
+                        )
+                        status = st.selectbox(
+                            "Status", options=["active", "archived"], index=0
+                        )
+                    with right_col:
+                        group = st.text_input("Gruppe / Group", value="Igel")
+                        primary_caregiver = st.text_input(
+                            "Bezugserzieher:in / Primary caregiver"
+                        )
+                        allergies = st.text_input("Allergien / Allergies")
+                        pickup_password = st.text_input(
+                            "Abhol-Kennwort (optional) / Pickup password",
+                            type="password",
+                        )
 
-                parent_col_left, parent_col_right = st.columns(2)
-                with parent_col_left:
-                    parent_name = st.text_input("Elternteil Name / Parent name")
-                    parent_phone = st.text_input("Telefon / Phone")
-                    parent_phone2 = st.text_input("Telefon 2 / Phone 2")
-                    parent_address = st.text_input("Adresse / Address")
-                with parent_col_right:
-                    emergency_contact_name = st.text_input(
-                        "Notfallkontakt Name / Emergency contact name"
-                    )
-                    emergency_contact_phone = st.text_input(
-                        "Notfallkontakt Telefon / Emergency contact phone"
-                    )
-                    preferred_language = st.selectbox(
-                        "Bevorzugte Sprache / Preferred language",
-                        options=["de", "en"],
-                        index=0,
-                        format_func=lambda value: (
-                            "Deutsch / German"
-                            if value == "de"
-                            else "English / Englisch"
-                        ),
-                    )
-                    notifications_opt_in = st.checkbox(
-                        "Benachrichtigungen erhalten / Receive notifications",
-                        value=False,
-                    )
+                    parent_col_left, parent_col_right = st.columns(2)
+                    with parent_col_left:
+                        parent_name = st.text_input("Elternteil Name / Parent name")
+                        parent_phone = st.text_input("Telefon / Phone")
+                        parent_phone2 = st.text_input("Telefon 2 / Phone 2")
+                        parent_address = st.text_input("Adresse / Address")
+                    with parent_col_right:
+                        emergency_contact_name = st.text_input(
+                            "Notfallkontakt Name / Emergency contact name"
+                        )
+                        emergency_contact_phone = st.text_input(
+                            "Notfallkontakt Telefon / Emergency contact phone"
+                        )
+                        preferred_language = st.selectbox(
+                            "Bevorzugte Sprache / Preferred language",
+                            options=["de", "en"],
+                            index=0,
+                            format_func=lambda value: (
+                                "Deutsch / German"
+                                if value == "de"
+                                else "English / Englisch"
+                            ),
+                        )
+                        notifications_opt_in = st.checkbox(
+                            "Benachrichtigungen erhalten / Receive notifications",
+                            value=False,
+                        )
 
-                notes_col_left, notes_col_right = st.columns(2)
-                with notes_col_left:
-                    notes_parent_visible = st.text_area(
-                        "Hinweise für Eltern sichtbar / Parent-visible notes",
-                        height=110,
-                    )
-                with notes_col_right:
-                    notes_internal = st.text_area(
-                        "Interne Hinweise (nur Leitung) / Internal notes",
-                        height=110,
-                    )
-                submitted = st.form_submit_button("Hinzufügen / Add child")
+                    notes_col_left, notes_col_right = st.columns(2)
+                    with notes_col_left:
+                        notes_parent_visible = st.text_area(
+                            "Hinweise für Eltern sichtbar / Parent-visible notes",
+                            height=110,
+                        )
+                    with notes_col_right:
+                        notes_internal = st.text_area(
+                            "Interne Hinweise (nur Leitung) / Internal notes",
+                            height=110,
+                        )
+                    submitted = st.form_submit_button("Hinzufügen / Add child")
             if submitted:
                 if name.strip() == "" or parent_email.strip() == "":
                     st.error(
@@ -743,309 +743,344 @@ else:
                     options=children,
                     format_func=lambda child: str(child.get("name", "")),
                     key="edit_child_select",
+                    index=None,
+                    placeholder="Kind auswählen / Select child",
                 )
-                selected_parent = (
-                    stammdaten_manager.get_parent_by_email(
-                        str(selected_child.get("parent_email", "")).strip()
+                if selected_child is None:
+                    st.caption(
+                        "Bitte zuerst ein Kind auswählen, um Felder zu bearbeiten. / "
+                        "Please select a child first to edit details."
                     )
-                    or {}
-                )
-                with st.form(key="edit_child_form"):
-                    left_col, right_col = st.columns(2)
-                    with left_col:
-                        edit_name = st.text_input(
-                            "Name des Kindes / Child name",
-                            value=selected_child.get("name", ""),
+                else:
+                    selected_parent = (
+                        stammdaten_manager.get_parent_by_email(
+                            str(selected_child.get("parent_email", "")).strip()
                         )
-                        edit_parent_email = st.text_input(
-                            "E-Mail Elternteil / Parent email",
-                            value=selected_child.get("parent_email", ""),
-                        )
-                        edit_birthdate = st.date_input(
-                            "Geburtsdatum / Birthdate",
-                            value=_parse_optional_iso_date(
-                                selected_child.get("birthdate", "")
-                            ),
-                            format="YYYY-MM-DD",
-                        )
-                        edit_start_date = st.date_input(
-                            "Startdatum / Start date",
-                            value=_parse_optional_iso_date(
-                                selected_child.get("start_date", "")
-                            ),
-                            format="YYYY-MM-DD",
-                        )
-                    with right_col:
-                        edit_group = st.text_input(
-                            "Gruppe / Group",
-                            value=selected_child.get("group", ""),
-                        )
-                        edit_primary_caregiver = st.text_input(
-                            "Bezugserzieher:in / Primary caregiver",
-                            value=selected_child.get("primary_caregiver", ""),
-                        )
-                        edit_allergies = st.text_input(
-                            "Allergien / Allergies",
-                            value=selected_child.get("allergies", ""),
-                        )
-                        edit_pickup_password = st.text_input(
-                            "Abhol-Kennwort (optional) / Pickup password",
-                            value=selected_child.get("pickup_password", ""),
-                            type="password",
-                        )
+                        or {}
+                    )
+                    with st.form(key="edit_child_form"):
+                        left_col, right_col = st.columns(2)
+                        with left_col:
+                            edit_name = st.text_input(
+                                "Name des Kindes / Child name",
+                                value=selected_child.get("name", ""),
+                            )
+                            edit_parent_email = st.text_input(
+                                "E-Mail Elternteil / Parent email",
+                                value=selected_child.get("parent_email", ""),
+                            )
+                            edit_birthdate = st.date_input(
+                                "Geburtsdatum / Birthdate",
+                                value=_parse_optional_iso_date(
+                                    selected_child.get("birthdate", "")
+                                ),
+                                format="YYYY-MM-DD",
+                            )
+                            edit_start_date = st.date_input(
+                                "Startdatum / Start date",
+                                value=_parse_optional_iso_date(
+                                    selected_child.get("start_date", "")
+                                ),
+                                format="YYYY-MM-DD",
+                            )
+                        with right_col:
+                            edit_group = st.text_input(
+                                "Gruppe / Group",
+                                value=selected_child.get("group", ""),
+                            )
+                            edit_primary_caregiver = st.text_input(
+                                "Bezugserzieher:in / Primary caregiver",
+                                value=selected_child.get("primary_caregiver", ""),
+                            )
+                            edit_allergies = st.text_input(
+                                "Allergien / Allergies",
+                                value=selected_child.get("allergies", ""),
+                            )
+                            edit_pickup_password = st.text_input(
+                                "Abhol-Kennwort (optional) / Pickup password",
+                                value=selected_child.get("pickup_password", ""),
+                                type="password",
+                            )
 
-                    parent_col_left, parent_col_right = st.columns(2)
-                    with parent_col_left:
-                        edit_parent_name = st.text_input(
-                            "Elternteil Name / Parent name",
-                            value=str(selected_parent.get("name", "")).strip(),
+                        parent_col_left, parent_col_right = st.columns(2)
+                        with parent_col_left:
+                            edit_parent_name = st.text_input(
+                                "Elternteil Name / Parent name",
+                                value=str(selected_parent.get("name", "")).strip(),
+                            )
+                            edit_parent_phone = st.text_input(
+                                "Telefon / Phone",
+                                value=str(selected_parent.get("phone", "")).strip(),
+                            )
+                            edit_parent_phone2 = st.text_input(
+                                "Telefon 2 / Phone 2",
+                                value=str(selected_parent.get("phone2", "")).strip(),
+                            )
+                            edit_parent_address = st.text_input(
+                                "Adresse / Address",
+                                value=str(selected_parent.get("address", "")).strip(),
+                            )
+                        with parent_col_right:
+                            edit_emergency_contact_name = st.text_input(
+                                "Notfallkontakt Name / Emergency contact name",
+                                value=str(
+                                    selected_parent.get("emergency_contact_name", "")
+                                ).strip(),
+                            )
+                            edit_emergency_contact_phone = st.text_input(
+                                "Notfallkontakt Telefon / Emergency contact phone",
+                                value=str(
+                                    selected_parent.get("emergency_contact_phone", "")
+                                ).strip(),
+                            )
+                            language_options = ["de", "en"]
+                            current_parent_language = (
+                                str(selected_parent.get("preferred_language", "de"))
+                                .strip()
+                                .lower()
+                            )
+                            if current_parent_language not in language_options:
+                                current_parent_language = "de"
+                            edit_preferred_language = st.selectbox(
+                                "Bevorzugte Sprache / Preferred language",
+                                options=language_options,
+                                index=language_options.index(current_parent_language),
+                                format_func=lambda value: (
+                                    "Deutsch / German"
+                                    if value == "de"
+                                    else "English / Englisch"
+                                ),
+                            )
+                            edit_notifications_opt_in = st.checkbox(
+                                "Benachrichtigungen erhalten / Receive notifications",
+                                value=_parse_opt_in_flag(
+                                    selected_parent.get("notifications_opt_in", "false")
+                                ),
+                            )
+
+                        notes_col_left, notes_col_right = st.columns(2)
+                        with notes_col_left:
+                            edit_notes_parent_visible = st.text_area(
+                                "Hinweise für Eltern sichtbar / Parent-visible notes",
+                                value=selected_child.get("notes_parent_visible", ""),
+                                height=110,
+                            )
+                        with notes_col_right:
+                            edit_notes_internal = st.text_area(
+                                "Interne Hinweise (nur Leitung) / Internal notes",
+                                value=selected_child.get("notes_internal", ""),
+                                height=110,
+                            )
+                        status_options = ["active", "archived"]
+                        current_status = str(
+                            selected_child.get("status", "active")
+                        ).strip()
+                        if current_status not in status_options:
+                            current_status = "active"
+                        edit_status = st.selectbox(
+                            "Status",
+                            options=status_options,
+                            index=status_options.index(current_status),
                         )
-                        edit_parent_phone = st.text_input(
-                            "Telefon / Phone",
-                            value=str(selected_parent.get("phone", "")).strip(),
-                        )
-                        edit_parent_phone2 = st.text_input(
-                            "Telefon 2 / Phone 2",
-                            value=str(selected_parent.get("phone2", "")).strip(),
-                        )
-                        edit_parent_address = st.text_input(
-                            "Adresse / Address",
-                            value=str(selected_parent.get("address", "")).strip(),
-                        )
-                    with parent_col_right:
-                        edit_emergency_contact_name = st.text_input(
-                            "Notfallkontakt Name / Emergency contact name",
-                            value=str(
-                                selected_parent.get("emergency_contact_name", "")
-                            ).strip(),
-                        )
-                        edit_emergency_contact_phone = st.text_input(
-                            "Notfallkontakt Telefon / Emergency contact phone",
-                            value=str(
-                                selected_parent.get("emergency_contact_phone", "")
-                            ).strip(),
-                        )
-                        language_options = ["de", "en"]
-                        current_parent_language = (
-                            str(selected_parent.get("preferred_language", "de"))
+                        current_download_consent = (
+                            str(selected_child.get("download_consent", "pixelated"))
                             .strip()
                             .lower()
                         )
-                        if current_parent_language not in language_options:
-                            current_parent_language = "de"
-                        edit_preferred_language = st.selectbox(
-                            "Bevorzugte Sprache / Preferred language",
-                            options=language_options,
-                            index=language_options.index(current_parent_language),
-                            format_func=lambda value: (
-                                "Deutsch / German"
-                                if value == "de"
-                                else "English / Englisch"
+                        consent_options = ["pixelated", "unpixelated"]
+                        if current_download_consent not in consent_options:
+                            current_download_consent = "pixelated"
+                        edit_download_consent = st.selectbox(
+                            "Download-Consent / Download consent",
+                            options=consent_options,
+                            index=consent_options.index(current_download_consent),
+                            format_func=lambda mode: (
+                                "Downloads verpixelt / Downloads pixelated"
+                                if mode == "pixelated"
+                                else "Downloads unverpixelt / Downloads unpixelated"
                             ),
                         )
-                        edit_notifications_opt_in = st.checkbox(
-                            "Benachrichtigungen erhalten / Receive notifications",
-                            value=_parse_opt_in_flag(
-                                selected_parent.get("notifications_opt_in", "false")
-                            ),
+                        edit_submitted = st.form_submit_button(
+                            "Änderungen speichern / Save"
                         )
-
-                    notes_col_left, notes_col_right = st.columns(2)
-                    with notes_col_left:
-                        edit_notes_parent_visible = st.text_area(
-                            "Hinweise für Eltern sichtbar / Parent-visible notes",
-                            value=selected_child.get("notes_parent_visible", ""),
-                            height=110,
-                        )
-                    with notes_col_right:
-                        edit_notes_internal = st.text_area(
-                            "Interne Hinweise (nur Leitung) / Internal notes",
-                            value=selected_child.get("notes_internal", ""),
-                            height=110,
-                        )
-                    status_options = ["active", "archived"]
-                    current_status = str(selected_child.get("status", "active")).strip()
-                    if current_status not in status_options:
-                        current_status = "active"
-                    edit_status = st.selectbox(
-                        "Status",
-                        options=status_options,
-                        index=status_options.index(current_status),
-                    )
-                    current_download_consent = (
-                        str(selected_child.get("download_consent", "pixelated"))
-                        .strip()
-                        .lower()
-                    )
-                    consent_options = ["pixelated", "unpixelated"]
-                    if current_download_consent not in consent_options:
-                        current_download_consent = "pixelated"
-                    edit_download_consent = st.selectbox(
-                        "Download-Consent / Download consent",
-                        options=consent_options,
-                        index=consent_options.index(current_download_consent),
-                        format_func=lambda mode: (
-                            "Downloads verpixelt / Downloads pixelated"
-                            if mode == "pixelated"
-                            else "Downloads unverpixelt / Downloads unpixelated"
-                        ),
-                    )
-                    edit_submitted = st.form_submit_button(
-                        "Änderungen speichern / Save"
-                    )
-                if edit_submitted:
-                    if not edit_name.strip() or not edit_parent_email.strip():
-                        st.error(
-                            "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
-                        )
-                    else:
-                        try:
-                            stammdaten_manager.update_child(
-                                selected_child.get("id", ""),
-                                {
-                                    "name": edit_name.strip(),
-                                    "parent_email": edit_parent_email.strip(),
-                                    "birthdate": _optional_date_to_iso(edit_birthdate),
-                                    "start_date": _optional_date_to_iso(
-                                        edit_start_date
-                                    ),
-                                    "group": edit_group.strip(),
-                                    "primary_caregiver": edit_primary_caregiver.strip(),
-                                    "allergies": edit_allergies.strip(),
-                                    "notes_parent_visible": edit_notes_parent_visible.strip(),
-                                    "notes_internal": edit_notes_internal.strip(),
-                                    "pickup_password": edit_pickup_password.strip(),
-                                    "status": edit_status,
-                                    "download_consent": edit_download_consent,
-                                },
+                    if edit_submitted:
+                        if not edit_name.strip() or not edit_parent_email.strip():
+                            st.error(
+                                "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
                             )
-                            stammdaten_manager.upsert_parent_by_email(
-                                edit_parent_email.strip(),
-                                {
-                                    "name": edit_parent_name.strip(),
-                                    "phone": edit_parent_phone.strip(),
-                                    "phone2": edit_parent_phone2.strip(),
-                                    "address": edit_parent_address.strip(),
-                                    "preferred_language": edit_preferred_language,
-                                    "emergency_contact_name": edit_emergency_contact_name.strip(),
-                                    "emergency_contact_phone": edit_emergency_contact_phone.strip(),
-                                    "notifications_opt_in": _active_flag_to_string(
-                                        edit_notifications_opt_in
-                                    ),
-                                },
-                            )
-                            st.success(
-                                "Kind wurde aktualisiert. / Child record updated."
-                            )
-                            _trigger_rerun()
-                        except Exception as exc:
-                            st.error(f"Speichern fehlgeschlagen / Save failed: {exc}")
+                        else:
+                            try:
+                                stammdaten_manager.update_child(
+                                    selected_child.get("id", ""),
+                                    {
+                                        "name": edit_name.strip(),
+                                        "parent_email": edit_parent_email.strip(),
+                                        "birthdate": _optional_date_to_iso(
+                                            edit_birthdate
+                                        ),
+                                        "start_date": _optional_date_to_iso(
+                                            edit_start_date
+                                        ),
+                                        "group": edit_group.strip(),
+                                        "primary_caregiver": edit_primary_caregiver.strip(),
+                                        "allergies": edit_allergies.strip(),
+                                        "notes_parent_visible": edit_notes_parent_visible.strip(),
+                                        "notes_internal": edit_notes_internal.strip(),
+                                        "pickup_password": edit_pickup_password.strip(),
+                                        "status": edit_status,
+                                        "download_consent": edit_download_consent,
+                                    },
+                                )
+                                stammdaten_manager.upsert_parent_by_email(
+                                    edit_parent_email.strip(),
+                                    {
+                                        "name": edit_parent_name.strip(),
+                                        "phone": edit_parent_phone.strip(),
+                                        "phone2": edit_parent_phone2.strip(),
+                                        "address": edit_parent_address.strip(),
+                                        "preferred_language": edit_preferred_language,
+                                        "emergency_contact_name": edit_emergency_contact_name.strip(),
+                                        "emergency_contact_phone": edit_emergency_contact_phone.strip(),
+                                        "notifications_opt_in": _active_flag_to_string(
+                                            edit_notifications_opt_in
+                                        ),
+                                    },
+                                )
+                                st.success(
+                                    "Kind wurde aktualisiert. / Child record updated."
+                                )
+                                _trigger_rerun()
+                            except Exception as exc:
+                                st.error(
+                                    f"Speichern fehlgeschlagen / Save failed: {exc}"
+                                )
 
             if children:
-                st.write("**Abholberechtigte / Pickup authorizations:**")
-                pickup_child = st.selectbox(
-                    "Kind für Abholberechtigungen / Child for pickup authorizations",
-                    options=children,
-                    format_func=lambda child: str(child.get("name", "")),
-                    key="pickup_child_select",
-                )
-                pickup_child_id = str(pickup_child.get("id", "")).strip()
-                pickup_records = (
-                    stammdaten_manager.get_pickup_authorizations_by_child_id(
-                        pickup_child_id
+                with st.expander(
+                    "Abholberechtigte / Pickup authorizations", expanded=False
+                ):
+                    pickup_child = st.selectbox(
+                        "Kind für Abholberechtigungen / Child for pickup authorizations",
+                        options=children,
+                        format_func=lambda child: str(child.get("name", "")),
+                        key="pickup_child_select",
+                        index=None,
+                        placeholder="Kind auswählen / Select child",
                     )
-                )
-
-                if pickup_records:
-                    for record in pickup_records:
-                        state_label = (
-                            "Aktiv / Active"
-                            if _normalize_active_flag(record.get("active"))
-                            else "Inaktiv / Inactive"
+                    if pickup_child is None:
+                        st.caption(
+                            "Bitte zuerst ein Kind auswählen, um Abholberechtigungen "
+                            "anzuzeigen. / Please select a child first to view pickup "
+                            "authorizations."
                         )
-                        period_parts = []
-                        if record.get("valid_from"):
-                            period_parts.append(f"ab / from {record.get('valid_from')}")
-                        if record.get("valid_to"):
-                            period_parts.append(f"bis / until {record.get('valid_to')}")
-                        period_label = (
-                            f" ({', '.join(period_parts)})" if period_parts else ""
-                        )
-                        st.write(
-                            f"- **{record.get('name', '—')}** · "
-                            f"{record.get('relationship', '—')} · "
-                            f"{record.get('phone', '—')} · "
-                            f"{state_label}{period_label}"
-                        )
-                else:
-                    st.caption(
-                        "Keine Abholberechtigten hinterlegt. / No pickup authorizations yet."
-                    )
-
-                with st.form(key="pickup_add_form"):
-                    pickup_add_col_left, pickup_add_col_right = st.columns(2)
-                    with pickup_add_col_left:
-                        pickup_name = st.text_input(
-                            "Name / Name",
-                            key="pickup_add_name",
-                        )
-                        pickup_relationship = st.text_input(
-                            "Beziehung / Relationship",
-                            key="pickup_add_relationship",
-                        )
-                        pickup_phone = st.text_input(
-                            "Telefon / Phone",
-                            key="pickup_add_phone",
-                        )
-                    with pickup_add_col_right:
-                        pickup_valid_from = st.date_input(
-                            "Gültig von / Valid from",
-                            value=None,
-                            format="YYYY-MM-DD",
-                            key="pickup_add_valid_from",
-                        )
-                        pickup_valid_to = st.date_input(
-                            "Gültig bis / Valid to",
-                            value=None,
-                            format="YYYY-MM-DD",
-                            key="pickup_add_valid_to",
-                        )
-                        pickup_active = st.checkbox(
-                            "Aktiv / Active",
-                            value=True,
-                            key="pickup_add_active",
-                        )
-                    pickup_add_submitted = st.form_submit_button(
-                        "Abholberechtigte hinzufügen / Add pickup authorization"
-                    )
-                if pickup_add_submitted:
-                    if not pickup_name.strip():
-                        st.error("Bitte Name angeben. / Please provide a name.")
+                        pickup_records = []
                     else:
-                        try:
-                            stammdaten_manager.add_pickup_authorization(
-                                pickup_child_id,
-                                {
-                                    "name": pickup_name.strip(),
-                                    "relationship": pickup_relationship.strip(),
-                                    "phone": pickup_phone.strip(),
-                                    "valid_from": _optional_date_to_iso(
-                                        pickup_valid_from
-                                    ),
-                                    "valid_to": _optional_date_to_iso(pickup_valid_to),
-                                    "active": _active_flag_to_string(pickup_active),
-                                },
-                                created_by=user_email,
+                        pickup_child_id = str(pickup_child.get("id", "")).strip()
+                        pickup_records = (
+                            stammdaten_manager.get_pickup_authorizations_by_child_id(
+                                pickup_child_id
                             )
-                            st.success(
-                                "Abholberechtigung angelegt. / Pickup authorization created."
+                        )
+
+                    if pickup_child is not None and pickup_records:
+                        for record in pickup_records:
+                            state_label = (
+                                "Aktiv / Active"
+                                if _normalize_active_flag(record.get("active"))
+                                else "Inaktiv / Inactive"
                             )
-                            _trigger_rerun()
-                        except Exception as exc:
-                            st.error(
-                                "Abholberechtigung konnte nicht gespeichert werden / "
-                                f"Could not save pickup authorization: {exc}"
+                            period_parts = []
+                            if record.get("valid_from"):
+                                period_parts.append(
+                                    f"ab / from {record.get('valid_from')}"
+                                )
+                            if record.get("valid_to"):
+                                period_parts.append(
+                                    f"bis / until {record.get('valid_to')}"
+                                )
+                            period_label = (
+                                f" ({', '.join(period_parts)})" if period_parts else ""
                             )
+                            st.write(
+                                f"- **{record.get('name', '—')}** · "
+                                f"{record.get('relationship', '—')} · "
+                                f"{record.get('phone', '—')} · "
+                                f"{state_label}{period_label}"
+                            )
+                    elif pickup_child is not None:
+                        st.caption(
+                            "Keine Abholberechtigten hinterlegt. / No pickup authorizations yet."
+                        )
+
+                    if pickup_child is not None:
+                        with st.form(key="pickup_add_form"):
+                            pickup_add_col_left, pickup_add_col_right = st.columns(2)
+                            with pickup_add_col_left:
+                                pickup_name = st.text_input(
+                                    "Name / Name",
+                                    key="pickup_add_name",
+                                )
+                                pickup_relationship = st.text_input(
+                                    "Beziehung / Relationship",
+                                    key="pickup_add_relationship",
+                                )
+                                pickup_phone = st.text_input(
+                                    "Telefon / Phone",
+                                    key="pickup_add_phone",
+                                )
+                            with pickup_add_col_right:
+                                pickup_valid_from = st.date_input(
+                                    "Gültig von / Valid from",
+                                    value=None,
+                                    format="YYYY-MM-DD",
+                                    key="pickup_add_valid_from",
+                                )
+                                pickup_valid_to = st.date_input(
+                                    "Gültig bis / Valid to",
+                                    value=None,
+                                    format="YYYY-MM-DD",
+                                    key="pickup_add_valid_to",
+                                )
+                                pickup_active = st.checkbox(
+                                    "Aktiv / Active",
+                                    value=True,
+                                    key="pickup_add_active",
+                                )
+                            pickup_add_submitted = st.form_submit_button(
+                                "Abholberechtigte hinzufügen / Add pickup authorization"
+                            )
+                        if pickup_add_submitted:
+                            if not pickup_name.strip():
+                                st.error("Bitte Name angeben. / Please provide a name.")
+                            else:
+                                try:
+                                    stammdaten_manager.add_pickup_authorization(
+                                        pickup_child_id,
+                                        {
+                                            "name": pickup_name.strip(),
+                                            "relationship": pickup_relationship.strip(),
+                                            "phone": pickup_phone.strip(),
+                                            "valid_from": _optional_date_to_iso(
+                                                pickup_valid_from
+                                            ),
+                                            "valid_to": _optional_date_to_iso(
+                                                pickup_valid_to
+                                            ),
+                                            "active": _active_flag_to_string(
+                                                pickup_active
+                                            ),
+                                        },
+                                        created_by=user_email,
+                                    )
+                                    st.success(
+                                        "Abholberechtigung angelegt. / Pickup authorization created."
+                                    )
+                                    _trigger_rerun()
+                                except Exception as exc:
+                                    st.error(
+                                        "Abholberechtigung konnte nicht gespeichert werden / "
+                                        f"Could not save pickup authorization: {exc}"
+                                    )
 
                 if pickup_records:
                     selected_pickup_record = st.selectbox(

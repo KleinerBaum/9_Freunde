@@ -2112,7 +2112,9 @@ else:
             if child and child.get("id"):
                 try:
                     if app_config.storage_mode == "google":
-                        photo_folder_id = ensure_child_photo_folder(str(child["id"]))
+                        photo_folder_id = str(
+                            child.get("photo_folder_id") or child.get("folder_id") or ""
+                        ).strip()
                     else:
                         photo_folder_id = str(
                             child.get("photo_folder_id") or child.get("folder_id") or ""

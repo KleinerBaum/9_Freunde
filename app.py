@@ -752,7 +752,7 @@ else:
                 st.dataframe(
                     overview_df,
                     hide_index=True,
-                    use_container_width=True,
+                    width="stretch",
                 )
                 st.caption(
                     "Zeigt Name, Elternkontakt, Fotoanzahl, letzte Upload-Aktivität und "
@@ -810,7 +810,7 @@ else:
                 st.dataframe(
                     overview_df,
                     hide_index=True,
-                    use_container_width=True,
+                    width="stretch",
                 )
             elif not children_load_error:
                 st.write("*Noch keine Kinder registriert.*")
@@ -1500,7 +1500,7 @@ else:
                             )
                         else:
                             dataframe = pd.DataFrame(normalized_rows, columns=header)
-                            st.dataframe(dataframe, use_container_width=True)
+                            st.dataframe(dataframe, width="stretch")
 
         # ---- Admin: Infos verwalten ----
         elif admin_view == "Infos verwalten":
@@ -1535,7 +1535,7 @@ else:
                         for page in pages
                     ]
                 )
-                st.dataframe(overview_df, use_container_width=True)
+                st.dataframe(overview_df, width="stretch")
             else:
                 st.caption("Noch keine Seiten vorhanden. / No pages yet.")
 
@@ -1935,7 +1935,7 @@ else:
                         st.image(
                             image_file,
                             caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     except DriveServiceError as exc:
                         st.error(
@@ -2533,7 +2533,7 @@ else:
                         st.image(
                             img_bytes,
                             caption=f"{file_name} · Vorschau / Preview",
-                            use_container_width=True,
+                            width="stretch",
                         )
                         download_bytes = _get_photo_download_bytes(
                             file_id=file_id,

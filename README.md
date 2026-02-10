@@ -218,7 +218,7 @@ Der Tab `pickup_authorizations` wird bei Bedarf automatisch erstellt, wenn er im
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
 
-Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei leerem Bereich oder falschem Tabnamen zeigt die App eine klare Hinweismeldung (DE/EN).
+Zusätzlich gibt es im Admin-Menü die read-only Ansicht **"Stammdaten Sheet"**, die den Bereich `A1:Z500` aus dem konfigurierten Tab als Tabelle rendert. Bei falschem Tabnamen zeigt die App weiterhin eine klare Hinweismeldung (DE/EN); ein leerer Bereich bleibt bewusst ohne zusätzliche Info-Box.
 
 In derselben Admin-Ansicht steht außerdem ein **Export/Backup-Block (CSV + JSON)** bereit. Für die zentralen Tabs (`children`, `parents`) werden Download-Buttons angeboten. Leere Tabs werden als Hinweis angezeigt (kein Crash), und CSV-Exporte enthalten konsistente Header-/Spaltenreihenfolge basierend auf der Header-Zeile des jeweiligen Tabs.
 

@@ -753,11 +753,6 @@ else:
                     hide_index=True,
                     width="stretch",
                 )
-                st.caption(
-                    "Zeigt Name, Elternkontakt, Fotoanzahl, letzte Upload-Aktivität und "
-                    "Ordner-IDs zur Datenkontrolle. / Displays name, parent contact, "
-                    "photo count, latest upload activity, and folder IDs for data checks."
-                )
             elif not children_load_error:
                 st.write(
                     "*Noch keine Kinder registriert. / No children registered yet.*"
@@ -1385,16 +1380,6 @@ else:
                             st.success("Status aktualisiert. / Pickup status updated.")
                             _trigger_rerun()
 
-            if app_config.storage_mode == "google":
-                st.info(
-                    "Beim Anlegen eines Kindes wird automatisch ein zugehöriger Drive-Ordner erstellt und verknüpft."
-                )
-            else:
-                st.info(
-                    "Beim Anlegen eines Kindes wird lokal ein Prototyp-Ordner erstellt. / "
-                    "A local prototype folder is created automatically."
-                )
-
         # ---- Admin: Stammdaten Sheet ----
         elif admin_view == "Stammdaten Sheet":
             st.subheader(
@@ -1483,11 +1468,7 @@ else:
                     st.info(str(exc))
                 else:
                     header, normalized_rows = _normalize_sheet_table(rows)
-                    if not rows:
-                        st.info(
-                            "Der ausgewählte Bereich ist leer. / The selected range is empty."
-                        )
-                    elif not header:
+                    if rows and not header:
                         st.info(
                             "Header-Zeile fehlt oder ist leer. / Header row is missing or empty."
                         )
@@ -1760,10 +1741,6 @@ else:
         # ---- Admin: Fotos ----
         elif admin_view == "Fotos":
             st.subheader("Kinder-Fotos hochladen und verwalten / Upload child photos")
-            st.info(
-                "MVP ohne Gesichtserkennung: Upload erfolgt in den kindspezifischen Foto-Ordner. / "
-                "MVP without face recognition: uploads are stored in each child's photo folder."
-            )
             children = stammdaten_manager.get_children()
             if not children:
                 st.warning("Bitte legen Sie zuerst Kinder-Stammdaten an.")
@@ -2036,17 +2013,6 @@ else:
                 else:
                     st.caption(
                         "Keine Fotos für dieses Kind gefunden. / No photos found for this child."
-                    )
-
-                if app_config.storage_mode == "google":
-                    st.info(
-                        "Fotos werden im hinterlegten Google Drive Foto-Hauptordner in Unterordnern pro Kind gespeichert. Eltern sehen nur freigegebene Inhalte ihres Kindes. / "
-                        "Photos are stored in the configured Google Drive photos root folder with per-child subfolders. Parents only see shared content for their child."
-                    )
-                else:
-                    st.info(
-                        "Fotos werden lokal im Prototyp-Speicher abgelegt. / "
-                        "Photos are stored in local prototype storage."
                     )
 
         # ---- Admin: Kalender ----

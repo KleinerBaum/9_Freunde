@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Mapping-Schicht für Schema-v1 erweitert: neue zentrale Funktion `map_schema_v1_payload_to_tab_records()` mappt Payloads vollständig auf `children`, `parents`, `pickup_authorizations` und `consents` (inkl. `parent2__*`, `pa1..pa4__*`, `consent__privacy_notice_ack`, `consent__excursions`, `consent__emergency_treatment`, `consent__whatsapp_group`, `sign__*`, `meta__*`). `pa1..pa4` werden als geordnete Liste von Abholberechtigungen serialisiert; pro Präfix entsteht ein Datensatz bei befüllten Kernfeldern. Unit-Tests für Prioritäten und Defaults ergänzt.
 - Schema-v1/Pflichtspalten konsolidiert: `CONSENTS_REQUIRED_COLUMNS` und ein zentrales `REQUIRED_COLUMNS_BY_SHEET` wurden im Google-Sheets-Repository ergänzt; das lokale ODS-Repository verwendet nun exakt dieselbe Feldabdeckung und Reihenfolge. README-Mapping für `pa*`, `consent__*`, `sign__*` und `meta__*` präzisiert (inkl. explizitem **out of scope**-Status nicht-produktiv unterstützter Felder).
 - Stammdaten-Schema (children) erweitert: neue optionale Felder `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional` werden in Google Sheets und lokalem ODS automatisch als Header ergänzt.
 - Mapping für Elternkontakt vereinheitlicht: Wenn `parent1__email` im Kinderdatensatz gesetzt ist, wird `children.parent_email` automatisch darauf synchronisiert.

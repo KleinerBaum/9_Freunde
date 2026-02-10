@@ -536,6 +536,162 @@ def _sync_child_parent_email(payload: dict[str, Any]) -> None:
         payload["parent_email"] = primary_parent_email
 
 
+def _normalize_bool_text(value: Any, *, default: str = "false") -> str:
+    return "true" if _normalize_checkbox_flag(value) else default
+
+
+def _consent_status(value: Any) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return "false"
+    return "true" if _normalize_checkbox_flag(value) else normalized
+
+
+def _build_pickup_authorization_records(
+    payload: dict[str, Any],
+    *,
+    child_id: str,
+) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    for index in range(1, 5):
+        prefix = f"pa{index}__"
+        candidate = {
+            "name": str(payload.get(f"{prefix}name", "")).strip(),
+            "relationship": str(payload.get(f"{prefix}relationship", "")).strip(),
+            "phone": str(payload.get(f"{prefix}phone", "")).strip(),
+            "valid_from": str(payload.get(f"{prefix}valid_from", "")).strip(),
+            "valid_to": str(payload.get(f"{prefix}valid_to", "")).strip(),
+            "active": _normalize_bool_text(
+                payload.get(f"{prefix}active"), default="true"
+            ),
+            "created_at": str(payload.get(f"{prefix}created_at", "")).strip(),
+            "created_by": str(payload.get(f"{prefix}created_by", "")).strip(),
+        }
+        if not any(
+            candidate[field]
+            for field in (
+                "name",
+                "relationship",
+                "phone",
+                "valid_from",
+                "valid_to",
+                "created_at",
+                "created_by",
+            )
+        ):
+            continue
+
+        records.append({"child_id": child_id, **candidate})
+    return records
+
+
+def map_schema_v1_payload_to_tab_records(
+    payload: dict[str, Any],
+    *,
+    child_id: str | None = None,
+) -> dict[str, Any]:
+    """Mappt ein Schema-v1-Payload auf die Google-Sheets-Tab-Strukturen.
+
+    Die Funktion liefert normalisierte Datensätze für `children`, `parents`,
+    `pickup_authorizations` und `consents`.
+
+    `pa1..pa4` werden als Liste in `pickup_authorizations` serialisiert:
+    pro Präfix genau ein Datensatz in aufsteigender Reihenfolge, falls mindestens
+    eines der Kernfelder (`name`, `relationship`, `phone`, `valid_from`,
+    `valid_to`, `created_at`, `created_by`) belegt ist.
+    """
+
+    resolved_child_id = str(
+        payload.get("meta__record_id") or payload.get("child_id") or child_id or ""
+    ).strip()
+
+    parent1_email = str(payload.get("parent1__email", "")).strip()
+    children_record = {
+        "child_id": resolved_child_id,
+        "name": str(payload.get("child__name") or payload.get("name") or "").strip(),
+        "parent_email": parent1_email or str(payload.get("parent_email") or "").strip(),
+        "birthdate": str(
+            payload.get("child__birthdate") or payload.get("birthdate") or ""
+        ).strip(),
+        "start_date": str(
+            payload.get("child__start_date") or payload.get("start_date") or ""
+        ).strip(),
+        "group": str(payload.get("child__group") or payload.get("group") or "").strip(),
+        "allergies": str(
+            payload.get("child__allergies") or payload.get("allergies") or ""
+        ).strip(),
+        "notes_parent_visible": str(
+            payload.get("child__notes_parent_visible")
+            or payload.get("notes_parent_visible")
+            or ""
+        ).strip(),
+        "notes_internal": str(
+            payload.get("child__notes_internal") or payload.get("notes_internal") or ""
+        ).strip(),
+        "pickup_password": str(
+            payload.get("child__pickup_password")
+            or payload.get("pickup_password")
+            or ""
+        ).strip(),
+        "status": str(
+            payload.get("child__status") or payload.get("status") or "active"
+        ).strip()
+        or "active",
+        "download_consent": _derive_download_consent(payload),
+    }
+
+    parents_records: list[dict[str, str]] = []
+    for prefix in ("parent1", "parent2"):
+        email = str(payload.get(f"{prefix}__email") or "").strip()
+        record = {
+            "email": email,
+            "name": str(payload.get(f"{prefix}__name") or "").strip(),
+            "phone": str(payload.get(f"{prefix}__phone") or "").strip(),
+            "phone2": str(payload.get(f"{prefix}__phone2") or "").strip(),
+            "address": str(payload.get(f"{prefix}__address") or "").strip(),
+            "preferred_language": str(
+                payload.get(f"{prefix}__preferred_language") or ""
+            ).strip(),
+            "emergency_contact_name": str(
+                payload.get(f"{prefix}__emergency_contact_name") or ""
+            ).strip(),
+            "emergency_contact_phone": str(
+                payload.get(f"{prefix}__emergency_contact_phone") or ""
+            ).strip(),
+            "notifications_opt_in": _normalize_bool_text(
+                payload.get(f"{prefix}__notifications_opt_in"),
+                default="false",
+            ),
+        }
+        if any(record.values()):
+            parents_records.append(record)
+
+    consent_records: list[dict[str, str]] = []
+    for key, raw_value in payload.items():
+        if (
+            key.startswith("consent__")
+            or key.startswith("sign__")
+            or key.startswith("meta__")
+        ):
+            consent_records.append(
+                {
+                    "child_id": resolved_child_id,
+                    "consent_type": key,
+                    "status": _consent_status(raw_value),
+                }
+            )
+
+    return {
+        "children": children_record,
+        "parents": parents_records,
+        "pickup_authorizations": _build_pickup_authorization_records(
+            payload,
+            child_id=resolved_child_id,
+        ),
+        "consents": consent_records,
+    }
+
+
 def _get_row_index_by_id(tab: str, id_field: str, value: str) -> tuple[int, list[str]]:
     rows = _values_get(f"{tab}!A:ZZ")
     if not rows:

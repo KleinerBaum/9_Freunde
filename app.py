@@ -702,7 +702,6 @@ else:
                     "Übersicht",
                     "Stammdaten",
                     "Stammdaten Sheet",
-                    "Infos verwalten",
                     "Medikationen",
                 ),
                 horizontal=True,
@@ -1501,128 +1500,6 @@ else:
                         else:
                             dataframe = pd.DataFrame(normalized_rows, columns=header)
                             st.dataframe(dataframe, width="stretch")
-
-        # ---- Admin: Infos verwalten ----
-        elif admin_view == "Infos verwalten":
-            st.subheader("Infos verwalten / Manage info pages")
-            language = st.radio(
-                "Sprache / Language",
-                options=["de", "en"],
-                horizontal=True,
-                format_func=lambda value: "Deutsch" if value == "de" else "English",
-            )
-
-            try:
-                pages = content_repo.list_pages()
-            except ContentRepositoryError as exc:
-                st.error(
-                    "Inhalte konnten nicht geladen werden. / Could not load content pages."
-                )
-                st.info(str(exc))
-                pages = []
-
-            st.write("**Bestehende Seiten / Existing pages**")
-            if pages:
-                overview_df = pd.DataFrame(
-                    [
-                        {
-                            "slug": page.slug,
-                            "title": _page_title(page, language),
-                            "audience": page.audience,
-                            "published": page.published,
-                            "updated_at": page.updated_at,
-                        }
-                        for page in pages
-                    ]
-                )
-                st.dataframe(overview_df, width="stretch")
-            else:
-                st.caption("Noch keine Seiten vorhanden. / No pages yet.")
-
-            selected_slug = st.selectbox(
-                "Seite bearbeiten / Edit page",
-                options=[""] + [page.slug for page in pages],
-                format_func=lambda value: "Neue Seite anlegen / Create new page"
-                if value == ""
-                else value,
-            )
-            selected_page = (
-                content_repo.get_page(selected_slug) if selected_slug else None
-            )
-
-            with st.form("content_page_form"):
-                slug_value = st.text_input(
-                    "Slug (z. B. packing_list)",
-                    value=selected_page.slug if selected_page else "",
-                    help="Eindeutige Kennung der Seite / Unique page identifier",
-                )
-                title_de = st.text_input(
-                    "Titel (DE)",
-                    value=selected_page.title_de if selected_page else "",
-                )
-                title_en = st.text_input(
-                    "Title (EN)",
-                    value=selected_page.title_en if selected_page else "",
-                )
-                body_md_de = st.text_area(
-                    "Inhalt (Markdown, DE)",
-                    value=selected_page.body_md_de if selected_page else "",
-                    height=180,
-                )
-                body_md_en = st.text_area(
-                    "Content (Markdown, EN)",
-                    value=selected_page.body_md_en if selected_page else "",
-                    height=180,
-                )
-                audience = st.selectbox(
-                    "Zielgruppe / Audience",
-                    options=["both", "parent", "admin"],
-                    index=["both", "parent", "admin"].index(selected_page.audience)
-                    if selected_page
-                    else 0,
-                )
-                published = st.checkbox(
-                    "Veröffentlicht / Published",
-                    value=selected_page.published if selected_page else True,
-                )
-                save_page = st.form_submit_button("Speichern / Save")
-
-            if save_page:
-                try:
-                    content_repo.upsert_page(
-                        {
-                            "slug": slug_value,
-                            "title_de": title_de,
-                            "title_en": title_en,
-                            "body_md_de": body_md_de,
-                            "body_md_en": body_md_en,
-                            "audience": audience,
-                            "published": published,
-                        }
-                    )
-                    st.success("Seite gespeichert. / Page saved.")
-                    _trigger_rerun()
-                except ContentRepositoryError as exc:
-                    st.error("Speichern fehlgeschlagen. / Save failed.")
-                    st.info(str(exc))
-
-            if selected_page is not None:
-                if st.button("Seite löschen / Delete page"):
-                    try:
-                        content_repo.delete_page(selected_page.slug)
-                        st.success("Seite gelöscht. / Page deleted.")
-                        _trigger_rerun()
-                    except ContentRepositoryError as exc:
-                        st.error("Löschen fehlgeschlagen. / Delete failed.")
-                        st.info(str(exc))
-
-                st.write("**Vorschau / Preview**")
-                st.markdown(f"### {_page_title(selected_page, language)}")
-                body_preview = _page_body(selected_page, language)
-                if body_preview:
-                    st.markdown(body_preview)
-                else:
-                    st.caption("Kein Inhalt vorhanden. / No content available.")
 
         # ---- Admin: Dokumente ----
         elif admin_view == "Dokumente":

@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Admin-Unterbereich **„Infos verwalten“** aus der App entfernt: Unter **„Stammdaten & Infos“** sind jetzt nur noch **„Übersicht“**, **„Stammdaten“**, **„Stammdaten Sheet“** und **„Medikationen“** verfügbar.
 - Admin-Bereich **Dokumente** erweitert: Für neu erstellte Berichte/Verträge/Abrechnungen sowie bereits gespeicherte DOCX-Dateien wird nun vor dem Download eine aufklappbare Textvorschau angezeigt (DE/EN-UI).
 - Drive-Fehlerbehandlung im Admin-Flow verbessert: `StammdatenManager.add_child()` zeigt beim fehlgeschlagenen Ordner-Anlegen jetzt sichtbare DE/EN-UI-Fehler inkl. Detailhinweis; Foto-Upload/Foto-Ordner-Load unterscheiden `DriveServiceError` gezielt (inkl. 403/404-Hinweis) und geben zusätzlich Troubleshooting-Tipps mit `child_id` aus.
 - Google-Fotoordner-Konfiguration vereinheitlicht: `StammdatenManager.add_child()` nutzt jetzt explizit `gcp.drive_photos_root_folder_id` (statt Alias), und der Admin-Hinweis in **Fotos** beschreibt neutral den konfigurierten Drive-Hauptordner mit Unterordnern pro Kind (DE/EN), ohne irreführenden Pseudo-Pfad `photos/<child_id>/`.
@@ -27,7 +28,7 @@
 - Admin-Bereich **Dokumente** um zwei neue Stammdaten-basierte Vorlagen erweitert: **Betreuungsvertrag / Childcare contract** und **Lebensmittelpauschale-Abrechnung / Food allowance invoice** mit Download-Option.
 
 ### Changed
-- Admin-Navigation logisch gebündelt: Sidebar-Menüpunkte **„Stammdaten“, „Stammdaten Sheet“, „Infos verwalten“, „Medikationen“** wurden unter **„Stammdaten & Infos“** zusammengeführt; **„Dokumente“** und **„Verträge“** wurden unter **„Dokumente & Verträge“** zusammengeführt. Die Unterbereiche sind als horizontaler Umschalter (`Bereich / Section`) verfügbar.
+- Admin-Navigation logisch gebündelt: Sidebar-Menüpunkte **„Stammdaten“, „Stammdaten Sheet“, „Medikationen“** (inkl. damals vorhandenem Info-Unterbereich) wurden unter **„Stammdaten & Infos“** zusammengeführt; **„Dokumente“** und **„Verträge“** wurden unter **„Dokumente & Verträge“** zusammengeführt. Die Unterbereiche sind als horizontaler Umschalter (`Bereich / Section`) verfügbar.
 
 - `DocumentAgent` erzeugt neue DOCX-Vorlagen mit eingebettetem Logo (`images/logo.png`), aktuellem Erstellungsdatum und vorausgefüllten Kinddaten; die Abrechnung unterstützt einen frei wählbaren Zeitraum inklusive validierter Datumsgrenzen.
 - Admin-Bereich **Fotos → Foto-Status verwalten / Manage photo status** zeigt pro Datei jetzt eine eingebettete DE/EN-Bildvorschau in einer aufklappbaren Detailansicht; fehlerhafte Downloads werden pro Foto abgefangen, damit die Statuspflege der übrigen Einträge weiter funktioniert.
@@ -75,7 +76,7 @@
 
 ### Added
 - Neuer Infos-Bereich für Eltern (`Infos`) mit read-only Darstellung veröffentlichter Seiten aus `content_pages` (Filter: `published=true` und `audience in {parent,both}`) inkl. DE/EN-Sprachumschaltung.
-- Neuer Admin-Bereich `Infos verwalten` mit einfachem CRUD-Flow (Liste → Edit/Create → Preview) für Markdown-Inhalte (`title_*`, `body_md_*`, `audience`, `published`).
+- Neuer Admin-Bereich für Info-Seiten mit einfachem CRUD-Flow (Liste → Edit/Create → Preview) für Markdown-Inhalte (`title_*`, `body_md_*`, `audience`, `published`).
 - Neues Repository `services/content_repo.py` für `content_pages` inkl. Google-Sheets-Header-Auto-Setup und lokalem JSON-Fallback (`data/content_pages.json`).
 
 ### Changed

@@ -14,20 +14,39 @@ from services.google_clients import get_drive_client
 class DriveServiceError(RuntimeError):
     """Domänenspezifischer Fehler für Drive-Zugriffe."""
 
-    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        cause: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.cause = cause
 
 
 def translate_http_error(exc: HttpError) -> DriveServiceError:
-    status = getattr(exc.resp, "status", None)
-    if status in (403, 404):
+    status = int(getattr(exc.resp, "status", 0) or 0)
+    if status == 403:
         return DriveServiceError(
-            "Kein Zugriff auf den Drive-Ordner oder Datei nicht gefunden. "
-            "Bitte den Zielordner mit dem Service-Account teilen.",
+            "Kein Zugriff auf den Drive-Ordner. Bitte den Zielordner mit dem "
+            "Service-Account teilen.",
             status_code=status,
+            cause="forbidden",
         )
-    return DriveServiceError(f"Drive API Fehler: {exc}", status_code=status)
+    if status == 404:
+        return DriveServiceError(
+            "Drive-Ordner oder Datei nicht gefunden. Bitte die konfigurierte ID "
+            "prüfen.",
+            status_code=status,
+            cause="not_found",
+        )
+    return DriveServiceError(
+        f"Drive API Fehler: {exc}",
+        status_code=status if status else None,
+        cause="api_error",
+    )
 
 
 def create_folder(name: str, parent_id: str | None = None) -> str:

@@ -248,7 +248,7 @@ Der Tab `pickup_authorizations` wird bei Bedarf automatisch erstellt, wenn er im
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
 
-Im Admin-Bereich **"Stammdaten"** enthält die Kinder-Übersicht links eine Spalte **"Auswahl / Select"** mit Checkboxen. Für alle ausgewählten Kinder erscheinen darunter parallel editierbare Stammdaten-Formulare (nebeneinander) inklusive Elternfeldern.
+Im Admin-Bereich **"Stammdaten"** steht zuerst die Tabelle **"Kind bearbeiten / Edit child"** mit der Spalte **"Auswahl / Select"** (Checkboxen). Für alle ausgewählten Kinder erscheinen direkt darunter parallel editierbare Stammdaten-Formulare (nebeneinander) inklusive Elternfeldern. Die reine **Kinder-Übersicht / Children overview** folgt unterhalb dieses Bearbeitungsblocks.
 
 Unterhalb dieses Bereichs steht zusätzlich ein **Export/Backup-Block (CSV + JSON)** bereit. Für die zentralen Tabs (`children`, `parents`) werden Download-Buttons angeboten. Leere Tabs werden als Hinweis angezeigt (kein Crash), und CSV-Exporte enthalten konsistente Header-/Spaltenreihenfolge basierend auf der Header-Zeile des jeweiligen Tabs.
 

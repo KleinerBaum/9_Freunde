@@ -362,6 +362,81 @@ def _build_admin_overview_rows(
     return overview_rows
 
 
+def _render_child_selection_editor(
+    children: list[dict[str, str]],
+    stammdaten_manager: StammdatenManager,
+) -> None:
+    st.write("**Kind bearbeiten / Edit child:**")
+    selected_ids = set(st.session_state.get("stammdaten_selected_child_ids", []))
+    selection_rows: list[dict[str, str | bool]] = []
+    for child_record in children:
+        child_id = str(child_record.get("id", "")).strip()
+        selection_rows.append(
+            {
+                "Auswahl / Select": child_id in selected_ids,
+                "Name / Name": _display_or_dash(child_record.get("name")),
+                "Parent Email": _display_or_dash(child_record.get("parent_email")),
+                "Group": _display_or_dash(child_record.get("group")),
+                "Birthdate": _display_or_dash(child_record.get("birthdate")),
+                "Folder Status": _folder_status_label(child_record),
+            }
+        )
+
+    selection_df = st.data_editor(
+        pd.DataFrame(selection_rows),
+        hide_index=True,
+        width="stretch",
+        key="stammdaten_child_selection_table",
+        column_config={
+            "Auswahl / Select": st.column_config.CheckboxColumn("Auswahl / Select")
+        },
+        disabled=[
+            "Name / Name",
+            "Parent Email",
+            "Group",
+            "Birthdate",
+            "Folder Status",
+        ],
+    )
+    selected_children: list[dict[str, str]] = []
+    selected_child_ids: list[str] = []
+    selection_values = selection_df["Auswahl / Select"].tolist()
+    for index, selected in enumerate(selection_values):
+        if not bool(selected):
+            continue
+        selected_children.append(children[index])
+        selected_child_ids.append(str(children[index].get("id", "")).strip())
+    st.session_state["stammdaten_selected_child_ids"] = selected_child_ids
+
+    if not selected_children:
+        st.caption(
+            "Bitte mindestens ein Kind in der Tabelle auswählen. / "
+            "Please select at least one child in the table."
+        )
+    else:
+        st.markdown("**Ausgewählte Stammdaten bearbeiten / Edit selected master data**")
+        child_columns = st.columns(len(selected_children))
+        for index, child_record in enumerate(selected_children):
+            with child_columns[index]:
+                child_name = _display_or_dash(child_record.get("name"))
+                st.markdown(f"### {child_name}")
+                parent_record = (
+                    stammdaten_manager.get_parent_by_email(
+                        str(child_record.get("parent_email", "")).strip()
+                    )
+                    or {}
+                )
+                key_prefix = f"child_{str(child_record.get('id', '')).strip() or index}"
+                _render_child_edit_form(
+                    child_record,
+                    parent_record,
+                    key_prefix,
+                    stammdaten_manager,
+                )
+
+    _render_export_backup_section()
+
+
 def _extract_registration_import_data(
     pdf_bytes: bytes,
 ) -> tuple[RegistrationPayload, dict[str, Any]]:
@@ -1423,6 +1498,9 @@ else:
                     "Please try again later."
                 )
 
+            if children:
+                _render_child_selection_editor(children, stammdaten_manager)
+
             if not children_load_error and children:
                 st.markdown("**👥 Kinder-Übersicht / Children overview**")
                 overview_rows: list[dict[str, str]] = []
@@ -1448,89 +1526,6 @@ else:
                 )
             elif not children_load_error:
                 st.write("*Noch keine Kinder registriert.*")
-
-            if children:
-                st.write("**Kind bearbeiten / Edit child:**")
-                selected_ids = set(
-                    st.session_state.get("stammdaten_selected_child_ids", [])
-                )
-                selection_rows: list[dict[str, str | bool]] = []
-                for child_record in children:
-                    child_id = str(child_record.get("id", "")).strip()
-                    selection_rows.append(
-                        {
-                            "Auswahl / Select": child_id in selected_ids,
-                            "Name / Name": _display_or_dash(child_record.get("name")),
-                            "Parent Email": _display_or_dash(
-                                child_record.get("parent_email")
-                            ),
-                            "Group": _display_or_dash(child_record.get("group")),
-                            "Birthdate": _display_or_dash(
-                                child_record.get("birthdate")
-                            ),
-                            "Folder Status": _folder_status_label(child_record),
-                        }
-                    )
-
-                selection_df = st.data_editor(
-                    pd.DataFrame(selection_rows),
-                    hide_index=True,
-                    width="stretch",
-                    key="stammdaten_child_selection_table",
-                    column_config={
-                        "Auswahl / Select": st.column_config.CheckboxColumn(
-                            "Auswahl / Select"
-                        )
-                    },
-                    disabled=[
-                        "Name / Name",
-                        "Parent Email",
-                        "Group",
-                        "Birthdate",
-                        "Folder Status",
-                    ],
-                )
-                selected_children: list[dict[str, str]] = []
-                selected_child_ids: list[str] = []
-                selection_values = selection_df["Auswahl / Select"].tolist()
-                for index, selected in enumerate(selection_values):
-                    if not bool(selected):
-                        continue
-                    selected_children.append(children[index])
-                    selected_child_ids.append(
-                        str(children[index].get("id", "")).strip()
-                    )
-                st.session_state["stammdaten_selected_child_ids"] = selected_child_ids
-
-                if not selected_children:
-                    st.caption(
-                        "Bitte mindestens ein Kind in der Tabelle auswählen. / "
-                        "Please select at least one child in the table."
-                    )
-                else:
-                    st.markdown(
-                        "**Ausgewählte Stammdaten bearbeiten / Edit selected master data**"
-                    )
-                    child_columns = st.columns(len(selected_children))
-                    for index, child_record in enumerate(selected_children):
-                        with child_columns[index]:
-                            child_name = _display_or_dash(child_record.get("name"))
-                            st.markdown(f"### {child_name}")
-                            parent_record = (
-                                stammdaten_manager.get_parent_by_email(
-                                    str(child_record.get("parent_email", "")).strip()
-                                )
-                                or {}
-                            )
-                            key_prefix = f"child_{str(child_record.get('id', '')).strip() or index}"
-                            _render_child_edit_form(
-                                child_record,
-                                parent_record,
-                                key_prefix,
-                                stammdaten_manager,
-                            )
-
-                _render_export_backup_section()
 
             if children:
                 with st.expander(

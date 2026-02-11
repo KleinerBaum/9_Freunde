@@ -1060,6 +1060,23 @@ else:
                         "*Noch keine Kinder registriert. / No children registered yet.*"
                     )
 
+                st.markdown("**Bevorstehende Termine / Upcoming events**")
+                try:
+                    upcoming_events = list_events(max_results=10)
+                except CalendarServiceError as exc:
+                    upcoming_events = []
+                    st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+
+                if upcoming_events:
+                    for event in upcoming_events:
+                        st.write(f"- {event['start']} · **{event['summary']}**")
+                        if event["description"]:
+                            st.caption(event["description"])
+                else:
+                    st.write(
+                        "Keine anstehenden Termine vorhanden. / No upcoming events."
+                    )
+
                 st.info(
                     "Das Dashboard zeigt Kennzahlen und die aktuelle Kinder-Übersicht auf "
                     "einen Blick. / The dashboard shows key metrics and the current children "
@@ -2135,20 +2152,6 @@ else:
                         st.success("Termin wurde hinzugefügt. / Event created.")
                     except CalendarServiceError as exc:
                         st.error(f"Fehler beim Speichern / Failed to save event: {exc}")
-
-            st.write("**Bevorstehende Termine / Upcoming events**")
-            try:
-                events = list_events(max_results=10)
-            except CalendarServiceError as exc:
-                events = []
-                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
-            if events:
-                for ev in events:
-                    st.write(f"- {ev['start']} · **{ev['summary']}**")
-                    if ev["description"]:
-                        st.caption(ev["description"])
-            else:
-                st.write("Keine anstehenden Termine vorhanden. / No upcoming events.")
 
         elif admin_view == "System / Healthchecks":
             st.subheader("System / Healthchecks")

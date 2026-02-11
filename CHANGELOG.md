@@ -17,6 +17,7 @@
 - Sidebar um einen kompakten Sprachumschalter **„Sprache / Language“** oberhalb von **„Angemeldet als / Logged in as“** erweitert; bei DE/EN-Auswahl werden kombinierte UI-Labels im Format `DE / EN` sprachspezifisch ohne verbleibendes `/` gerendert.
 - Sprachumschaltung erweitert: Die gewählte Sprache wird jetzt auch auf die Toggle-Einträge selbst sowie app-weit auf weitere UI-Texte (z. B. Header, Subheader, Hinweise, Navigations- und Formularlabels im Format `DE / EN`) angewendet.
 - Admin-Ansicht umgestellt: **"Admin-Übersicht / Admin overview"** wurde in den Bereich **"Dashboard / Dashboard"** integriert. Der bisherige Hinweistext wurde durch eine neue Dashboard-Beschreibung ersetzt.
+- Bereich **"Bevorstehende Termine / Upcoming events"** aus **"Kalender / Calendar"** in das **Admin-Dashboard** verschoben, damit die Terminübersicht direkt in der **Admin-Übersicht / Admin overview** sichtbar ist.
 - Styling auf Theme-first umgestellt: neue Streamlit-Theme-Konfiguration in `.streamlit/config.toml` (u. a. `primaryColor`, `secondaryBackgroundColor`, `baseRadius`, `buttonRadius`, `showSidebarBorder`) statt umfangreicher Inline-CSS-Overrides.
 - UI-Abschnitte als Cards vereinheitlicht: Admin-**Dashboard**, Admin-**Übersicht** und Eltern-**Mein Kind** werden jetzt in `st.container(border=True)` gerendert.
 - Globales Hintergrund-Styling reduziert auf ein minimales CSS-Overlay für `images/Hintergrund.png`, damit Theme-Farben und Radius-Einstellungen konsistent greifen.

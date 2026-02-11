@@ -1817,6 +1817,18 @@ else:
                 doc_notes = st.text_area(
                     "Stichpunkte oder Notizen für das Dokument / Notes for the report"
                 )
+                document_language = st.selectbox(
+                    "Dokumentsprache / Document language",
+                    options=("de", "en"),
+                    index=0,
+                    format_func=_language_label,
+                    key="admin_document_language",
+                )
+                mark_document_as_draft = st.checkbox(
+                    "Als Entwurf markieren / Mark as draft",
+                    value=False,
+                    key="admin_document_draft",
+                )
                 save_to_drive = st.checkbox(
                     "Dokument im Drive-Ordner des Kindes speichern? / "
                     "Save document in child's Drive folder?"
@@ -1825,7 +1837,10 @@ else:
                     with st.spinner("Generiere Dokument mit OpenAI..."):
                         try:
                             doc_bytes, file_name = doc_agent.generate_document(
-                                sel_child, doc_notes
+                                sel_child,
+                                doc_notes,
+                                language=document_language,
+                                is_draft=mark_document_as_draft,
                             )
                             st.success("Dokument erstellt: " + file_name)
                             with st.expander(
@@ -1873,12 +1888,28 @@ else:
 
                 with contract_col:
                     st.write("Betreuungsvertrag / Childcare contract")
+                    contract_language = st.selectbox(
+                        "Vertragssprache / Contract language",
+                        options=("de", "en"),
+                        index=0,
+                        format_func=_language_label,
+                        key="admin_contract_language",
+                    )
+                    mark_contract_as_draft = st.checkbox(
+                        "Vertrag als Entwurf markieren / Mark contract as draft",
+                        value=False,
+                        key="admin_contract_draft",
+                    )
                     if st.button(
                         "Betreuungsvertrag generieren / Generate childcare contract"
                     ):
                         try:
                             contract_bytes, contract_filename = (
-                                doc_agent.generate_care_contract(sel_child)
+                                doc_agent.generate_care_contract(
+                                    sel_child,
+                                    language=contract_language,
+                                    is_draft=mark_contract_as_draft,
+                                )
                             )
                             st.success(
                                 "Betreuungsvertrag erstellt. / Childcare contract generated."

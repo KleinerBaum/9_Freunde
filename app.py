@@ -988,31 +988,17 @@ else:
     # Sidebar menu based on role
     st.sidebar.title("9 Freunde App")
     st.sidebar.write(f"Angemeldet als: `{user_email}`")
-    if (
-        user_role == "admin"
-        and app_config.storage_mode == "google"
-        and st.sidebar.button("Google-Verbindung prüfen / Check Google connection")
-    ):
-        with st.sidebar:
-            with st.spinner(
-                "Prüfe Drive, Kalender & Sheets... / "
-                "Checking drive, calendar & sheets..."
-            ):
-                check_results = _run_google_connection_check()
-            for check_title, ok, message in check_results:
-                if ok:
-                    st.success(f"{check_title}: {message}")
-                else:
-                    st.error(f"{check_title}: {message}")
-
+    healthcheck_requested = False
     if user_role == "admin":
         menu = st.sidebar.radio(
-            "Navigationsmenü",
+            "Hauptnavigation / Main navigation",
             (
-                "Stammdaten & Infos",
-                "Dokumente & Verträge",
-                "Fotos",
-                "Kalender",
+                "Dashboard / Dashboard",
+                "Stammdaten & Infos / Master data & info",
+                "Fotos & Medien / Photos & media",
+                "Dokumente & Verträge / Documents & contracts",
+                "Kalender / Calendar",
+                "System / Healthchecks",
             ),
             index=0,
         )
@@ -1021,6 +1007,11 @@ else:
             "Menü",
             ("Mein Kind", "Infos", "Dokumente", "Fotos", "Termine", "Medikationen"),
             index=0,
+        )
+
+    if user_role == "admin" and menu == "System / Healthchecks":
+        healthcheck_requested = st.sidebar.button(
+            "Google-Verbindung prüfen / Check Google connection"
         )
 
     # Logout button at bottom of sidebar
@@ -1033,7 +1024,9 @@ else:
     st.header(menu)
     if user_role == "admin":
         admin_view = menu
-        if menu == "Stammdaten & Infos":
+        if menu == "Dashboard / Dashboard":
+            admin_view = "Dashboard"
+        elif menu == "Stammdaten & Infos / Master data & info":
             admin_view = st.radio(
                 "Bereich / Section",
                 (
@@ -1043,12 +1036,50 @@ else:
                 horizontal=True,
                 key="admin_master_data_section",
             )
-        elif menu == "Dokumente & Verträge":
+        elif menu == "Dokumente & Verträge / Documents & contracts":
             admin_view = st.radio(
                 "Bereich / Section",
                 ("Dokumente", "Verträge"),
                 horizontal=True,
                 key="admin_documents_section",
+            )
+        elif menu == "Fotos & Medien / Photos & media":
+            admin_view = "Fotos"
+        elif menu == "Kalender / Calendar":
+            admin_view = "Kalender"
+        elif menu == "System / Healthchecks":
+            admin_view = "System / Healthchecks"
+
+        # ---- Admin: Dashboard ----
+        if admin_view == "Dashboard":
+            st.subheader("Dashboard / Dashboard")
+            try:
+                dashboard_children = stammdaten_manager.get_children()
+                active_children_count = len(
+                    [
+                        child
+                        for child in dashboard_children
+                        if str(child.get("status", "active")).strip().lower()
+                        == "active"
+                    ]
+                )
+            except Exception:
+                dashboard_children = []
+                active_children_count = 0
+
+            col_total, col_active, col_inactive = st.columns(3)
+            with col_total:
+                st.metric("Kinder gesamt / Total children", len(dashboard_children))
+            with col_active:
+                st.metric("Aktiv / Active", active_children_count)
+            with col_inactive:
+                st.metric(
+                    "Archiviert / Archived", len(dashboard_children) - active_children_count
+                )
+
+            st.info(
+                "Wählen Sie links einen Hauptbereich, um Details zu bearbeiten. / "
+                "Use the main navigation on the left to open detailed sections."
             )
 
         # ---- Admin: Übersicht ----
@@ -2390,6 +2421,29 @@ else:
                         st.caption(ev["description"])
             else:
                 st.write("Keine anstehenden Termine vorhanden. / No upcoming events.")
+
+        elif admin_view == "System / Healthchecks":
+            st.subheader("System / Healthchecks")
+            st.caption(
+                "Prüfen Sie die Integrationen zu Google Drive, Kalender und Sheets. / "
+                "Check integrations for Google Drive, Calendar and Sheets."
+            )
+            if healthcheck_requested:
+                with st.spinner(
+                    "Prüfe Drive, Kalender & Sheets... / "
+                    "Checking drive, calendar & sheets..."
+                ):
+                    check_results = _run_google_connection_check()
+                for check_title, ok, message in check_results:
+                    if ok:
+                        st.success(f"{check_title}: {message}")
+                    else:
+                        st.error(f"{check_title}: {message}")
+            else:
+                st.info(
+                    "Nutzen Sie den Button in der Sidebar, um den Check zu starten. / "
+                    "Use the sidebar button to run the check."
+                )
 
     else:
         # ---- Parent/Eltern View ----

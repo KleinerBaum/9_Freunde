@@ -24,7 +24,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 - **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
-- **Admin-Navigation gebündelt:** Die Bereiche **„Stammdaten & Infos“** (inkl. Übersicht und Stammdaten) sowie **„Dokumente & Verträge“** reduzieren die Sidebar-Einträge und strukturieren zusammengehörige Aufgaben logisch; **„Medikationen“** ist direkt im Bereich **„Stammdaten“** als eingeklappter Abschnitt integriert.
+- **Admin-Navigation modernisiert:** Die Sidebar führt jetzt nur noch Hauptbereiche (**Dashboard**, **Stammdaten & Infos**, **Fotos & Medien**, **Dokumente & Verträge**, **Kalender**, **System / Healthchecks**). Der Google-Verbindungscheck ist im Bereich **„System / Healthchecks“** gebündelt; **„Medikationen“** bleibt als eingeklappter Abschnitt in **„Stammdaten“** integriert.
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung).
 

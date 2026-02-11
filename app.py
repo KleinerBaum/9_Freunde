@@ -146,6 +146,50 @@ def _normalize_active_flag(value: str | bool | None) -> bool:
 
 PHOTO_STATUS_OPTIONS = ("draft", "published", "archived")
 DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
+CONTRACT_LANGUAGE_OPTIONS = (
+    "de",
+    "en",
+    "tr",
+    "ar",
+    "ru",
+    "uk",
+    "pl",
+    "ro",
+    "bg",
+    "el",
+    "it",
+    "es",
+    "fr",
+    "nl",
+    "fa",
+    "ku",
+    "sq",
+    "sr",
+    "hr",
+    "bs",
+)
+LANGUAGE_LABELS = {
+    "de": "Deutsch / German",
+    "en": "Englisch / English",
+    "tr": "Türkisch / Turkish",
+    "ar": "Arabisch / Arabic",
+    "ru": "Russisch / Russian",
+    "uk": "Ukrainisch / Ukrainian",
+    "pl": "Polnisch / Polish",
+    "ro": "Rumänisch / Romanian",
+    "bg": "Bulgarisch / Bulgarian",
+    "el": "Griechisch / Greek",
+    "it": "Italienisch / Italian",
+    "es": "Spanisch / Spanish",
+    "fr": "Französisch / French",
+    "nl": "Niederländisch / Dutch",
+    "fa": "Persisch / Persian",
+    "ku": "Kurdisch / Kurdish",
+    "sq": "Albanisch / Albanian",
+    "sr": "Serbisch / Serbian",
+    "hr": "Kroatisch / Croatian",
+    "bs": "Bosnisch / Bosnian",
+}
 GOOGLE_CALENDAR_EMBED_HTML = (
     '<iframe src="https://calendar.google.com/calendar/embed?height=300&wkst=2&ctz='
     "Europe%2FAmsterdam&showPrint=0&showTz=0&showTitle=0&src="
@@ -173,10 +217,9 @@ def _parse_opt_in_flag(value: str | bool | None) -> bool:
 
 def _language_label(value: str) -> str:
     normalized = value.strip().lower()
-    if normalized == "de":
-        return _ui_text("Deutsch / German")
-    if normalized == "en":
-        return _ui_text("Englisch / English")
+    label = LANGUAGE_LABELS.get(normalized)
+    if label:
+        return _ui_text(label)
     return "-"
 
 
@@ -1907,7 +1950,7 @@ else:
                     st.write("Betreuungsvertrag / Childcare contract")
                     contract_language = st.selectbox(
                         "Vertragssprache / Contract language",
-                        options=("de", "en"),
+                        options=CONTRACT_LANGUAGE_OPTIONS,
                         index=0,
                         format_func=_language_label,
                         key="admin_contract_language",

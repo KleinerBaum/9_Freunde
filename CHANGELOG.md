@@ -22,6 +22,7 @@
 - Sidebar um einen kompakten Sprachumschalter **„Sprache / Language“** oberhalb von **„Angemeldet als / Logged in as“** erweitert; bei DE/EN-Auswahl werden kombinierte UI-Labels im Format `DE / EN` sprachspezifisch ohne verbleibendes `/` gerendert.
 - Sprachumschaltung erweitert: Die gewählte Sprache wird jetzt auch auf die Toggle-Einträge selbst sowie app-weit auf weitere UI-Texte (z. B. Header, Subheader, Hinweise, Navigations- und Formularlabels im Format `DE / EN`) angewendet.
 - Admin-Ansicht umgestellt: **"Admin-Übersicht / Admin overview"** wurde in den Bereich **"Dashboard / Dashboard"** integriert. Der bisherige Hinweistext wurde durch eine neue Dashboard-Beschreibung ersetzt.
+- Admin-Dashboard-Layout angepasst: Die Expander **„Neues Kind anlegen / Add child“** und **„Anmeldung importieren (PDF) / Import registration (PDF)“** wurden aus **„Stammdaten“** in die **Admin-Übersicht / Admin overview** verschoben und dort oberhalb der **Kinder-Übersicht / Children overview** positioniert.
 - Bereich **"Bevorstehende Termine / Upcoming events"** aus **"Kalender / Calendar"** in das **Admin-Dashboard** verschoben, damit die Terminübersicht direkt in der **Admin-Übersicht / Admin overview** sichtbar ist.
 - Admin-Dashboard zeigt jetzt unterhalb der Terminliste eine eingebettete **Kalenderansicht / Calendar view**; die bisherige Dashboard-Info-Textbox wurde entfernt.
 - Admin-Bereich **"Kalender / Calendar"** fokussiert nun auf **"Neuer Termin / New event"** ohne zusätzliche eingebettete Kalenderansicht.

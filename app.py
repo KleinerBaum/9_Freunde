@@ -8,6 +8,7 @@ import base64
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from datetime import date
 
@@ -190,14 +191,69 @@ LANGUAGE_LABELS = {
     "hr": "Kroatisch / Croatian",
     "bs": "Bosnisch / Bosnian",
 }
-GOOGLE_CALENDAR_EMBED_HTML = (
-    '<iframe src="https://calendar.google.com/calendar/embed?height=300&wkst=2&ctz='
-    "Europe%2FAmsterdam&showPrint=0&showTz=0&showTitle=0&src="
-    "NWRmYjdhNTI0YmEzYzYwZWJlODNmOGUyOGNkNDgzYjcxYTEyOTE0MzMxNWI3MGJkMTA2ZTJkZjUy"
-    'ZTU2ZmFkZkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&color=%237986cb" '
-    'style="border-width:0" width="800" height="300" frameborder="0" scrolling="no">'
-    "</iframe>"
-)
+
+
+def _get_configured_calendar_id() -> str:
+    app_config = get_app_config()
+    if app_config.google is None:
+        return ""
+    return str(app_config.google.calendar_id or "").strip()
+
+
+def _build_google_calendar_embed_url(calendar_id: str) -> str:
+    query = urlencode(
+        {
+            "height": "300",
+            "wkst": "2",
+            "ctz": "Europe/Berlin",
+            "showPrint": "0",
+            "showTz": "0",
+            "showTitle": "0",
+            "src": calendar_id,
+            "color": "#7986cb",
+        }
+    )
+    return f"https://calendar.google.com/calendar/embed?{query}"
+
+
+def _build_google_calendar_embed_html(calendar_id: str) -> str:
+    embed_url = _build_google_calendar_embed_url(calendar_id)
+    return (
+        f'<iframe src="{embed_url}" style="border-width:0" width="800" height="300" '
+        'frameborder="0" scrolling="no"></iframe>'
+    )
+
+
+def _render_calendar_embed(section_key: str) -> None:
+    app_config = get_app_config()
+    if app_config.storage_mode == "google":
+        calendar_id = _get_configured_calendar_id()
+        if not calendar_id:
+            st.error(
+                "`gcp.calendar_id` fehlt. Hinterlegen Sie die Kalender-ID unter "
+                "`Settings → Secrets → [gcp].calendar_id`. / Missing "
+                "`gcp.calendar_id`. Add the calendar ID at "
+                "`Settings → Secrets → [gcp].calendar_id`."
+            )
+            return
+
+        embed_url = _build_google_calendar_embed_url(calendar_id)
+        st.markdown(
+            f"[Kalender im Browser öffnen / Open calendar in browser]({embed_url})"
+        )
+        show_embed = st.checkbox(
+            "Kalender einbetten / Show embedded calendar",
+            value=False,
+            key=f"show_embed_calendar_{section_key}",
+        )
+        if show_embed:
+            components.html(_build_google_calendar_embed_html(calendar_id), height=320)
+        return
+
+    st.info(
+        "Kalender-Einbettung ist nur im Google-Modus verfügbar. / Calendar embed is "
+        "only available in Google mode."
+    )
 
 
 def _normalize_photo_status(value: str | None) -> str:
@@ -1471,7 +1527,7 @@ else:
                     )
 
                 st.markdown("**Kalender / Calendar**")
-                components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
+                _render_calendar_embed("admin_dashboard")
 
         # ---- Admin: Stammdaten ----
         if admin_view == "Stammdaten":
@@ -2526,7 +2582,7 @@ else:
 
         elif menu == "appointments":
             st.subheader("Termine / Events")
-            components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
+            _render_calendar_embed("parent_appointments")
             try:
                 events = list_events(max_results=10)
             except CalendarServiceError as exc:

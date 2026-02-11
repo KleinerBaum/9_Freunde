@@ -56,6 +56,9 @@
 - Admin-Fotoverwaltung erweitert: Im Bereich **„Fotos → Foto-Status verwalten / Manage photo status“** gibt es jetzt zusätzlich einen Link auf den zentralen Google-Drive-Foto-Hauptordner (`🗂️ Gesamtordner auf Google Drive öffnen / Open all-children folder on Google Drive`) sowie eine DE/EN-Vorschau-Liste mit Bildern aus allen Kinder-Ordnern.
 
 - Kalenderbereich (Admin **Kalender** und Eltern **Termine / Events**) zeigt jetzt zusätzlich eine eingebettete Google-Kalender-Ansicht per IFrame (DE/EN UI bleibt erhalten).
+- Kalender-Embed in `app.py` auf konfigurationsbasierte URL-Erzeugung umgestellt: `gcp.calendar_id` wird URL-encodet in die Google-Embed-URL eingebettet (statt statischer `src`-ID).
+- Kalender-UI priorisiert die API-Terminliste (`list_events`) und zeigt den IFrame nur noch optional über **„Kalender einbetten / Show embedded calendar“** sowie einen direkten Browser-Link.
+- Fehlende `gcp.calendar_id` wird in Kalender-Ansichten mit klarer DE/EN-Fehlermeldung ausgewiesen (analog zu bestehenden Konfigurationschecks).
 - Admin-Ansicht **"Stammdaten Sheet"** zeigt im Export/Backup-Bereich nur noch die Tabs `children` und `parents`; optionale Exportkarten für `attendance`, `daily_logs` und `messages` wurden entfernt.
 - Google-Ordnerkonfiguration robuster gemacht: `gcp.drive_photos_root_folder_id` und `gcp.drive_contracts_folder_id` akzeptieren jetzt zusätzlich vollständige Drive-Ordner-URLs (`.../folders/<ID>` oder `...?id=<ID>`); die App extrahiert automatisch die Ordner-ID und liefert bei ungültigen URLs eine klare Fehlermeldung.
 - Google-Verbindungscheck in `app.py` prüft `gcp.calendar_id` jetzt explizit vor dem API-Aufruf und zeigt bei fehlender Kalender-ID eine konkrete DE/EN-Quick-Fix-Meldung mit Zielpfad `Settings → Secrets → [gcp].calendar_id`.

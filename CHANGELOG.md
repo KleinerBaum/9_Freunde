@@ -14,6 +14,7 @@
 - Upload in **Fotos & Medien** akzeptiert zusätzlich Videoformate (`mp4`, `mov`, `webm`) und legt Metadaten weiterhin mit Status `draft` ab.
 
 ### Changed
+- Fotoablage auf zentralen Drive-Ordner vereinfacht: Child-spezifische Fotoordner werden nicht mehr vorausgesetzt. Admin-Upload, Galerie, Statusverwaltung und Elternansicht lesen/schreiben jetzt über `gcp.drive_photos_root_folder_id`; die Kind-Auswahl filtert Medien dabei über `photo_meta.child_id`.
 - Admin-Bereich **Dokumente & Verträge**: Die Auswahl **„Vertragssprache / Contract language“** für Betreuungsverträge wurde auf eine erweiterte Liste in Düsseldorf realistischer Vertragssprachen ausgebaut (u. a. DE/EN/TR/AR/RU/UK/PL/RO/BG/EL/IT/ES/FR/NL/FA/KU/SQ/SR/HR/BS). Für nicht explizit unterstützte Sprachen bleibt die Vertragsgenerierung weiterhin auf DE/EN-Fallback.
 - Sidebar um einen kompakten Sprachumschalter **„Sprache / Language“** oberhalb von **„Angemeldet als / Logged in as“** erweitert; bei DE/EN-Auswahl werden kombinierte UI-Labels im Format `DE / EN` sprachspezifisch ohne verbleibendes `/` gerendert.
 - Sprachumschaltung erweitert: Die gewählte Sprache wird jetzt auch auf die Toggle-Einträge selbst sowie app-weit auf weitere UI-Texte (z. B. Header, Subheader, Hinweise, Navigations- und Formularlabels im Format `DE / EN`) angewendet.

@@ -29,7 +29,7 @@ from services.calendar_service import (
     add_event,
     list_events,
 )
-from services.drive_service import DriveServiceError, ensure_child_photo_folder
+from services.drive_service import DriveServiceError, get_photos_root_folder_id
 from services.google_clients import get_drive_client
 from services.content_repo import ContentRepository, ContentRepositoryError
 from services.registration_form_service import (
@@ -2166,7 +2166,11 @@ else:
                         children=children,
                         stammdaten_manager=stammdaten_manager,
                         drive_agent=drive_agent,
-                        ensure_child_photo_folder=ensure_child_photo_folder,
+                        photos_folder_id=(
+                            get_photos_root_folder_id()
+                            if app_config.storage_mode == "google"
+                            else "root"
+                        ),
                         trigger_rerun=_trigger_rerun,
                     )
                 )
@@ -2382,13 +2386,9 @@ else:
             if child and child.get("id"):
                 try:
                     if app_config.storage_mode == "google":
-                        photo_folder_id = str(
-                            child.get("photo_folder_id") or child.get("folder_id") or ""
-                        ).strip()
+                        photo_folder_id = get_photos_root_folder_id()
                     else:
-                        photo_folder_id = str(
-                            child.get("photo_folder_id") or child.get("folder_id") or ""
-                        )
+                        photo_folder_id = "root"
                     photos = (
                         drive_agent.list_files(
                             photo_folder_id, mime_type_filter="image/"
@@ -2397,14 +2397,17 @@ else:
                         else []
                     )
                     published_photos: list[dict[str, str]] = []
+                    current_child_id = str(child.get("id", "")).strip()
                     for photo in photos:
                         file_id = str(photo.get("id", "")).strip()
                         if not file_id:
                             continue
                         meta = stammdaten_manager.get_photo_meta_by_file_id(file_id)
-                        status = _normalize_photo_status(
-                            None if meta is None else meta.get("status")
-                        )
+                        if not meta:
+                            continue
+                        if str(meta.get("child_id", "")).strip() != current_child_id:
+                            continue
+                        status = _normalize_photo_status(meta.get("status"))
                         if status == "published":
                             published_photos.append(photo)
                     photos = published_photos

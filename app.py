@@ -31,7 +31,6 @@ from services.calendar_service import (
     list_events,
 )
 from services.drive_service import DriveServiceError, get_photos_root_folder_id
-from services.google_clients import get_drive_client
 from services.content_repo import ContentRepository, ContentRepositoryError
 from services.registration_form_service import (
     RegistrationPayload,
@@ -198,6 +197,77 @@ def _get_configured_calendar_id() -> str:
     if app_config.google is None:
         return ""
     return str(app_config.google.calendar_id or "").strip()
+
+
+def _get_service_account_client_email() -> str:
+    app_config = get_app_config()
+    if app_config.google is None:
+        return ""
+    service_account = app_config.google.service_account
+    return str(service_account.get("client_email", "")).strip()
+
+
+def _format_drive_healthcheck_error(
+    folder_label: str,
+    folder_id: str,
+    exc: Exception,
+) -> str:
+    status_code = getattr(exc, "status_code", None)
+    cause = str(getattr(exc, "cause", "") or "").strip()
+    if status_code == 403 or cause == "forbidden":
+        return (
+            f"Drive-Test für {folder_label} fehlgeschlagen (403). "
+            "Dem Service-Account fehlt der Zugriff auf den Ordner. / "
+            f"Drive check for {folder_label} failed (403). The service account has no "
+            f"access to the folder. Folder ID: `{folder_id}`."
+        )
+    if status_code == 404 or cause == "not_found":
+        return (
+            f"Drive-Test für {folder_label} fehlgeschlagen (404). Die konfigurierte "
+            "Ordner-ID scheint ungültig zu sein. / "
+            f"Drive check for {folder_label} failed (404). The configured folder ID "
+            f"seems invalid. Folder ID: `{folder_id}`."
+        )
+
+    return (
+        f"Drive-Test für {folder_label} fehlgeschlagen. / "
+        f"Drive check for {folder_label} failed. Folder ID: `{folder_id}`. "
+        f"Fehler / Error: {exc}"
+    )
+
+
+def _format_calendar_healthcheck_error(
+    calendar_id: str,
+    service_account_email: str,
+    exc: Exception,
+) -> str:
+    status_code = getattr(exc, "status_code", None)
+    cause = str(getattr(exc, "cause", "") or "").strip()
+    share_hint = (
+        "Kalender muss für den Service-Account mit mindestens "
+        '"Änderungen an Terminen vornehmen" freigegeben sein. / Calendar must be '
+        "shared with the service account with at least "
+        '"Make changes to events" permissions.'
+    )
+
+    base = (
+        f"Verwendete calendar_id / Used calendar_id: `{calendar_id}` · "
+        f"Service-Account: `{service_account_email or '-'}'. {share_hint}"
+    )
+
+    if status_code == 403 or cause == "forbidden":
+        return (
+            f"Kalender-Test fehlgeschlagen (403). / Calendar check failed (403). {base}"
+        )
+    if status_code == 404 or cause == "not_found":
+        return (
+            f"Kalender-Test fehlgeschlagen (404). / Calendar check failed (404). {base}"
+        )
+
+    return (
+        "Kalender-Test fehlgeschlagen. / Calendar check failed. "
+        f"{base} Fehler / Error: {exc}"
+    )
 
 
 def _build_google_calendar_embed_url(calendar_id: str) -> str:
@@ -816,35 +886,59 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
     checks: list[tuple[str, bool, str]] = []
     app_config = get_app_config()
 
-    try:
-        drive_client = get_drive_client()
-        drive_client.files().list(
-            pageSize=1,
-            fields="files(id,name)",
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
-        checks.append(
+    if app_config.storage_mode == "google" and app_config.google is not None:
+        drive_checks = [
             (
-                "Google Drive Zugriff / Google Drive access",
-                True,
-                "Drive-Liste erfolgreich gelesen. / Successfully read drive listing.",
-            )
-        )
-    except Exception as exc:  # pragma: no cover - runtime external dependency
+                "Fotos-Ordner / Photos folder",
+                app_config.google.drive_photos_root_folder_id,
+            ),
+            (
+                "Verträge-Ordner / Contracts folder",
+                app_config.google.drive_contracts_folder_id,
+            ),
+        ]
+        for folder_label, folder_id in drive_checks:
+            try:
+                drive_agent.list_files(folder_id)
+                checks.append(
+                    (
+                        f"Google Drive Zugriff ({folder_label}) / Google Drive access ({folder_label})",
+                        True,
+                        "Drive-Lesezugriff erfolgreich. / Drive read access successful. "
+                        f"Folder ID: `{folder_id}`.",
+                    )
+                )
+            except DriveServiceError as exc:
+                checks.append(
+                    (
+                        f"Google Drive Zugriff ({folder_label}) / Google Drive access ({folder_label})",
+                        False,
+                        _format_drive_healthcheck_error(folder_label, folder_id, exc),
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - runtime external dependency
+                checks.append(
+                    (
+                        f"Google Drive Zugriff ({folder_label}) / Google Drive access ({folder_label})",
+                        False,
+                        _format_drive_healthcheck_error(folder_label, folder_id, exc),
+                    )
+                )
+    else:
         checks.append(
             (
                 "Google Drive Zugriff / Google Drive access",
                 False,
-                "Drive-Test fehlgeschlagen. Prüfen Sie, ob der Service-Account als "
-                "Editor auf dem Zielordner eingetragen ist. "
-                f"Fehler: {exc}",
+                "Google-Modus ist nicht aktiv oder Konfiguration fehlt. / "
+                "Google mode is not active or configuration is missing.",
             )
         )
 
     calendar_id = ""
     if app_config.google is not None and isinstance(app_config.google.calendar_id, str):
         calendar_id = app_config.google.calendar_id.strip()
+
+    service_account_email = _get_service_account_client_email()
 
     if app_config.storage_mode == "google" and not calendar_id:
         checks.append(
@@ -870,7 +964,22 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
                 (
                     "Google Kalender Zugriff / Google Calendar access",
                     True,
-                    "Kalender-Events erfolgreich gelesen. / Successfully read calendar events.",
+                    "Kalender-Events erfolgreich gelesen. / Successfully read calendar events. "
+                    f"calendar_id: `{calendar_id}`.",
+                )
+            )
+        except (
+            CalendarServiceError
+        ) as exc:  # pragma: no cover - runtime external dependency
+            checks.append(
+                (
+                    "Google Kalender Zugriff / Google Calendar access",
+                    False,
+                    _format_calendar_healthcheck_error(
+                        calendar_id=calendar_id,
+                        service_account_email=service_account_email,
+                        exc=exc,
+                    ),
                 )
             )
         except Exception as exc:  # pragma: no cover - runtime external dependency
@@ -878,11 +987,11 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
                 (
                     "Google Kalender Zugriff / Google Calendar access",
                     False,
-                    "Kalender-Test fehlgeschlagen. Prüfen Sie, ob die in `calendar_id` "
-                    "konfigurierte Kalender-ID mit dem Service-Account geteilt ist "
-                    "(mindestens "
-                    '"Änderungen an Terminen vornehmen"/"Make changes to events"). '
-                    f"Fehler: {exc}",
+                    _format_calendar_healthcheck_error(
+                        calendar_id=calendar_id,
+                        service_account_email=service_account_email,
+                        exc=exc,
+                    ),
                 )
             )
 

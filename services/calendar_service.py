@@ -19,6 +19,39 @@ CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 class CalendarServiceError(RuntimeError):
     """Domänenspezifischer Fehler für Kalenderzugriffe."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        cause: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.cause = cause
+
+
+def _translate_calendar_http_error(exc: HttpError) -> CalendarServiceError:
+    status_code = int(getattr(exc.resp, "status", 0) or 0)
+    if status_code == 403:
+        return CalendarServiceError(
+            "Kein Zugriff auf den Kalender. Bitte Kalenderfreigabe für den "
+            "Service-Account prüfen.",
+            status_code=status_code,
+            cause="forbidden",
+        )
+    if status_code == 404:
+        return CalendarServiceError(
+            "Kalender nicht gefunden. Bitte `gcp.calendar_id` prüfen.",
+            status_code=status_code,
+            cause="not_found",
+        )
+    return CalendarServiceError(
+        f"Google Calendar API Fehler. / Google Calendar API error: {exc}",
+        status_code=status_code if status_code else None,
+        cause="api_error",
+    )
+
 
 @st.cache_resource(show_spinner=False)
 def _get_calendar_client():
@@ -100,9 +133,7 @@ def add_event(
         try:
             calendar.events().insert(calendarId=calendar_id, body=event_body).execute()
         except HttpError as exc:
-            raise CalendarServiceError(
-                f"Google Calendar API Fehler. / Google Calendar API error: {exc}"
-            ) from exc
+            raise _translate_calendar_http_error(exc) from exc
     else:
         local_event = {"id": uuid.uuid4().hex, **event_body}
         events = _read_local_events()
@@ -134,9 +165,7 @@ def list_events(max_results: int = 10) -> list[dict[str, str]]:
                 .execute()
             )
         except HttpError as exc:
-            raise CalendarServiceError(
-                f"Google Calendar API Fehler. / Google Calendar API error: {exc}"
-            ) from exc
+            raise _translate_calendar_http_error(exc) from exc
         raw_events = response.get("items", [])
     else:
         now_iso = datetime.utcnow().isoformat()

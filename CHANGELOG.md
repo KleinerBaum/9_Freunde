@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- Google-Healthcheck in `app.py` erweitert: getrennte Drive-Checks für Foto-/Vertragsordner mit expliziter Anzeige der betroffenen Ordner-ID und differenzierten 403/404-Hinweisen; Kalender-Checks zeigen jetzt zusätzlich verwendete `calendar_id` sowie erforderliche Freigabe für `gcp_service_account.client_email`.
+- `DriveServiceError` und `CalendarServiceError` transportieren jetzt strukturierte Fehlerdetails (`status_code`, `cause`) für präzisere UI-Hinweise bei Google-API-Fehlern.
+
 ### Added
 - Neue UI-/Domain-Bausteine eingeführt: `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` für eine schlanke Trennung von Darstellung und Modellen ohne Änderungen an `services/`.
 - Foto-Galerie auf das neue `MediaItem`-Domain-Modell und die wiederverwendbare Galerie-Komponente umgestellt (Filter, Pagination, Vorschau, Auswahlzustand über zentrale UI-Keys).

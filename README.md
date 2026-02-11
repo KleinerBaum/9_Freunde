@@ -455,6 +455,15 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
   - Bei 403/404 meldet die UI explizit Freigabe-/ID-Probleme und zeigt technische Details aus `DriveServiceError`.
   - Fehlt der zentrale Foto-Ordner (`gcp.drive_photos_root_folder_id`) oder fehlt dessen Freigabe, erscheint ein entsprechender Hinweis zur Prüfung der Konfiguration und Service-Account-Berechtigung.
 
+- **System / Healthchecks zeigt Drive-Ordner-ID je Check (Fotos & Verträge)**
+  - Bei Drive-Fehlern zeigt die UI jetzt den konkreten betroffenen Ordner (`gcp.drive_photos_root_folder_id` bzw. `gcp.drive_contracts_folder_id`) und differenziert 403 (fehlende Freigabe) vs. 404 (ungültige ID).
+  - Dadurch kann die Freigabe direkt auf dem richtigen Ordner korrigiert werden, ohne Secrets/PII offenzulegen.
+
+- **System / Healthchecks zeigt Kalender-Kontext bei Fehlern**
+  - Bei Kalender-Fehlern zeigt die UI explizit die verwendete `calendar_id` und die benötigte Freigabe für `gcp_service_account.client_email` (mindestens „Änderungen an Terminen vornehmen“ / “Make changes to events”).
+  - Zusätzlich wird 403 (fehlende Berechtigung) von 404 (ungültige `calendar_id`) getrennt angezeigt.
+
+
 - **404 File not found / Requested entity was not found**
   - Ursache: Falsche ID (`drive_contracts_folder_id`, `stammdaten_sheet_id`, `calendar_id`) oder Ressource nicht im Zugriffskontext.
   - Lösung: IDs prüfen und Freigaben erneut kontrollieren.

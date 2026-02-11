@@ -19,7 +19,7 @@ from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
-from photo import PhotoAgent
+from photo import MediaPageContext, PhotoAgent, render_media_page
 from storage import DriveAgent
 from config import get_app_config, validate_config_or_stop
 from services.calendar_service import (
@@ -1960,292 +1960,25 @@ else:
 
         # ---- Admin: Fotos ----
         elif admin_view == "Fotos":
-            st.subheader("Kinder-Fotos hochladen und verwalten / Upload child photos")
+            st.subheader("Fotos & Videos verwalten / Manage photos & videos")
             children = stammdaten_manager.get_children()
             if not children:
-                st.warning("Bitte legen Sie zuerst Kinder-Stammdaten an.")
+                st.warning(
+                    "Bitte legen Sie zuerst Kinder-Stammdaten an. / "
+                    "Please create child records first."
+                )
             else:
-                sel_child = st.selectbox(
-                    "Foto hochladen für Kind / Upload photo for child",
-                    options=children,
-                    format_func=lambda child: str(child.get("name", "")),
+                render_media_page(
+                    MediaPageContext(
+                        app_config=app_config,
+                        user_email=user_email,
+                        children=children,
+                        stammdaten_manager=stammdaten_manager,
+                        drive_agent=drive_agent,
+                        ensure_child_photo_folder=ensure_child_photo_folder,
+                        trigger_rerun=_trigger_rerun,
+                    )
                 )
-                with st.form("photo_upload_form", border=True):
-                    image_file = st.file_uploader(
-                        "Foto auswählen / Select photo", type=["jpg", "jpeg", "png"]
-                    )
-                    photo_upload_submitted = st.form_submit_button(
-                        "Upload Foto / Upload photo"
-                    )
-
-                if photo_upload_submitted:
-                    if image_file is None:
-                        st.warning(
-                            "Bitte zuerst ein Bild auswählen. / Please select an image first."
-                        )
-                    else:
-                        try:
-                            child_id = str(sel_child.get("id", "")).strip()
-                            if app_config.storage_mode == "google":
-                                photo_folder_id = ensure_child_photo_folder(child_id)
-                            else:
-                                photo_folder_id = str(
-                                    sel_child.get("photo_folder_id")
-                                    or sel_child.get("folder_id")
-                                    or ""
-                                )
-                            if not photo_folder_id:
-                                raise ValueError(
-                                    "Kein Foto-Ordner für dieses Kind vorhanden. / No photo folder configured for this child."
-                                )
-                            file_id = photo_agent.upload_photo(
-                                image_file, photo_folder_id
-                            )
-                            stammdaten_manager.upsert_photo_meta(
-                                file_id,
-                                {
-                                    "child_id": child_id,
-                                    "album": "",
-                                    "status": "draft",
-                                    "uploaded_at": pd.Timestamp.now(
-                                        tz="Europe/Berlin"
-                                    ).isoformat(),
-                                    "uploaded_by": user_email,
-                                    "retention_until": "",
-                                },
-                            )
-                            st.success(
-                                f"Foto für {sel_child.get('name', '')} hochgeladen (Status: draft). / "
-                                f"Photo uploaded for {sel_child.get('name', '')} (status: draft)."
-                            )
-                            st.image(
-                                image_file,
-                                caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
-                                width="stretch",
-                            )
-                        except DriveServiceError as exc:
-                            st.error(
-                                "Foto-Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe "
-                                "für den Service-Account (403/404) und die Drive-ID. / "
-                                "Photo upload failed. Verify folder sharing for the service "
-                                "account (403/404) and the Drive ID."
-                            )
-                            st.info(str(exc))
-                        except ValueError as exc:
-                            st.error(
-                                f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
-                            )
-                            st.warning(
-                                "Hinweis: Bitte prüfen Sie den Kind-Datensatz in den "
-                                "Stammdaten und stellen Sie sicher, dass der Service-Account "
-                                "Zugriff auf den Hauptordner hat. / Hint: Check the child "
-                                "record in master data and ensure the service account has "
-                                "access to the root folder."
-                            )
-                            st.info(
-                                f"Betroffene child_id / Affected child_id: {child_id or '-'}"
-                            )
-                        except Exception as exc:
-                            st.error(
-                                f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
-                            )
-
-                st.markdown("### Foto-Status verwalten / Manage photo status")
-                child_id = str(sel_child.get("id", "")).strip()
-                try:
-                    if app_config.storage_mode == "google":
-                        current_photo_folder_id = ensure_child_photo_folder(child_id)
-                    else:
-                        current_photo_folder_id = str(
-                            sel_child.get("photo_folder_id")
-                            or sel_child.get("folder_id")
-                            or ""
-                        )
-
-                    if current_photo_folder_id:
-                        drive_url = (
-                            "https://drive.google.com/drive/folders/"
-                            f"{current_photo_folder_id}"
-                        )
-                        st.markdown(
-                            f"[📂 Ordner auf Google Drive öffnen / Open folder on Google Drive]({drive_url})"
-                        )
-
-                    st.markdown("#### Alle Kinder-Fotos / All children photos")
-                    if app_config.storage_mode == "google" and app_config.google:
-                        all_children_drive_url = (
-                            "https://drive.google.com/drive/folders/"
-                            f"{app_config.google.drive_photos_root_folder_id}"
-                        )
-                        st.markdown(
-                            "[🗂️ Gesamtordner auf Google Drive öffnen / "
-                            "Open all-children folder on Google Drive]"
-                            f"({all_children_drive_url})"
-                        )
-
-                    all_child_photos: list[tuple[str, dict[str, Any]]] = []
-                    missing_folder_children: list[str] = []
-                    for child in children:
-                        listed_child_name = str(child.get("name", "")).strip() or "-"
-                        listed_child_folder_id = str(
-                            child.get("photo_folder_id") or child.get("folder_id") or ""
-                        ).strip()
-                        if not listed_child_folder_id:
-                            missing_folder_children.append(listed_child_name)
-                            continue
-
-                        photos_in_child_folder = drive_agent.list_files(
-                            listed_child_folder_id,
-                            mime_type_filter="image/",
-                        )
-                        for listed_photo in photos_in_child_folder:
-                            all_child_photos.append((listed_child_name, listed_photo))
-
-                    if missing_folder_children:
-                        st.caption(
-                            "Für folgende Kinder ist aktuell kein Foto-Ordner hinterlegt: "
-                            f"{', '.join(missing_folder_children)}. / "
-                            "No photo folder is currently configured for the following children: "
-                            f"{', '.join(missing_folder_children)}."
-                        )
-
-                    if all_child_photos:
-                        st.caption(
-                            "Fotos aus allen Kinder-Ordnern / Photos from all child folders: "
-                            f"{len(all_child_photos)}"
-                        )
-                        for listed_child_name, listed_photo in all_child_photos:
-                            listed_file_id = str(listed_photo.get("id", "")).strip()
-                            listed_file_name = str(listed_photo.get("name", "photo"))
-                            with st.expander(
-                                f"{listed_child_name} · {listed_file_name}",
-                                expanded=False,
-                            ):
-                                st.caption(f"ID: {listed_file_id or '-'}")
-                                try:
-                                    listed_image_bytes = drive_agent.download_file(
-                                        listed_file_id
-                                    )
-                                    st.image(
-                                        listed_image_bytes,
-                                        caption=(
-                                            "Vorschau / Preview: "
-                                            f"{listed_child_name} · {listed_file_name}"
-                                        ),
-                                        width=320,
-                                    )
-                                except Exception as exc:
-                                    st.warning(
-                                        "Bildvorschau konnte nicht geladen werden. / "
-                                        f"Could not load image preview: {exc}"
-                                    )
-                    else:
-                        st.caption(
-                            "Keine Fotos in den Kinder-Ordnern gefunden. / "
-                            "No photos found in child folders."
-                        )
-                except DriveServiceError as exc:
-                    current_photo_folder_id = ""
-                    st.error(
-                        "Foto-Ordner konnte nicht geladen werden. Bitte prüfen Sie "
-                        "Freigaben und Drive-Konfiguration. / Could not load photo "
-                        "folder. Please verify sharing and Drive configuration."
-                    )
-                    st.info(str(exc))
-                    st.warning(
-                        "Bitte Kind-Stammdaten und Service-Account-Zugriff auf den "
-                        "Hauptordner prüfen. / Please check child master data and "
-                        "service account access to the root folder."
-                    )
-                    st.info(
-                        f"Betroffene child_id / Affected child_id: {child_id or '-'}"
-                    )
-
-                child_photos = (
-                    drive_agent.list_files(
-                        current_photo_folder_id, mime_type_filter="image/"
-                    )
-                    if current_photo_folder_id
-                    else []
-                )
-                if child_photos:
-                    for child_photo in child_photos:
-                        file_id = str(child_photo.get("id", ""))
-                        file_name = str(child_photo.get("name", "photo"))
-                        meta = (
-                            stammdaten_manager.get_photo_meta_by_file_id(file_id) or {}
-                        )
-                        current_status = _normalize_photo_status(meta.get("status"))
-
-                        with st.expander(
-                            f"{file_name} · Status verwalten / Manage status",
-                            expanded=False,
-                        ):
-                            col_file, col_status = st.columns([2, 2])
-                            with col_file:
-                                st.write(f"**{file_name}**")
-                                st.caption(f"ID: {file_id or '-'}")
-                            with col_status:
-                                selected_status = st.selectbox(
-                                    "Status / Status",
-                                    options=list(PHOTO_STATUS_OPTIONS),
-                                    index=list(PHOTO_STATUS_OPTIONS).index(
-                                        current_status
-                                    ),
-                                    key=f"admin_photo_status_{file_id}",
-                                )
-
-                            try:
-                                image_bytes = drive_agent.download_file(file_id)
-                                st.image(
-                                    image_bytes,
-                                    caption=(
-                                        f"Vorschau: {file_name} / Preview: {file_name}"
-                                    ),
-                                    width=320,
-                                )
-                            except Exception as exc:
-                                st.warning(
-                                    "Bildvorschau konnte nicht geladen werden. / "
-                                    f"Could not load image preview: {exc}"
-                                )
-
-                            if selected_status != current_status:
-                                try:
-                                    stammdaten_manager.upsert_photo_meta(
-                                        file_id,
-                                        {
-                                            "child_id": child_id,
-                                            "status": selected_status,
-                                            "uploaded_by": str(
-                                                meta.get("uploaded_by", "")
-                                            )
-                                            or user_email,
-                                            "uploaded_at": str(
-                                                meta.get("uploaded_at", "")
-                                            )
-                                            or pd.Timestamp.now(
-                                                tz="Europe/Berlin"
-                                            ).isoformat(),
-                                            "album": str(meta.get("album", "")),
-                                            "retention_until": str(
-                                                meta.get("retention_until", "")
-                                            ),
-                                        },
-                                    )
-                                    st.success(
-                                        "Foto-Status aktualisiert. / Photo status updated."
-                                    )
-                                    _trigger_rerun()
-                                except Exception as exc:
-                                    st.error(
-                                        "Foto-Status konnte nicht gespeichert werden. / "
-                                        f"Could not save photo status: {exc}"
-                                    )
-                else:
-                    st.caption(
-                        "Keine Fotos für dieses Kind gefunden. / No photos found for this child."
-                    )
 
         # ---- Admin: Kalender ----
         elif admin_view == "Kalender":

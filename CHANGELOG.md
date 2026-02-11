@@ -8,6 +8,10 @@
 - Neues Dataclass-Modell `RegistrationPayload` plus Parser `parse_registration_payload(fields)` ergänzt, das strukturierte Bereiche (`child`, `parents`, `pickup_authorizations`, `consents`, `meta`, `errors`) liefert und Pflichtfeld-Validierung ohne Schreiboperationen durchführt.
 - Unit-Tests `tests/test_registration_form_service.py` ergänzt (Normalisierung, Schema-Validierung, Fehlerpfade, Pflichtfeldprüfung).
 
+- Admin-Bereich **Fotos & Medien** als Gallery-Pattern umgestellt: neue Tabs **Galerie / Gallery**, **Upload** und **Status**.
+- Galerie nutzt jetzt klickbare Thumbnail-Kacheln (`st-clickable-images`) mit Pagination (24 Medien/Seite), Preview und Download-Aktion für Bilder und Videos.
+- Upload in **Fotos & Medien** akzeptiert zusätzlich Videoformate (`mp4`, `mov`, `webm`) und legt Metadaten weiterhin mit Status `draft` ab.
+
 ### Changed
 - Styling auf Theme-first umgestellt: neue Streamlit-Theme-Konfiguration in `.streamlit/config.toml` (u. a. `primaryColor`, `secondaryBackgroundColor`, `baseRadius`, `buttonRadius`, `showSidebarBorder`) statt umfangreicher Inline-CSS-Overrides.
 - UI-Abschnitte als Cards vereinheitlicht: Admin-**Dashboard**, Admin-**Übersicht** und Eltern-**Mein Kind** werden jetzt in `st.container(border=True)` gerendert.

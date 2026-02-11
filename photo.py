@@ -30,7 +30,7 @@ class MediaPageContext:
     children: list[dict[str, Any]]
     stammdaten_manager: Any
     drive_agent: DriveAgent
-    ensure_child_photo_folder: Callable[[str], str]
+    photos_folder_id: str
     trigger_rerun: Callable[[], None]
 
 
@@ -47,7 +47,7 @@ class MediaItem:
 
 class PhotoAgent:
     def upload_photo(self, image_file: Any, folder_id: str) -> str:
-        """Speichert ein hochgeladenes Medium im zugewiesenen Kind-Ordner."""
+        """Speichert ein hochgeladenes Medium im zentralen Medien-Ordner."""
         media_bytes = image_file.getvalue()
         file_name = image_file.name or "media.jpg"
         lower_name = file_name.lower()
@@ -140,15 +140,28 @@ def _image_data_url(media_item: MediaItem) -> str:
     return f"data:{media_item.mime_type};base64,{encoded}"
 
 
-def _get_child_folder_id(ctx: MediaPageContext, child: dict[str, Any]) -> str:
-    child_id = str(child.get("id", "")).strip()
-    if not child_id:
-        return ""
+def _get_media_folder_id(ctx: MediaPageContext) -> str:
+    return str(ctx.photos_folder_id).strip()
 
-    if ctx.app_config.storage_mode == "google":
-        return ctx.ensure_child_photo_folder(child_id)
 
-    return str(child.get("photo_folder_id") or child.get("folder_id") or "").strip()
+def _filter_media_items_for_child(
+    ctx: MediaPageContext,
+    media_items: list[MediaItem],
+    child_id: str,
+) -> list[MediaItem]:
+    normalized_child_id = child_id.strip()
+    if not normalized_child_id:
+        return []
+
+    filtered_media_items: list[MediaItem] = []
+    for media_item in media_items:
+        metadata = ctx.stammdaten_manager.get_photo_meta_by_file_id(media_item.file_id)
+        if not metadata:
+            continue
+        if str(metadata.get("child_id", "")).strip() != normalized_child_id:
+            continue
+        filtered_media_items.append(media_item)
+    return filtered_media_items
 
 
 def _paginate_media(
@@ -174,15 +187,19 @@ def render_gallery(ctx: MediaPageContext) -> None:
         return
 
     try:
-        folder_id = _get_child_folder_id(ctx, selected_child)
+        folder_id = _get_media_folder_id(ctx)
         if not folder_id:
             st.warning(
-                "Kein Medien-Ordner für dieses Kind vorhanden. / No media folder configured for this child."
+                "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
             )
             return
 
         raw_media_items = _list_media(folder_id)
-        media_items = _to_media_items(raw_media_items)
+        media_items = _filter_media_items_for_child(
+            ctx,
+            _to_media_items(raw_media_items),
+            child_id,
+        )
     except DriveServiceError as exc:
         st.error(
             "Medien konnten nicht geladen werden. Bitte Drive-Freigaben prüfen. / "
@@ -297,10 +314,10 @@ def render_upload(ctx: MediaPageContext) -> None:
 
     child_id = str(selected_child.get("id", "")).strip()
     try:
-        folder_id = _get_child_folder_id(ctx, selected_child)
+        folder_id = _get_media_folder_id(ctx)
         if not folder_id:
             raise ValueError(
-                "Kein Medien-Ordner für dieses Kind vorhanden. / No media folder configured for this child."
+                "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
             )
 
         file_id = PhotoAgent().upload_photo(upload_file, folder_id)
@@ -346,7 +363,7 @@ def render_photo_status(ctx: MediaPageContext) -> None:
     child_id = str(selected_child.get("id", "")).strip()
 
     try:
-        folder_id = _get_child_folder_id(ctx, selected_child)
+        folder_id = _get_media_folder_id(ctx)
     except DriveServiceError as exc:
         st.error(
             "Foto-Ordner konnte nicht geladen werden. / Could not load media folder."
@@ -356,7 +373,7 @@ def render_photo_status(ctx: MediaPageContext) -> None:
 
     if not folder_id:
         st.warning(
-            "Kein Medien-Ordner für dieses Kind vorhanden. / No media folder configured for this child."
+            "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
         )
         return
 
@@ -366,10 +383,15 @@ def render_photo_status(ctx: MediaPageContext) -> None:
     )
 
     raw_media_items = _list_media(folder_id)
-    media_items = _to_media_items(raw_media_items)
+    media_items = _filter_media_items_for_child(
+        ctx,
+        _to_media_items(raw_media_items),
+        child_id,
+    )
     if not media_items:
         st.caption(
-            "Keine Medien für dieses Kind gefunden. / No media found for this child."
+            "Keine Medien für das ausgewählte Kind gefunden. / "
+            "No media found for the selected child."
         )
         return
 

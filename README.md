@@ -6,9 +6,9 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Kinder-Übersicht (Admin):** In „Stammdaten“ wird eine sortierbare Tabelle mit Name, Eltern-E-Mail, Gruppe, Geburtsdatum und Drive-Ordnerstatus (`✅ Ready`/`⚠️ Missing`) angezeigt.
 - **Admin-Start mit Gesamtübersicht:** Unter **„Stammdaten & Infos → Übersicht“** wird direkt nach dem Login eine kompakte Tabelle mit Kind, Elternkontakt, Fotoanzahl, letzter Aktivität sowie `photo_folder_id`/`folder_id` zur schnellen Datenkontrolle angezeigt.
-- **Direktlink zum Fotoordner:** Im Admin-Bereich **„Fotos“** wird pro ausgewähltem Kind ein direkter Google-Drive-Link (`📂`) auf den aktuellen Foto-Ordner eingeblendet.
+- **Direktlink zum zentralen Fotoordner:** Im Admin-Bereich **„Fotos“** wird ein direkter Google-Drive-Link (`📂`) auf den zentralen Foto-Ordner (`gcp.drive_photos_root_folder_id`) eingeblendet.
 - **Media-Gallery für Fotos & Videos (Admin):** Der Bereich **„Fotos & Medien“** ist jetzt in die Tabs **„Galerie / Gallery“**, **„Upload“** und **„Status“** aufgeteilt. Die Galerie nutzt ein klickbares Thumbnail-Grid mit Pagination (24 Items/Seite), Vorschau (Bild/Video), Datei-Metadaten und Direkt-Download pro Eintrag.
-- **Gesamtordner + Gesamtvorschau (Admin):** Im selben Foto-Bereich gibt es zusätzlich einen Link auf den zentralen Foto-Hauptordner (`🗂️`) sowie eine Vorschau-Liste mit Bildern aus allen Kinder-Ordnern. / In the same photo area, admins also get a link to the global photos root folder plus a preview list across all child folders.
+- **Zentrale Fotoablage (Admin):** Im Foto-Bereich werden alle Uploads im konfigurierten zentralen Drive-Ordner gespeichert; die Kind-Auswahl steuert ausschließlich Filter und Statusverwaltung über Metadaten (`child_id`). / In the photo area, all uploads are stored in the configured central Drive folder; child selection is used only for filtering and status management via metadata (`child_id`).
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Geführtes Bearbeiten in Stammdaten:** Editierfelder für Kinder und Abholberechtigungen werden erst nach aktiver Auswahl eines Eintrags angezeigt; die Bereiche **„Neues Kind anlegen / Add child“**, **„Abholberechtigte / Pickup authorizations“** und **„Medikationen“** sind standardmäßig eingeklappt.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
@@ -116,7 +116,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Nutzen Sie für `private_key` bevorzugt einen mehrzeiligen TOML-String mit `"""..."""`, damit echte Zeilenumbrüche erhalten bleiben, und vermeiden Sie zusätzliche umschließende Quotes (z. B. `'"..."'`).
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
    - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos (alternativ akzeptiert die App auch eine vollständige Drive-Ordner-URL und extrahiert die ID automatisch).
-  - Hinweis zur Ablage: Fotos werden innerhalb dieses konfigurierten Hauptordners in Unterordnern pro Kind gespeichert; die App verwendet bewusst keinen festen sichtbaren Pfad wie `photos/<child_id>/`.
+  - Hinweis zur Ablage: Fotos werden direkt im konfigurierten zentralen Hauptordner gespeichert; die Zuordnung zu Kindern erfolgt über Metadaten (`photo_meta.child_id`).
    - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente (alternativ auch als vollständige Drive-Ordner-URL möglich).
    - `stammdaten_sheet_id` (optional): überschreibt die Standard-Tabelle `Stammdaten_Eltern_2026` (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
    - `calendar_id` (optional): die Kalender-ID für den Google Kalender der Einrichtung.
@@ -451,7 +451,7 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
 
 - **Admin-Foto-Upload zeigt jetzt gezielte Drive-Hinweise**
   - Bei 403/404 meldet die UI explizit Freigabe-/ID-Probleme und zeigt technische Details aus `DriveServiceError`.
-  - Fehlt ein `photo_folder_id`, erscheint zusätzlich ein Hinweis zur Prüfung von Kind-Stammdaten und Service-Account-Zugriff (inkl. betroffener `child_id`).
+  - Fehlt der zentrale Foto-Ordner (`gcp.drive_photos_root_folder_id`) oder fehlt dessen Freigabe, erscheint ein entsprechender Hinweis zur Prüfung der Konfiguration und Service-Account-Berechtigung.
 
 - **404 File not found / Requested entity was not found**
   - Ursache: Falsche ID (`drive_contracts_folder_id`, `stammdaten_sheet_id`, `calendar_id`) oder Ressource nicht im Zugriffskontext.

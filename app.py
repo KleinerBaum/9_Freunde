@@ -1120,11 +1120,8 @@ else:
                         "Keine anstehenden Termine vorhanden. / No upcoming events."
                     )
 
-                st.info(
-                    "Das Dashboard zeigt Kennzahlen und die aktuelle Kinder-Übersicht auf "
-                    "einen Blick. / The dashboard shows key metrics and the current children "
-                    "overview at a glance."
-                )
+                st.markdown("**Kalender / Calendar**")
+                components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
 
         # ---- Admin: Stammdaten ----
         if admin_view == "Stammdaten":
@@ -2173,9 +2170,6 @@ else:
 
         # ---- Admin: Kalender ----
         elif admin_view == "Kalender":
-            st.subheader("Kalenderansicht / Calendar view")
-            components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
-
             st.subheader("Neuer Termin / New event")
             title = st.text_input("Titel / Title")
             event_date = st.date_input("Datum / Date")

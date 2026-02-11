@@ -418,6 +418,262 @@ def _save_registration_import(
     return child_id
 
 
+def _render_admin_child_creation_and_import(
+    stammdaten_manager: StammdatenManager,
+    *,
+    user_email: str,
+) -> None:
+    with st.expander("Neues Kind anlegen / Add child", expanded=False):
+        with st.form(key="new_child_form", border=True):
+            left_col, right_col = st.columns(2)
+            with left_col:
+                name = st.text_input("Name des Kindes / Child name")
+                parent_email = st.text_input("E-Mail Elternteil / Parent email")
+                birthdate = st.date_input(
+                    "Geburtsdatum / Birthdate",
+                    value=None,
+                    format="YYYY-MM-DD",
+                )
+                start_date = st.date_input(
+                    "Startdatum / Start date",
+                    value=None,
+                    format="YYYY-MM-DD",
+                )
+                status = st.selectbox("Status", options=["active", "archived"], index=0)
+            with right_col:
+                group = st.text_input("Gruppe / Group", value="Igel")
+                primary_caregiver = st.text_input(
+                    "Bezugserzieher:in / Primary caregiver"
+                )
+                allergies = st.text_input("Allergien / Allergies")
+                pickup_password = st.text_input(
+                    "Abhol-Kennwort (optional) / Pickup password",
+                    type="password",
+                )
+
+            parent_col_left, parent_col_right = st.columns(2)
+            with parent_col_left:
+                parent_name = st.text_input("Elternteil Name / Parent name")
+                parent_phone = st.text_input("Telefon / Phone")
+                parent_phone2 = st.text_input("Telefon 2 / Phone 2")
+                parent_address = st.text_input("Adresse / Address")
+            with parent_col_right:
+                emergency_contact_name = st.text_input(
+                    "Notfallkontakt Name / Emergency contact name"
+                )
+                emergency_contact_phone = st.text_input(
+                    "Notfallkontakt Telefon / Emergency contact phone"
+                )
+                preferred_language = st.selectbox(
+                    "Bevorzugte Sprache / Preferred language",
+                    options=["de", "en"],
+                    format_func=lambda value: (
+                        "Deutsch / German" if value == "de" else "English / Englisch"
+                    ),
+                )
+                notifications_opt_in = st.checkbox(
+                    "Benachrichtigungen erhalten / Receive notifications",
+                    value=False,
+                )
+
+            notes_col_left, notes_col_right = st.columns(2)
+            with notes_col_left:
+                notes_parent_visible = st.text_area(
+                    "Hinweise für Eltern sichtbar / Parent-visible notes",
+                    height=110,
+                )
+            with notes_col_right:
+                notes_internal = st.text_area(
+                    "Interne Hinweise (nur Leitung) / Internal notes",
+                    height=110,
+                )
+            submitted = st.form_submit_button("Hinzufügen / Add child")
+    if submitted:
+        if name.strip() == "" or parent_email.strip() == "":
+            st.error(
+                "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
+            )
+        else:
+            try:
+                stammdaten_manager.add_child(
+                    name.strip(),
+                    parent_email.strip(),
+                    {
+                        "birthdate": _optional_date_to_iso(birthdate),
+                        "start_date": _optional_date_to_iso(start_date),
+                        "group": group.strip(),
+                        "primary_caregiver": primary_caregiver.strip(),
+                        "allergies": allergies.strip(),
+                        "notes_parent_visible": notes_parent_visible.strip(),
+                        "notes_internal": notes_internal.strip(),
+                        "pickup_password": pickup_password.strip(),
+                        "status": status,
+                    },
+                )
+                stammdaten_manager.upsert_parent_by_email(
+                    parent_email.strip(),
+                    {
+                        "name": parent_name.strip(),
+                        "phone": parent_phone.strip(),
+                        "phone2": parent_phone2.strip(),
+                        "address": parent_address.strip(),
+                        "preferred_language": preferred_language,
+                        "emergency_contact_name": emergency_contact_name.strip(),
+                        "emergency_contact_phone": emergency_contact_phone.strip(),
+                        "notifications_opt_in": _active_flag_to_string(
+                            notifications_opt_in
+                        ),
+                    },
+                )
+                st.success(f"Kind '{name}' hinzugefügt. / Child '{name}' added.")
+                _trigger_rerun()
+            except Exception as exc:
+                st.error(f"Fehler beim Speichern / Save error: {exc}")
+
+    with st.expander(
+        "Anmeldung importieren (PDF) / Import registration (PDF)",
+        expanded=False,
+    ):
+        template_path = (
+            Path(__file__).resolve().parent
+            / "assets"
+            / "forms"
+            / "9Freunde_Anmeldeformular_v1.pdf"
+        )
+        if template_path.exists():
+            st.download_button(
+                "Leere Vorlage herunterladen / Download blank template",
+                data=template_path.read_bytes(),
+                file_name=template_path.name,
+                mime="application/pdf",
+                key="registration_template_download",
+            )
+        else:
+            st.warning("Vorlage nicht gefunden. / Template file not found.")
+
+        with st.form(key="registration_import_form", border=True):
+            uploaded_registration_pdf = st.file_uploader(
+                "Ausgefülltes Anmeldeformular hochladen / Upload completed registration form",
+                type=["pdf"],
+                key="registration_import_pdf",
+            )
+            import_submitted = st.form_submit_button(
+                "In Stammdaten speichern / Save to master data",
+                type="primary",
+            )
+
+        if import_submitted:
+            if uploaded_registration_pdf is None:
+                st.warning(
+                    "Bitte zuerst ein PDF auswählen. / Please select a PDF file first."
+                )
+            else:
+                registration_payload: RegistrationPayload | None = None
+                mapped_registration_records: dict[str, Any] | None = None
+                import_errors: list[str] = []
+
+                try:
+                    (
+                        registration_payload,
+                        mapped_registration_records,
+                    ) = _extract_registration_import_data(
+                        uploaded_registration_pdf.getvalue()
+                    )
+                    import_errors = list(registration_payload.errors)
+                except ValueError as exc:
+                    import_errors = [str(exc)]
+                except Exception as exc:
+                    import_errors = [
+                        "Import konnte nicht verarbeitet werden. / Import could not be processed.",
+                        f"Details / Details: {exc}",
+                    ]
+
+                if registration_payload is not None:
+                    child_preview = registration_payload.child
+                    parent_preview = registration_payload.parents
+                    pickup_preview = registration_payload.pickup_authorizations
+                    consent_preview = registration_payload.consents
+
+                    st.markdown("**Kind-Zusammenfassung / Child summary**")
+                    st.write(
+                        {
+                            "Name": _display_or_dash(child_preview.get("name")),
+                            "Geburtsdatum / Birthdate": _display_or_dash(
+                                child_preview.get("birthdate")
+                            ),
+                            "Startdatum / Start date": _display_or_dash(
+                                child_preview.get("start_date")
+                            ),
+                            "Gruppe / Group": _display_or_dash(
+                                child_preview.get("group")
+                            ),
+                            "Parent E-Mail": _display_or_dash(
+                                child_preview.get("parent_email")
+                                or child_preview.get("parent1_email")
+                            ),
+                        }
+                    )
+
+                    st.markdown("**Eltern-Zusammenfassung / Parent summary**")
+                    if parent_preview:
+                        st.dataframe(
+                            pd.DataFrame(parent_preview),
+                            hide_index=True,
+                            width="stretch",
+                        )
+                    else:
+                        st.info("Keine Elternangaben gefunden. / No parent data found.")
+
+                    st.markdown("**Abholberechtigte / Pickup authorization list**")
+                    if pickup_preview:
+                        st.dataframe(
+                            pd.DataFrame(pickup_preview),
+                            hide_index=True,
+                            width="stretch",
+                        )
+                    else:
+                        st.info(
+                            "Keine Abholberechtigten erkannt. / No pickup authorizations detected."
+                        )
+
+                    st.markdown("**Einwilligungen / Consent summary**")
+                    st.write(consent_preview)
+
+                if import_errors:
+                    st.error(
+                        "Validierungsfehler gefunden. Speichern ist blockiert. / Validation errors found. Saving is blocked."
+                    )
+                    for error in import_errors:
+                        st.write(f"- {error}")
+                elif mapped_registration_records is not None:
+                    try:
+                        imported_child_id = _save_registration_import(
+                            stammdaten_manager,
+                            mapped_records=mapped_registration_records,
+                            created_by=user_email,
+                        )
+                        st.session_state["stammdaten_selected_child_ids"] = [
+                            imported_child_id
+                        ]
+                        if hasattr(st, "toast"):
+                            st.toast(
+                                "Anmeldung erfolgreich importiert. / Registration imported successfully."
+                            )
+                        st.success(
+                            "Import erfolgreich gespeichert. / Import saved successfully. "
+                            f"child_id: `{imported_child_id}`"
+                        )
+                        st.caption(
+                            "Direkt zur Bearbeitung vorausgewählt. / Preselected for direct editing."
+                        )
+                        _trigger_rerun()
+                    except Exception as exc:
+                        st.error(
+                            "Fehler beim Speichern des Imports. / Error while saving import."
+                        )
+                        st.caption(f"Details / Details: {exc}")
+
+
 @st.cache_data(show_spinner=False)
 def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
     original_bytes = drive_agent.download_file(file_id)
@@ -1102,6 +1358,11 @@ else:
                     )
                     photo_meta_records = []
 
+                _render_admin_child_creation_and_import(
+                    stammdaten_manager,
+                    user_email=user_email,
+                )
+
                 if not children_load_error and children:
                     st.markdown("**👥 Kinder-Übersicht / Children overview**")
                     overview_df = pd.DataFrame(
@@ -1188,267 +1449,6 @@ else:
             elif not children_load_error:
                 st.write("*Noch keine Kinder registriert.*")
 
-            # Formular zum Hinzufügen eines neuen Kindes
-            with st.expander("Neues Kind anlegen / Add child", expanded=False):
-                with st.form(key="new_child_form", border=True):
-                    left_col, right_col = st.columns(2)
-                    with left_col:
-                        name = st.text_input("Name des Kindes / Child name")
-                        parent_email = st.text_input("E-Mail Elternteil / Parent email")
-                        birthdate = st.date_input(
-                            "Geburtsdatum / Birthdate",
-                            value=None,
-                            format="YYYY-MM-DD",
-                        )
-                        start_date = st.date_input(
-                            "Startdatum / Start date",
-                            value=None,
-                            format="YYYY-MM-DD",
-                        )
-                        status = st.selectbox(
-                            "Status", options=["active", "archived"], index=0
-                        )
-                    with right_col:
-                        group = st.text_input("Gruppe / Group", value="Igel")
-                        primary_caregiver = st.text_input(
-                            "Bezugserzieher:in / Primary caregiver"
-                        )
-                        allergies = st.text_input("Allergien / Allergies")
-                        pickup_password = st.text_input(
-                            "Abhol-Kennwort (optional) / Pickup password",
-                            type="password",
-                        )
-
-                    parent_col_left, parent_col_right = st.columns(2)
-                    with parent_col_left:
-                        parent_name = st.text_input("Elternteil Name / Parent name")
-                        parent_phone = st.text_input("Telefon / Phone")
-                        parent_phone2 = st.text_input("Telefon 2 / Phone 2")
-                        parent_address = st.text_input("Adresse / Address")
-                    with parent_col_right:
-                        emergency_contact_name = st.text_input(
-                            "Notfallkontakt Name / Emergency contact name"
-                        )
-                        emergency_contact_phone = st.text_input(
-                            "Notfallkontakt Telefon / Emergency contact phone"
-                        )
-                        preferred_language = st.selectbox(
-                            "Bevorzugte Sprache / Preferred language",
-                            options=["de", "en"],
-                            index=0,
-                            format_func=lambda value: (
-                                "Deutsch / German"
-                                if value == "de"
-                                else "English / Englisch"
-                            ),
-                        )
-                        notifications_opt_in = st.checkbox(
-                            "Benachrichtigungen erhalten / Receive notifications",
-                            value=False,
-                        )
-
-                    notes_col_left, notes_col_right = st.columns(2)
-                    with notes_col_left:
-                        notes_parent_visible = st.text_area(
-                            "Hinweise für Eltern sichtbar / Parent-visible notes",
-                            height=110,
-                        )
-                    with notes_col_right:
-                        notes_internal = st.text_area(
-                            "Interne Hinweise (nur Leitung) / Internal notes",
-                            height=110,
-                        )
-                    submitted = st.form_submit_button("Hinzufügen / Add child")
-            if submitted:
-                if name.strip() == "" or parent_email.strip() == "":
-                    st.error(
-                        "Bitte Name und Eltern-E-Mail angeben. / Please provide child name and parent email."
-                    )
-                else:
-                    try:
-                        stammdaten_manager.add_child(
-                            name.strip(),
-                            parent_email.strip(),
-                            {
-                                "birthdate": _optional_date_to_iso(birthdate),
-                                "start_date": _optional_date_to_iso(start_date),
-                                "group": group.strip(),
-                                "primary_caregiver": primary_caregiver.strip(),
-                                "allergies": allergies.strip(),
-                                "notes_parent_visible": notes_parent_visible.strip(),
-                                "notes_internal": notes_internal.strip(),
-                                "pickup_password": pickup_password.strip(),
-                                "status": status,
-                            },
-                        )
-                        stammdaten_manager.upsert_parent_by_email(
-                            parent_email.strip(),
-                            {
-                                "name": parent_name.strip(),
-                                "phone": parent_phone.strip(),
-                                "phone2": parent_phone2.strip(),
-                                "address": parent_address.strip(),
-                                "preferred_language": preferred_language,
-                                "emergency_contact_name": emergency_contact_name.strip(),
-                                "emergency_contact_phone": emergency_contact_phone.strip(),
-                                "notifications_opt_in": _active_flag_to_string(
-                                    notifications_opt_in
-                                ),
-                            },
-                        )
-                        st.success(
-                            f"Kind '{name}' hinzugefügt. / Child '{name}' added."
-                        )
-                        _trigger_rerun()
-                    except Exception as e:
-                        st.error(f"Fehler beim Speichern / Save error: {e}")
-
-            with st.expander(
-                "Anmeldung importieren (PDF) / Import registration (PDF)",
-                expanded=False,
-            ):
-                template_path = (
-                    Path(__file__).resolve().parent
-                    / "assets"
-                    / "forms"
-                    / "9Freunde_Anmeldeformular_v1.pdf"
-                )
-                if template_path.exists():
-                    st.download_button(
-                        "Leere Vorlage herunterladen / Download blank template",
-                        data=template_path.read_bytes(),
-                        file_name=template_path.name,
-                        mime="application/pdf",
-                        key="registration_template_download",
-                    )
-                else:
-                    st.warning("Vorlage nicht gefunden. / Template file not found.")
-
-                with st.form(key="registration_import_form", border=True):
-                    uploaded_registration_pdf = st.file_uploader(
-                        "Ausgefülltes Anmeldeformular hochladen / Upload completed registration form",
-                        type=["pdf"],
-                        key="registration_import_pdf",
-                    )
-                    import_submitted = st.form_submit_button(
-                        "In Stammdaten speichern / Save to master data",
-                        type="primary",
-                    )
-
-                if import_submitted:
-                    if uploaded_registration_pdf is None:
-                        st.warning(
-                            "Bitte zuerst ein PDF auswählen. / Please select a PDF file first."
-                        )
-                    else:
-                        registration_payload: RegistrationPayload | None = None
-                        mapped_registration_records: dict[str, Any] | None = None
-                        import_errors: list[str] = []
-
-                        try:
-                            (
-                                registration_payload,
-                                mapped_registration_records,
-                            ) = _extract_registration_import_data(
-                                uploaded_registration_pdf.getvalue()
-                            )
-                            import_errors = list(registration_payload.errors)
-                        except ValueError as exc:
-                            import_errors = [str(exc)]
-                        except Exception as exc:
-                            import_errors = [
-                                "Import konnte nicht verarbeitet werden. / Import could not be processed.",
-                                f"Details / Details: {exc}",
-                            ]
-
-                        if registration_payload is not None:
-                            child_preview = registration_payload.child
-                            parent_preview = registration_payload.parents
-                            pickup_preview = registration_payload.pickup_authorizations
-                            consent_preview = registration_payload.consents
-
-                            st.markdown("**Kind-Zusammenfassung / Child summary**")
-                            st.write(
-                                {
-                                    "Name": _display_or_dash(child_preview.get("name")),
-                                    "Geburtsdatum / Birthdate": _display_or_dash(
-                                        child_preview.get("birthdate")
-                                    ),
-                                    "Startdatum / Start date": _display_or_dash(
-                                        child_preview.get("start_date")
-                                    ),
-                                    "Gruppe / Group": _display_or_dash(
-                                        child_preview.get("group")
-                                    ),
-                                    "Parent E-Mail": _display_or_dash(
-                                        child_preview.get("parent_email")
-                                        or child_preview.get("parent1_email")
-                                    ),
-                                }
-                            )
-
-                            st.markdown("**Eltern-Zusammenfassung / Parent summary**")
-                            if parent_preview:
-                                st.dataframe(
-                                    pd.DataFrame(parent_preview),
-                                    hide_index=True,
-                                    width="stretch",
-                                )
-                            else:
-                                st.info(
-                                    "Keine Elternangaben gefunden. / No parent data found."
-                                )
-
-                            st.markdown(
-                                "**Abholberechtigte / Pickup authorization list**"
-                            )
-                            if pickup_preview:
-                                st.dataframe(
-                                    pd.DataFrame(pickup_preview),
-                                    hide_index=True,
-                                    width="stretch",
-                                )
-                            else:
-                                st.info(
-                                    "Keine Abholberechtigten erkannt. / No pickup authorizations detected."
-                                )
-
-                            st.markdown("**Einwilligungen / Consent summary**")
-                            st.write(consent_preview)
-
-                        if import_errors:
-                            st.error(
-                                "Validierungsfehler gefunden. Speichern ist blockiert. / Validation errors found. Saving is blocked."
-                            )
-                            for error in import_errors:
-                                st.write(f"- {error}")
-                        elif mapped_registration_records is not None:
-                            try:
-                                imported_child_id = _save_registration_import(
-                                    stammdaten_manager,
-                                    mapped_records=mapped_registration_records,
-                                    created_by=user_email,
-                                )
-                                st.session_state["stammdaten_selected_child_ids"] = [
-                                    imported_child_id
-                                ]
-                                if hasattr(st, "toast"):
-                                    st.toast(
-                                        "Anmeldung erfolgreich importiert. / Registration imported successfully."
-                                    )
-                                st.success(
-                                    "Import erfolgreich gespeichert. / Import saved successfully. "
-                                    f"child_id: `{imported_child_id}`"
-                                )
-                                st.caption(
-                                    "Direkt zur Bearbeitung vorausgewählt. / Preselected for direct editing."
-                                )
-                                _trigger_rerun()
-                            except Exception as exc:
-                                st.error(
-                                    "Fehler beim Speichern des Imports. / Error while saving import."
-                                )
-                                st.caption(f"Details / Details: {exc}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
                 selected_ids = set(

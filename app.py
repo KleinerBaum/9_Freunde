@@ -724,7 +724,7 @@ def _render_child_edit_form(
     key_prefix: str,
     stammdaten_manager: StammdatenManager,
 ) -> None:
-    with st.form(key=f"{key_prefix}_edit_child_form"):
+    with st.form(key=f"{key_prefix}_edit_child_form", border=True):
         left_col, right_col = st.columns(2)
         with left_col:
             edit_name = st.text_input(
@@ -1074,7 +1074,8 @@ else:
                 st.metric("Aktiv / Active", active_children_count)
             with col_inactive:
                 st.metric(
-                    "Archiviert / Archived", len(dashboard_children) - active_children_count
+                    "Archiviert / Archived",
+                    len(dashboard_children) - active_children_count,
                 )
 
             st.info(
@@ -1178,7 +1179,7 @@ else:
 
             # Formular zum Hinzufügen eines neuen Kindes
             with st.expander("Neues Kind anlegen / Add child", expanded=False):
-                with st.form(key="new_child_form"):
+                with st.form(key="new_child_form", border=True):
                     left_col, right_col = st.columns(2)
                     with left_col:
                         name = st.text_input("Name des Kindes / Child name")
@@ -1312,125 +1313,131 @@ else:
                 else:
                     st.warning("Vorlage nicht gefunden. / Template file not found.")
 
-                uploaded_registration_pdf = st.file_uploader(
-                    "Ausgefülltes Anmeldeformular hochladen / Upload completed registration form",
-                    type=["pdf"],
-                    key="registration_import_pdf",
-                )
-
-                registration_payload: RegistrationPayload | None = None
-                mapped_registration_records: dict[str, Any] | None = None
-                import_errors: list[str] = []
-
-                if uploaded_registration_pdf is not None:
-                    try:
-                        (
-                            registration_payload,
-                            mapped_registration_records,
-                        ) = _extract_registration_import_data(
-                            uploaded_registration_pdf.getvalue()
-                        )
-                        import_errors = list(registration_payload.errors)
-                    except ValueError as exc:
-                        import_errors = [str(exc)]
-                    except Exception as exc:
-                        import_errors = [
-                            "Import konnte nicht verarbeitet werden. / Import could not be processed.",
-                            f"Details / Details: {exc}",
-                        ]
-
-                if registration_payload is not None:
-                    child_preview = registration_payload.child
-                    parent_preview = registration_payload.parents
-                    pickup_preview = registration_payload.pickup_authorizations
-                    consent_preview = registration_payload.consents
-
-                    st.markdown("**Kind-Zusammenfassung / Child summary**")
-                    st.write(
-                        {
-                            "Name": _display_or_dash(child_preview.get("name")),
-                            "Geburtsdatum / Birthdate": _display_or_dash(
-                                child_preview.get("birthdate")
-                            ),
-                            "Startdatum / Start date": _display_or_dash(
-                                child_preview.get("start_date")
-                            ),
-                            "Gruppe / Group": _display_or_dash(
-                                child_preview.get("group")
-                            ),
-                            "Parent E-Mail": _display_or_dash(
-                                child_preview.get("parent_email")
-                                or child_preview.get("parent1_email")
-                            ),
-                        }
+                with st.form(key="registration_import_form", border=True):
+                    uploaded_registration_pdf = st.file_uploader(
+                        "Ausgefülltes Anmeldeformular hochladen / Upload completed registration form",
+                        type=["pdf"],
+                        key="registration_import_pdf",
                     )
-
-                    st.markdown("**Eltern-Zusammenfassung / Parent summary**")
-                    if parent_preview:
-                        st.dataframe(
-                            pd.DataFrame(parent_preview),
-                            hide_index=True,
-                            width="stretch",
-                        )
-                    else:
-                        st.info("Keine Elternangaben gefunden. / No parent data found.")
-
-                    st.markdown("**Abholberechtigte / Pickup authorization list**")
-                    if pickup_preview:
-                        st.dataframe(
-                            pd.DataFrame(pickup_preview),
-                            hide_index=True,
-                            width="stretch",
-                        )
-                    else:
-                        st.info(
-                            "Keine Abholberechtigten erkannt. / No pickup authorizations detected."
-                        )
-
-                    st.markdown("**Einwilligungen / Consent summary**")
-                    st.write(consent_preview)
-
-                if import_errors:
-                    st.error(
-                        "Validierungsfehler gefunden. Speichern ist blockiert. / Validation errors found. Saving is blocked."
-                    )
-                    for error in import_errors:
-                        st.write(f"- {error}")
-                elif (
-                    uploaded_registration_pdf is not None
-                    and mapped_registration_records is not None
-                ):
-                    if st.button(
+                    import_submitted = st.form_submit_button(
                         "In Stammdaten speichern / Save to master data",
-                        key="registration_import_save",
                         type="primary",
-                    ):
+                    )
+
+                if import_submitted:
+                    if uploaded_registration_pdf is None:
+                        st.warning(
+                            "Bitte zuerst ein PDF auswählen. / Please select a PDF file first."
+                        )
+                    else:
+                        registration_payload: RegistrationPayload | None = None
+                        mapped_registration_records: dict[str, Any] | None = None
+                        import_errors: list[str] = []
+
                         try:
-                            imported_child_id = _save_registration_import(
-                                stammdaten_manager,
-                                mapped_records=mapped_registration_records,
-                                created_by=user_email,
+                            (
+                                registration_payload,
+                                mapped_registration_records,
+                            ) = _extract_registration_import_data(
+                                uploaded_registration_pdf.getvalue()
                             )
-                            st.session_state["stammdaten_selected_child_ids"] = [
-                                imported_child_id
-                            ]
-                            if hasattr(st, "toast"):
-                                st.toast(
-                                    "Anmeldung erfolgreich importiert. / Registration imported successfully."
-                                )
-                            st.success(
-                                "Import erfolgreich gespeichert. / Import saved successfully. "
-                                f"child_id: `{imported_child_id}`"
-                            )
-                            st.caption(
-                                "Direkt zur Bearbeitung vorausgewählt. / Preselected for direct editing."
-                            )
-                            _trigger_rerun()
+                            import_errors = list(registration_payload.errors)
+                        except ValueError as exc:
+                            import_errors = [str(exc)]
                         except Exception as exc:
-                            st.error(
-                                "Fehler beim Speichern des Imports. / Error while saving import."
+                            import_errors = [
+                                "Import konnte nicht verarbeitet werden. / Import could not be processed.",
+                                f"Details / Details: {exc}",
+                            ]
+
+                        if registration_payload is not None:
+                            child_preview = registration_payload.child
+                            parent_preview = registration_payload.parents
+                            pickup_preview = registration_payload.pickup_authorizations
+                            consent_preview = registration_payload.consents
+
+                            st.markdown("**Kind-Zusammenfassung / Child summary**")
+                            st.write(
+                                {
+                                    "Name": _display_or_dash(child_preview.get("name")),
+                                    "Geburtsdatum / Birthdate": _display_or_dash(
+                                        child_preview.get("birthdate")
+                                    ),
+                                    "Startdatum / Start date": _display_or_dash(
+                                        child_preview.get("start_date")
+                                    ),
+                                    "Gruppe / Group": _display_or_dash(
+                                        child_preview.get("group")
+                                    ),
+                                    "Parent E-Mail": _display_or_dash(
+                                        child_preview.get("parent_email")
+                                        or child_preview.get("parent1_email")
+                                    ),
+                                }
                             )
-                            st.caption(f"Details / Details: {exc}")
+
+                            st.markdown("**Eltern-Zusammenfassung / Parent summary**")
+                            if parent_preview:
+                                st.dataframe(
+                                    pd.DataFrame(parent_preview),
+                                    hide_index=True,
+                                    width="stretch",
+                                )
+                            else:
+                                st.info(
+                                    "Keine Elternangaben gefunden. / No parent data found."
+                                )
+
+                            st.markdown(
+                                "**Abholberechtigte / Pickup authorization list**"
+                            )
+                            if pickup_preview:
+                                st.dataframe(
+                                    pd.DataFrame(pickup_preview),
+                                    hide_index=True,
+                                    width="stretch",
+                                )
+                            else:
+                                st.info(
+                                    "Keine Abholberechtigten erkannt. / No pickup authorizations detected."
+                                )
+
+                            st.markdown("**Einwilligungen / Consent summary**")
+                            st.write(consent_preview)
+
+                        if import_errors:
+                            st.error(
+                                "Validierungsfehler gefunden. Speichern ist blockiert. / Validation errors found. Saving is blocked."
+                            )
+                            for error in import_errors:
+                                st.write(f"- {error}")
+                        elif mapped_registration_records is not None:
+                            try:
+                                imported_child_id = _save_registration_import(
+                                    stammdaten_manager,
+                                    mapped_records=mapped_registration_records,
+                                    created_by=user_email,
+                                )
+                                st.session_state["stammdaten_selected_child_ids"] = [
+                                    imported_child_id
+                                ]
+                                if hasattr(st, "toast"):
+                                    st.toast(
+                                        "Anmeldung erfolgreich importiert. / Registration imported successfully."
+                                    )
+                                st.success(
+                                    "Import erfolgreich gespeichert. / Import saved successfully. "
+                                    f"child_id: `{imported_child_id}`"
+                                )
+                                st.caption(
+                                    "Direkt zur Bearbeitung vorausgewählt. / Preselected for direct editing."
+                                )
+                                _trigger_rerun()
+                            except Exception as exc:
+                                st.error(
+                                    "Fehler beim Speichern des Imports. / Error while saving import."
+                                )
+                                st.caption(f"Details / Details: {exc}")
             if children:
                 st.write("**Kind bearbeiten / Edit child:**")
                 selected_ids = set(
@@ -2050,12 +2057,17 @@ else:
                 )
             else:
                 contracts_folder_id = app_config.google.drive_contracts_folder_id
-                contract_file = st.file_uploader(
-                    "Vertrag hochladen (PDF/DOCX) / Upload contract (PDF/DOCX)",
-                    type=["pdf", "docx"],
-                    key="contracts_uploader",
-                )
-                if st.button("In Drive speichern / Save to Drive"):
+                with st.form("contracts_upload_form", border=True):
+                    contract_file = st.file_uploader(
+                        "Vertrag hochladen (PDF/DOCX) / Upload contract (PDF/DOCX)",
+                        type=["pdf", "docx"],
+                        key="contracts_uploader",
+                    )
+                    contract_upload_submitted = st.form_submit_button(
+                        "In Drive speichern / Save to Drive"
+                    )
+
+                if contract_upload_submitted:
                     if contract_file is None:
                         st.warning(
                             "Bitte zuerst eine PDF- oder DOCX-Datei auswählen. / "
@@ -2118,73 +2130,85 @@ else:
                     options=children,
                     format_func=lambda child: str(child.get("name", "")),
                 )
-                image_file = st.file_uploader(
-                    "Foto auswählen / Select photo", type=["jpg", "jpeg", "png"]
-                )
-                if image_file and st.button("Upload Foto / Upload photo"):
-                    try:
-                        child_id = str(sel_child.get("id", "")).strip()
-                        if app_config.storage_mode == "google":
-                            photo_folder_id = ensure_child_photo_folder(child_id)
-                        else:
-                            photo_folder_id = str(
-                                sel_child.get("photo_folder_id")
-                                or sel_child.get("folder_id")
-                                or ""
-                            )
-                        if not photo_folder_id:
-                            raise ValueError(
-                                "Kein Foto-Ordner für dieses Kind vorhanden. / No photo folder configured for this child."
-                            )
-                        file_id = photo_agent.upload_photo(image_file, photo_folder_id)
-                        stammdaten_manager.upsert_photo_meta(
-                            file_id,
-                            {
-                                "child_id": child_id,
-                                "album": "",
-                                "status": "draft",
-                                "uploaded_at": pd.Timestamp.now(
-                                    tz="Europe/Berlin"
-                                ).isoformat(),
-                                "uploaded_by": user_email,
-                                "retention_until": "",
-                            },
-                        )
-                        st.success(
-                            f"Foto für {sel_child.get('name', '')} hochgeladen (Status: draft). / "
-                            f"Photo uploaded for {sel_child.get('name', '')} (status: draft)."
-                        )
-                        st.image(
-                            image_file,
-                            caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
-                            width="stretch",
-                        )
-                    except DriveServiceError as exc:
-                        st.error(
-                            "Foto-Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe "
-                            "für den Service-Account (403/404) und die Drive-ID. / "
-                            "Photo upload failed. Verify folder sharing for the service "
-                            "account (403/404) and the Drive ID."
-                        )
-                        st.info(str(exc))
-                    except ValueError as exc:
-                        st.error(
-                            f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
-                        )
+                with st.form("photo_upload_form", border=True):
+                    image_file = st.file_uploader(
+                        "Foto auswählen / Select photo", type=["jpg", "jpeg", "png"]
+                    )
+                    photo_upload_submitted = st.form_submit_button(
+                        "Upload Foto / Upload photo"
+                    )
+
+                if photo_upload_submitted:
+                    if image_file is None:
                         st.warning(
-                            "Hinweis: Bitte prüfen Sie den Kind-Datensatz in den "
-                            "Stammdaten und stellen Sie sicher, dass der Service-Account "
-                            "Zugriff auf den Hauptordner hat. / Hint: Check the child "
-                            "record in master data and ensure the service account has "
-                            "access to the root folder."
+                            "Bitte zuerst ein Bild auswählen. / Please select an image first."
                         )
-                        st.info(
-                            f"Betroffene child_id / Affected child_id: {child_id or '-'}"
-                        )
-                    except Exception as exc:
-                        st.error(
-                            f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
-                        )
+                    else:
+                        try:
+                            child_id = str(sel_child.get("id", "")).strip()
+                            if app_config.storage_mode == "google":
+                                photo_folder_id = ensure_child_photo_folder(child_id)
+                            else:
+                                photo_folder_id = str(
+                                    sel_child.get("photo_folder_id")
+                                    or sel_child.get("folder_id")
+                                    or ""
+                                )
+                            if not photo_folder_id:
+                                raise ValueError(
+                                    "Kein Foto-Ordner für dieses Kind vorhanden. / No photo folder configured for this child."
+                                )
+                            file_id = photo_agent.upload_photo(
+                                image_file, photo_folder_id
+                            )
+                            stammdaten_manager.upsert_photo_meta(
+                                file_id,
+                                {
+                                    "child_id": child_id,
+                                    "album": "",
+                                    "status": "draft",
+                                    "uploaded_at": pd.Timestamp.now(
+                                        tz="Europe/Berlin"
+                                    ).isoformat(),
+                                    "uploaded_by": user_email,
+                                    "retention_until": "",
+                                },
+                            )
+                            st.success(
+                                f"Foto für {sel_child.get('name', '')} hochgeladen (Status: draft). / "
+                                f"Photo uploaded for {sel_child.get('name', '')} (status: draft)."
+                            )
+                            st.image(
+                                image_file,
+                                caption=f"Hochgeladenes Foto / Uploaded photo: {image_file.name}",
+                                width="stretch",
+                            )
+                        except DriveServiceError as exc:
+                            st.error(
+                                "Foto-Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe "
+                                "für den Service-Account (403/404) und die Drive-ID. / "
+                                "Photo upload failed. Verify folder sharing for the service "
+                                "account (403/404) and the Drive ID."
+                            )
+                            st.info(str(exc))
+                        except ValueError as exc:
+                            st.error(
+                                f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
+                            )
+                            st.warning(
+                                "Hinweis: Bitte prüfen Sie den Kind-Datensatz in den "
+                                "Stammdaten und stellen Sie sicher, dass der Service-Account "
+                                "Zugriff auf den Hauptordner hat. / Hint: Check the child "
+                                "record in master data and ensure the service account has "
+                                "access to the root folder."
+                            )
+                            st.info(
+                                f"Betroffene child_id / Affected child_id: {child_id or '-'}"
+                            )
+                        except Exception as exc:
+                            st.error(
+                                f"Fehler beim Foto-Upload / Photo upload failed: {exc}"
+                            )
 
                 st.markdown("### Foto-Status verwalten / Manage photo status")
                 child_id = str(sel_child.get("id", "")).strip()

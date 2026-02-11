@@ -865,15 +865,7 @@ else:
         if menu == "Dashboard / Dashboard":
             admin_view = "Dashboard"
         elif menu == "Stammdaten & Infos / Master data & info":
-            admin_view = st.radio(
-                "Bereich / Section",
-                (
-                    "Übersicht",
-                    "Stammdaten",
-                ),
-                horizontal=True,
-                key="admin_master_data_section",
-            )
+            admin_view = "Stammdaten"
         elif menu == "Dokumente & Verträge / Documents & contracts":
             admin_view = st.radio(
                 "Bereich / Section",
@@ -917,14 +909,6 @@ else:
                         len(dashboard_children) - active_children_count,
                     )
 
-                st.info(
-                    "Wählen Sie links einen Hauptbereich, um Details zu bearbeiten. / "
-                    "Use the main navigation on the left to open detailed sections."
-                )
-
-        # ---- Admin: Übersicht ----
-        if admin_view == "Übersicht":
-            with st.container(border=True):
                 st.subheader("Admin-Übersicht / Admin overview")
                 children: list[dict[str, str]] = []
                 children_load_error = False
@@ -966,8 +950,14 @@ else:
                         "*Noch keine Kinder registriert. / No children registered yet.*"
                     )
 
+                st.info(
+                    "Das Dashboard zeigt Kennzahlen und die aktuelle Kinder-Übersicht auf "
+                    "einen Blick. / The dashboard shows key metrics and the current children "
+                    "overview at a glance."
+                )
+
         # ---- Admin: Stammdaten ----
-        elif admin_view == "Stammdaten":
+        if admin_view == "Stammdaten":
             st.subheader("Kinder-Stammdaten verwalten")
             children: list[dict[str, str]] = []
             children_load_error = False

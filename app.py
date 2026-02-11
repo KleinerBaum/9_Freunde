@@ -180,6 +180,20 @@ def _language_label(value: str) -> str:
     return "-"
 
 
+def _ui_language() -> str:
+    language = str(st.session_state.get("ui_language", "de")).strip().lower()
+    return "en" if language == "en" else "de"
+
+
+def _ui_text(value: str) -> str:
+    """Reduziert zweisprachige Labels im Format `DE / EN` auf die aktive UI-Sprache."""
+    if " / " not in value:
+        return value
+
+    german_text, english_text = value.split(" / ", maxsplit=1)
+    return english_text if _ui_language() == "en" else german_text
+
+
 def _display_or_dash(value: object) -> str:
     normalized = str(value or "").strip()
     return normalized if normalized else "-"
@@ -825,59 +839,81 @@ else:
 
     # Sidebar menu based on role
     st.sidebar.title("9 Freunde App")
-    st.sidebar.write(f"Angemeldet als: `{user_email}`")
+    st.sidebar.radio(
+        "Sprache / Language",
+        options=("de", "en"),
+        format_func=_language_label,
+        horizontal=True,
+        key="ui_language",
+    )
+    st.sidebar.write(f"{_ui_text('Angemeldet als / Logged in as')}: `{user_email}`")
     healthcheck_requested = False
     if user_role == "admin":
+        admin_menu_labels: dict[str, str] = {
+            "dashboard": "Dashboard / Dashboard",
+            "master_data": "Stammdaten & Infos / Master data & info",
+            "photos": "Fotos & Medien / Photos & media",
+            "documents": "Dokumente & Verträge / Documents & contracts",
+            "calendar": "Kalender / Calendar",
+            "system": "System / Healthchecks",
+        }
         menu = st.sidebar.radio(
-            "Hauptnavigation / Main navigation",
-            (
-                "Dashboard / Dashboard",
-                "Stammdaten & Infos / Master data & info",
-                "Fotos & Medien / Photos & media",
-                "Dokumente & Verträge / Documents & contracts",
-                "Kalender / Calendar",
-                "System / Healthchecks",
-            ),
+            _ui_text("Hauptnavigation / Main navigation"),
+            options=tuple(admin_menu_labels.keys()),
+            format_func=lambda key: _ui_text(admin_menu_labels[key]),
             index=0,
         )
     else:
+        parent_menu_labels: dict[str, str] = {
+            "child": "Mein Kind / My child",
+            "info": "Infos / Info",
+            "documents": "Dokumente / Documents",
+            "photos": "Fotos / Photos",
+            "appointments": "Termine / Appointments",
+            "medication": "Medikationen / Medication",
+        }
         menu = st.sidebar.radio(
-            "Menü",
-            ("Mein Kind", "Infos", "Dokumente", "Fotos", "Termine", "Medikationen"),
+            _ui_text("Menü / Menu"),
+            options=tuple(parent_menu_labels.keys()),
+            format_func=lambda key: _ui_text(parent_menu_labels[key]),
             index=0,
         )
 
-    if user_role == "admin" and menu == "System / Healthchecks":
+    if user_role == "admin" and menu == "system":
         healthcheck_requested = st.sidebar.button(
-            "Google-Verbindung prüfen / Check Google connection"
+            _ui_text("Google-Verbindung prüfen / Check Google connection")
         )
 
     # Logout button at bottom of sidebar
-    if st.sidebar.button("Logout"):
+    if st.sidebar.button(_ui_text("Abmelden / Logout")):
         # Clear session state and rerun to show login
         st.session_state.clear()
         _trigger_rerun()
 
     # Content area:
-    st.header(menu)
+    if user_role == "admin":
+        st.header(_ui_text(admin_menu_labels[menu]))
+    else:
+        st.header(_ui_text(parent_menu_labels[menu]))
+
     if user_role == "admin":
         admin_view = menu
-        if menu == "Dashboard / Dashboard":
+        if menu == "dashboard":
             admin_view = "Dashboard"
-        elif menu == "Stammdaten & Infos / Master data & info":
+        elif menu == "master_data":
             admin_view = "Stammdaten"
-        elif menu == "Dokumente & Verträge / Documents & contracts":
+        elif menu == "documents":
             admin_view = st.radio(
-                "Bereich / Section",
+                _ui_text("Bereich / Section"),
                 ("Dokumente", "Verträge"),
                 horizontal=True,
                 key="admin_documents_section",
             )
-        elif menu == "Fotos & Medien / Photos & media":
+        elif menu == "photos":
             admin_view = "Fotos"
-        elif menu == "Kalender / Calendar":
+        elif menu == "calendar":
             admin_view = "Kalender"
-        elif menu == "System / Healthchecks":
+        elif menu == "system":
             admin_view = "System / Healthchecks"
 
         # ---- Admin: Dashboard ----
@@ -2036,7 +2072,7 @@ else:
         # ---- Parent/Eltern View ----
         child = stammdaten_manager.get_child_by_parent(user_email)
         st.session_state.child = child
-        if menu == "Mein Kind":
+        if menu == "child":
             with st.container(border=True):
                 st.subheader("Mein Kind - Übersicht")
                 if child:
@@ -2126,7 +2162,7 @@ else:
                     )
                 else:
                     st.write("Keine Kinderdaten gefunden. / No child data found.")
-        elif menu == "Infos":
+        elif menu == "info":
             st.subheader("Infos / Information")
             language = st.radio(
                 "Sprache / Language",
@@ -2168,7 +2204,7 @@ else:
                 else:
                     st.caption("Kein Inhalt vorhanden. / No content available.")
 
-        elif menu == "Dokumente":
+        elif menu == "documents":
             st.subheader("Dokumente Ihres Kindes")
             if child and child.get("folder_id"):
                 docs_list = drive_agent.list_files(
@@ -2190,7 +2226,7 @@ else:
                     st.write("Keine Dokumente vorhanden.")
             else:
                 st.write("Keine Dokumente verfügbar.")
-        elif menu == "Fotos":
+        elif menu == "photos":
             st.subheader("Fotos / Photos")
             if child and child.get("id"):
                 try:
@@ -2301,7 +2337,7 @@ else:
                     )
             else:
                 st.write("Keine Fotos verfügbar. / No photos available.")
-        elif menu == "Medikationen":
+        elif menu == "medication":
             st.subheader("Medikamentengabe / Medication log")
             if child and child.get("id"):
                 child_id = str(child.get("id", "")).strip()
@@ -2331,7 +2367,7 @@ else:
             else:
                 st.write("Keine Kinderdaten gefunden. / No child data found.")
 
-        elif menu == "Termine":
+        elif menu == "appointments":
             st.subheader("Termine / Events")
             components.html(GOOGLE_CALENDAR_EMBED_HTML, height=320)
             try:

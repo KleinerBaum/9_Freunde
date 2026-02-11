@@ -381,6 +381,9 @@ max_retries = 3
 base_url = "https://eu.api.openai.com/v1" # optional
 vector_store_id = "vs_..."         # optional (RAG)
 enable_web_search = true            # optional
+# Hinweis / Note: true erfordert Web-Search-Freischaltung im OpenAI-Projekt;
+# bei Problemen testweise false setzen / requires project entitlement;
+# if issues occur, try false temporarily.
 ```
 
 Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.

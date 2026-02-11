@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import time
+import logging
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -11,13 +12,24 @@ from typing import Any
 
 from docx import Document
 from docx.shared import Inches
-from openai import APITimeoutError, OpenAI, OpenAIError, RateLimitError
+from openai import (
+    APITimeoutError,
+    AuthenticationError,
+    BadRequestError,
+    OpenAI,
+    OpenAIError,
+    PermissionDeniedError,
+    RateLimitError,
+)
 
 from config import OpenAIConfig, get_app_config
 
 
 class DocumentGenerationError(RuntimeError):
     """Domänenspezifischer Fehler bei Dokumentenerstellung."""
+
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentAgent:
@@ -86,7 +98,12 @@ class DocumentAgent:
             )
 
         tools = self._build_tools()
+        fallback_tools = [
+            tool for tool in tools if str(tool.get("type", "")) != "web_search_preview"
+        ]
+        used_tool_fallback = False
         last_error: Exception | None = None
+        error_category = "unknown"
 
         for attempt in range(self.openai_config.max_retries + 1):
             try:
@@ -120,19 +137,122 @@ class DocumentAgent:
                 return {"title": title, "body": body}
             except (APITimeoutError, RateLimitError) as exc:
                 last_error = exc
+                error_category = "timeout_or_rate_limit"
+                logger.warning(
+                    "OpenAI request failed [category=%s, type=%s, attempt=%s, model=%s, tools=%s]",
+                    error_category,
+                    type(exc).__name__,
+                    attempt + 1,
+                    self.selected_model,
+                    [str(tool.get("type", "unknown")) for tool in tools],
+                )
+            except (AuthenticationError, PermissionDeniedError) as exc:
+                last_error = exc
+                error_category = "auth"
+                logger.warning(
+                    "OpenAI request failed [category=%s, type=%s, attempt=%s, model=%s]",
+                    error_category,
+                    type(exc).__name__,
+                    attempt + 1,
+                    self.selected_model,
+                )
+                break
+            except BadRequestError as exc:
+                last_error = exc
+                error_code = str(getattr(exc, "code", "") or "").lower()
+                error_message = str(exc).lower()
+                is_web_tool_error = "web_search_preview" in error_message or (
+                    "tool" in error_message
+                    and "not" in error_message
+                    and "allow" in error_message
+                )
+                if is_web_tool_error:
+                    error_category = "tool_not_allowed"
+                    logger.warning(
+                        "OpenAI tool configuration issue [category=%s, type=%s, attempt=%s, model=%s]",
+                        error_category,
+                        type(exc).__name__,
+                        attempt + 1,
+                        self.selected_model,
+                    )
+                    if (
+                        not used_tool_fallback
+                        and len(fallback_tools) != len(tools)
+                        and any(
+                            str(tool.get("type", "")) == "web_search_preview"
+                            for tool in tools
+                        )
+                    ):
+                        used_tool_fallback = True
+                        tools = fallback_tools
+                        logger.info(
+                            "Retrying OpenAI call without web_search_preview tool."
+                        )
+                        continue
+                else:
+                    error_category = "invalid_request"
+                    logger.warning(
+                        "OpenAI bad request [category=%s, type=%s, code=%s, attempt=%s, model=%s]",
+                        error_category,
+                        type(exc).__name__,
+                        error_code or "n/a",
+                        attempt + 1,
+                        self.selected_model,
+                    )
+                break
             except OpenAIError as exc:
                 last_error = exc
+                error_category = "unknown"
+                logger.warning(
+                    "OpenAI request failed [category=%s, type=%s, attempt=%s, model=%s]",
+                    error_category,
+                    type(exc).__name__,
+                    attempt + 1,
+                    self.selected_model,
+                )
                 break
 
             if attempt < self.openai_config.max_retries:
                 delay_seconds = min(6.0, (2**attempt) + random.uniform(0.0, 0.4))
                 time.sleep(delay_seconds)
 
-        raise DocumentGenerationError(
-            "Die Dokumentenerstellung mit OpenAI ist fehlgeschlagen. Bitte später erneut "
-            "versuchen oder Konfiguration prüfen.\n"
-            "OpenAI document generation failed. Please retry later or verify configuration."
-        ) from last_error
+        if error_category == "auth":
+            message = (
+                "OpenAI-Zugriff fehlgeschlagen (Authentifizierung/Berechtigung). "
+                "Bitte API-Key, Projektfreigaben und Rollen prüfen.\n"
+                "OpenAI access failed (authentication/permissions). "
+                "Please verify API key, project access, and roles."
+            )
+        elif error_category == "invalid_request":
+            message = (
+                "Die Anfrage an OpenAI war ungültig. Bitte Eingaben und Konfiguration "
+                "prüfen.\n"
+                "The OpenAI request was invalid. Please review input and configuration."
+            )
+        elif error_category == "tool_not_allowed":
+            message = (
+                "Das konfigurierte OpenAI-Tool ist für dieses Projekt nicht freigeschaltet. "
+                "Ein Fallback ohne Websuche wurde versucht. Bitte Freischaltung prüfen oder "
+                "Websuche deaktivieren.\n"
+                "The configured OpenAI tool is not enabled for this project. "
+                "A fallback without web search was attempted. Please check entitlement "
+                "or disable web search."
+            )
+        elif error_category == "timeout_or_rate_limit":
+            message = (
+                "OpenAI hat nicht rechtzeitig geantwortet oder das Ratenlimit erreicht. "
+                "Bitte später erneut versuchen.\n"
+                "OpenAI timed out or hit a rate limit. Please retry later."
+            )
+        else:
+            message = (
+                "Die Dokumentenerstellung mit OpenAI ist fehlgeschlagen. Bitte später "
+                "erneut versuchen oder Konfiguration prüfen.\n"
+                "OpenAI document generation failed. Please retry later or verify "
+                "configuration."
+            )
+
+        raise DocumentGenerationError(message) from last_error
 
     @staticmethod
     def _normalized_language(language: str) -> str:

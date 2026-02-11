@@ -13,6 +13,7 @@
 - Upload in **Fotos & Medien** akzeptiert zusätzlich Videoformate (`mp4`, `mov`, `webm`) und legt Metadaten weiterhin mit Status `draft` ab.
 
 ### Changed
+- Admin-Ansicht umgestellt: **"Admin-Übersicht / Admin overview"** wurde in den Bereich **"Dashboard / Dashboard"** integriert. Der bisherige Hinweistext wurde durch eine neue Dashboard-Beschreibung ersetzt.
 - Styling auf Theme-first umgestellt: neue Streamlit-Theme-Konfiguration in `.streamlit/config.toml` (u. a. `primaryColor`, `secondaryBackgroundColor`, `baseRadius`, `buttonRadius`, `showSidebarBorder`) statt umfangreicher Inline-CSS-Overrides.
 - UI-Abschnitte als Cards vereinheitlicht: Admin-**Dashboard**, Admin-**Übersicht** und Eltern-**Mein Kind** werden jetzt in `st.container(border=True)` gerendert.
 - Globales Hintergrund-Styling reduziert auf ein minimales CSS-Overlay für `images/Hintergrund.png`, damit Theme-Farben und Radius-Einstellungen konsistent greifen.

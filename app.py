@@ -43,15 +43,15 @@ from services.sheets_repo import (
 )
 from services.sheets_service import SheetsServiceError, read_sheet_values
 from services.photos_service import get_download_bytes
+from ui.layout import bootstrap_page
+from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
 # Streamlit page configuration
 LOGO_PATH = Path(__file__).resolve().parent / "images" / "logo.png"
 HEART_PATH = Path(__file__).resolve().parent / "images" / "Herz.png"
 BACKGROUND_PATH = Path(__file__).resolve().parent / "images" / "Hintergrund.png"
-st.set_page_config(
-    page_title="9 Freunde App",
-    page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "🤱",
-    layout="wide",
+bootstrap_page(
+    "9 Freunde App", icon_path=str(LOGO_PATH) if LOGO_PATH.exists() else None
 )
 
 
@@ -898,6 +898,14 @@ validate_config_or_stop()
 app_config = get_app_config()
 _inject_background_image()
 st.session_state.setdefault("ui_language", "de")
+ensure_defaults(
+    {
+        UIKeys.NAV_MAIN: "dashboard",
+        UIKeys.MEDIA_CHILD: None,
+        UIKeys.MEDIA_PAGE: 0,
+        UIKeys.MEDIA_SELECTED: None,
+    }
+)
 _enable_ui_text_localization()
 
 if HEART_PATH.exists():
@@ -974,11 +982,14 @@ else:
             "calendar": "Kalender / Calendar",
             "system": "System / Healthchecks",
         }
+        admin_options = tuple(admin_menu_labels.keys())
+        if ss_get(UIKeys.NAV_MAIN) not in admin_options:
+            ss_set(UIKeys.NAV_MAIN, admin_options[0])
         menu = st.sidebar.radio(
             _ui_text("Hauptnavigation / Main navigation"),
-            options=tuple(admin_menu_labels.keys()),
+            options=admin_options,
             format_func=lambda key: _ui_text(admin_menu_labels[key]),
-            index=0,
+            key=UIKeys.NAV_MAIN,
         )
     else:
         parent_menu_labels: dict[str, str] = {
@@ -989,11 +1000,14 @@ else:
             "appointments": "Termine / Appointments",
             "medication": "Medikationen / Medication",
         }
+        parent_options = tuple(parent_menu_labels.keys())
+        if ss_get(UIKeys.NAV_MAIN) not in parent_options:
+            ss_set(UIKeys.NAV_MAIN, parent_options[0])
         menu = st.sidebar.radio(
             _ui_text("Menü / Menu"),
-            options=tuple(parent_menu_labels.keys()),
+            options=parent_options,
             format_func=lambda key: _ui_text(parent_menu_labels[key]),
-            index=0,
+            key=UIKeys.NAV_MAIN,
         )
 
     if user_role == "admin" and menu == "system":

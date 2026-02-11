@@ -174,9 +174,9 @@ def _parse_opt_in_flag(value: str | bool | None) -> bool:
 def _language_label(value: str) -> str:
     normalized = value.strip().lower()
     if normalized == "de":
-        return "Deutsch / German"
+        return _ui_text("Deutsch / German")
     if normalized == "en":
-        return "English / Englisch"
+        return _ui_text("Englisch / English")
     return "-"
 
 
@@ -192,6 +192,78 @@ def _ui_text(value: str) -> str:
 
     german_text, english_text = value.split(" / ", maxsplit=1)
     return english_text if _ui_language() == "en" else german_text
+
+
+def _localize_ui_value(value: Any) -> Any:
+    """Lokalisiert UI-Texte in einfachen Datenstrukturen rekursiv."""
+    if isinstance(value, str):
+        return _ui_text(value)
+    if isinstance(value, list):
+        return [_localize_ui_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_localize_ui_value(item) for item in value)
+    return value
+
+
+def _wrap_streamlit_method_with_ui_text(obj: Any, method_name: str) -> None:
+    original_method = getattr(obj, method_name, None)
+    if not callable(original_method):
+        return
+
+    def _wrapped_method(*args: Any, **kwargs: Any) -> Any:
+        localized_args = args
+        if args:
+            localized_args = (
+                _localize_ui_value(args[0]),
+                *args[1:],
+            )
+
+        localized_kwargs = dict(kwargs)
+        for key in ("label", "help", "placeholder", "caption"):
+            if key in localized_kwargs:
+                localized_kwargs[key] = _localize_ui_value(localized_kwargs[key])
+
+        return original_method(*localized_args, **localized_kwargs)
+
+    setattr(obj, method_name, _wrapped_method)
+
+
+def _enable_ui_text_localization() -> None:
+    """Aktiviert automatische Reduktion von `DE / EN`-Texten in Streamlit-Komponenten."""
+    if st.session_state.get("_ui_text_localization_enabled"):
+        return
+
+    methods_to_wrap = (
+        "title",
+        "header",
+        "subheader",
+        "write",
+        "markdown",
+        "caption",
+        "info",
+        "warning",
+        "error",
+        "success",
+        "metric",
+        "button",
+        "checkbox",
+        "radio",
+        "selectbox",
+        "multiselect",
+        "text_input",
+        "text_area",
+        "date_input",
+        "number_input",
+        "file_uploader",
+        "download_button",
+        "expander",
+        "tabs",
+    )
+    for method_name in methods_to_wrap:
+        _wrap_streamlit_method_with_ui_text(st, method_name)
+        _wrap_streamlit_method_with_ui_text(st.sidebar, method_name)
+
+    st.session_state["_ui_text_localization_enabled"] = True
 
 
 def _display_or_dash(value: object) -> str:
@@ -782,6 +854,8 @@ def _render_child_edit_form(
 validate_config_or_stop()
 app_config = get_app_config()
 _inject_background_image()
+st.session_state.setdefault("ui_language", "de")
+_enable_ui_text_localization()
 
 if HEART_PATH.exists():
     col_left, col_center, col_right = st.columns([1, 2, 1])

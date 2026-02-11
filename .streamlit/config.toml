@@ -1,0 +1,9 @@
+[theme]
+base = "light"
+primaryColor = "#2F6FED"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F7FB"
+textColor = "#111827"
+baseRadius = "10px"
+buttonRadius = "10px"
+showSidebarBorder = true

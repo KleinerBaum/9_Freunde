@@ -20,6 +20,8 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.
 - **Landing-Page-Branding:** Oberhalb der Inhalte wird zusätzlich `images/Herz.png` zentriert dargestellt; `images/Hintergrund.png` wird als globales Hintergrundbild der gesamten App verwendet.
 - **Überarbeitetes Dark-Element-Theme (DE/EN):** Dunkle UI-Elemente (Buttons, Inputs, Sidebar) wurden auf eine kontraststarke, nutzerfreundliche und stylische Farbpalette umgestellt; helle Eingabeflächen mit klaren Fokuszuständen verbessern die Lesbarkeit deutlich. / Dark UI elements (buttons, inputs, sidebar) now use a higher-contrast, user-friendly, stylish palette; lighter input surfaces and clear focus states significantly improve readability.
+- **Theme-first Styling mit Streamlit-Konfiguration:** Die App nutzt `.streamlit/config.toml` für zentrale Theme-Werte (Farben, Radius, Sidebar-Rand), sodass Container/Forms/Dialogs konsistent ohne umfangreiche CSS-Hacks gestylt sind.
+- **Card-Layout über Container mit Border:** Wichtige Bereiche wie Admin-Dashboard, Admin-Übersicht und Elternansicht „Mein Kind“ sind als `st.container(border=True)` umgesetzt, um Abschnitte klar zu gliedern.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache) sowie eingebetteter Kalenderansicht per IFrame im UI.
 - **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`, optional `denied`) mit lokaler Verpixelung erkannter Gesichter bzw. vollständiger Download-Sperre bei `denied`.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
@@ -188,6 +190,23 @@ Als Admin steht in der Sidebar der Button **„Google-Verbindung prüfen / Check
 - **Sheets-Test:** Ein minimaler Read-Call auf `<stammdaten_sheet_tab>!A1:A1` (A1-quoted, z. B. bei Leerzeichen im Tabnamen) des konfigurierten `gcp.stammdaten_sheet_id` inkl. kurzer Retries mit exponentiellem Backoff (bis zu 3 Versuche) bei transienten Fehlern.
 
 Die App zeigt verständliche Fehlermeldungen (DE/EN) mit konkreten Hinweisen, falls Freigaben fehlen (z. B. kein Editor-Zugriff auf den Zielordner, Kalender nicht mit Service-Account geteilt, oder fehlende Sheet-Freigabe/ungültige `stammdaten_sheet_id` bei 403/404).
+
+
+### UI-Theming (Streamlit)
+
+Die wichtigsten Designwerte werden in `.streamlit/config.toml` gepflegt (u. a. Farben und Border-Radius):
+
+```toml
+[theme]
+base = "light"
+primaryColor = "#2F6FED"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F7FB"
+textColor = "#111827"
+baseRadius = "10px"
+buttonRadius = "10px"
+showSidebarBorder = true
+```
 
 ### OpenAI API (Textgenerierung)
 Für die KI-gestützte Textgenerierung benötigen Sie einen OpenAI API-Schlüssel:

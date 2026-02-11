@@ -56,7 +56,7 @@ st.set_page_config(
 
 
 def _inject_background_image() -> None:
-    """Setzt ein globales Hintergrundbild für die gesamte Streamlit-App."""
+    """Setzt ein dezentes globales Hintergrundbild für die gesamte Streamlit-App."""
     if not BACKGROUND_PATH.exists():
         return
 
@@ -64,179 +64,17 @@ def _inject_background_image() -> None:
     st.markdown(
         f"""
         <style>
-            :root {{
-                --app-overlay: rgba(255, 255, 255, 0.9);
-                --text-primary: #1b2a41;
-                --text-secondary: #314761;
-                --panel-background: rgba(255, 255, 255, 0.95);
-                --panel-border: rgba(120, 148, 186, 0.35);
-                --input-background: rgba(255, 255, 255, 0.98);
-                --input-text: #152238;
-                --input-border: #8fa9c9;
-                --accent-primary: #3f72af;
-                --accent-primary-hover: #2f5d93;
-                --sidebar-background: rgba(36, 55, 83, 0.95);
-                --sidebar-surface: rgba(255, 255, 255, 0.12);
-                --focus-ring: rgba(63, 114, 175, 0.35);
-            }}
-
             [data-testid="stAppViewContainer"] {{
-                background-image: url("data:image/png;base64,{encoded_background}");
+                background-image: linear-gradient(
+                        180deg,
+                        rgba(255, 255, 255, 0.78) 0%,
+                        rgba(255, 255, 255, 0.9) 100%
+                    ),
+                    url("data:image/png;base64,{encoded_background}");
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
                 background-attachment: fixed;
-            }}
-
-            [data-testid="stAppViewContainer"]::before {{
-                content: "";
-                position: fixed;
-                inset: 0;
-                background: linear-gradient(
-                    180deg,
-                    rgba(255, 255, 255, 0.78) 0%,
-                    rgba(255, 255, 255, 0.88) 100%
-                );
-                z-index: 0;
-                pointer-events: none;
-            }}
-
-            .stApp {{
-                color: var(--text-primary);
-            }}
-
-            [data-testid="stAppViewBlockContainer"],
-            section[data-testid="stSidebar"] > div {{
-                position: relative;
-                z-index: 1;
-            }}
-
-            [data-testid="stAppViewBlockContainer"] {{
-                background-color: var(--app-overlay);
-                border: 1px solid var(--panel-border);
-                border-radius: 1rem;
-                backdrop-filter: blur(1px);
-                padding: 1.5rem 2rem;
-                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-                margin-top: 1rem;
-                margin-bottom: 1rem;
-            }}
-
-            [data-testid="stSidebar"] > div {{
-                background: linear-gradient(180deg, var(--sidebar-background) 0%, #1e3350 100%);
-                color: #f8fafc;
-                border-right: 1px solid rgba(255, 255, 255, 0.14);
-            }}
-
-            [data-testid="stSidebar"] :is(p, li, h1, h2, h3, h4, h5, label, span),
-            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {{
-                color: #f8fafc;
-            }}
-
-            h1, h2, h3, h4, h5, h6,
-            p,
-            li,
-            label,
-            .stMarkdown,
-            [data-testid="stMarkdownContainer"],
-            [data-testid="stText"],
-            [data-testid="stCaptionContainer"] {{
-                color: var(--text-primary);
-                text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
-            }}
-
-            [data-baseweb="select"] > div,
-            [data-baseweb="input"] > div,
-            [data-testid="stDateInputField"] > div,
-            [data-baseweb="textarea"] > div,
-            textarea,
-            input {{
-                background: var(--input-background) !important;
-                color: var(--input-text) !important;
-                border: 1px solid var(--input-border) !important;
-                border-radius: 0.75rem !important;
-                box-shadow: 0 2px 10px rgba(63, 114, 175, 0.1);
-            }}
-
-            [data-baseweb="select"] span,
-            [data-baseweb="input"] input,
-            [data-testid="stDateInputField"] input,
-            textarea,
-            input {{
-                color: var(--input-text) !important;
-            }}
-
-            [data-baseweb="select"] > div:hover,
-            [data-baseweb="input"] > div:hover,
-            [data-testid="stDateInputField"] > div:hover,
-            [data-baseweb="textarea"] > div:hover {{
-                border-color: var(--accent-primary) !important;
-            }}
-
-            [data-baseweb="select"] > div:focus-within,
-            [data-baseweb="input"] > div:focus-within,
-            [data-testid="stDateInputField"] > div:focus-within,
-            [data-baseweb="textarea"] > div:focus-within {{
-                border-color: var(--accent-primary) !important;
-                box-shadow: 0 0 0 0.2rem var(--focus-ring) !important;
-            }}
-
-            .stButton > button,
-            [data-testid="stFormSubmitButton"] button {{
-                background: linear-gradient(135deg, var(--accent-primary) 0%, #5a8ccc 100%);
-                color: #ffffff !important;
-                border: none;
-                border-radius: 0.75rem;
-                font-weight: 600;
-                transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-                box-shadow: 0 6px 14px rgba(63, 114, 175, 0.26);
-            }}
-
-            .stButton > button:hover,
-            [data-testid="stFormSubmitButton"] button:hover {{
-                background: linear-gradient(135deg, var(--accent-primary-hover) 0%, #4f7fb8 100%);
-                transform: translateY(-1px);
-                box-shadow: 0 10px 18px rgba(47, 93, 147, 0.34);
-            }}
-
-            .stButton > button:focus-visible,
-            [data-testid="stFormSubmitButton"] button:focus-visible {{
-                box-shadow: 0 0 0 0.2rem var(--focus-ring) !important;
-                outline: none;
-            }}
-
-            .stButton > button:disabled,
-            [data-testid="stFormSubmitButton"] button:disabled {{
-                background: #9db4d3;
-                color: #eef3fb !important;
-                box-shadow: none;
-            }}
-
-            [data-testid="stSidebar"] [data-baseweb="select"] > div,
-            [data-testid="stSidebar"] [data-baseweb="input"] > div,
-            [data-testid="stSidebar"] [data-testid="stDateInputField"] > div,
-            [data-testid="stSidebar"] [data-baseweb="textarea"] > div {{
-                background: var(--sidebar-surface) !important;
-                color: #f8fafc !important;
-                border: 1px solid rgba(255, 255, 255, 0.24) !important;
-            }}
-
-            [data-testid="stSidebar"] [data-baseweb="select"] span,
-            [data-testid="stSidebar"] [data-baseweb="input"] input,
-            [data-testid="stSidebar"] textarea,
-            [data-testid="stSidebar"] input {{
-                color: #f8fafc !important;
-            }}
-
-            [data-testid="stDataFrame"] {{
-                background-color: var(--panel-background);
-                border-radius: 0.8rem;
-                border: 1px solid var(--panel-border);
-            }}
-
-            [data-testid="stAlert"] {{
-                border-radius: 0.75rem;
-                border: 1px solid var(--panel-border);
             }}
 
             [data-testid="stHeader"] {{
@@ -1052,79 +890,81 @@ else:
 
         # ---- Admin: Dashboard ----
         if admin_view == "Dashboard":
-            st.subheader("Dashboard / Dashboard")
-            try:
-                dashboard_children = stammdaten_manager.get_children()
-                active_children_count = len(
-                    [
-                        child
-                        for child in dashboard_children
-                        if str(child.get("status", "active")).strip().lower()
-                        == "active"
-                    ]
-                )
-            except Exception:
-                dashboard_children = []
-                active_children_count = 0
+            with st.container(border=True):
+                st.subheader("Dashboard / Dashboard")
+                try:
+                    dashboard_children = stammdaten_manager.get_children()
+                    active_children_count = len(
+                        [
+                            child
+                            for child in dashboard_children
+                            if str(child.get("status", "active")).strip().lower()
+                            == "active"
+                        ]
+                    )
+                except Exception:
+                    dashboard_children = []
+                    active_children_count = 0
 
-            col_total, col_active, col_inactive = st.columns(3)
-            with col_total:
-                st.metric("Kinder gesamt / Total children", len(dashboard_children))
-            with col_active:
-                st.metric("Aktiv / Active", active_children_count)
-            with col_inactive:
-                st.metric(
-                    "Archiviert / Archived",
-                    len(dashboard_children) - active_children_count,
-                )
+                col_total, col_active, col_inactive = st.columns(3)
+                with col_total:
+                    st.metric("Kinder gesamt / Total children", len(dashboard_children))
+                with col_active:
+                    st.metric("Aktiv / Active", active_children_count)
+                with col_inactive:
+                    st.metric(
+                        "Archiviert / Archived",
+                        len(dashboard_children) - active_children_count,
+                    )
 
-            st.info(
-                "Wählen Sie links einen Hauptbereich, um Details zu bearbeiten. / "
-                "Use the main navigation on the left to open detailed sections."
-            )
+                st.info(
+                    "Wählen Sie links einen Hauptbereich, um Details zu bearbeiten. / "
+                    "Use the main navigation on the left to open detailed sections."
+                )
 
         # ---- Admin: Übersicht ----
         if admin_view == "Übersicht":
-            st.subheader("Admin-Übersicht / Admin overview")
-            children: list[dict[str, str]] = []
-            children_load_error = False
-            try:
-                children = stammdaten_manager.get_children()
-                photo_meta_records = stammdaten_manager.get_photo_meta_records()
-            except SheetsRepositoryError as exc:
-                children_load_error = True
-                st.error(
-                    "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
-                    "Service-Account Zugriff auf die konfigurierte Tabelle hat "
-                    "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
-                    "verify that the service account has access to the configured "
-                    "sheet (gcp.stammdaten_sheet_id)."
-                )
-                st.caption(f"Details / Details: {exc}")
-                photo_meta_records = []
-            except Exception:
-                children_load_error = True
-                st.error(
-                    "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
-                    "erneut versuchen. / Master data could not be loaded right now. "
-                    "Please try again later."
-                )
-                photo_meta_records = []
+            with st.container(border=True):
+                st.subheader("Admin-Übersicht / Admin overview")
+                children: list[dict[str, str]] = []
+                children_load_error = False
+                try:
+                    children = stammdaten_manager.get_children()
+                    photo_meta_records = stammdaten_manager.get_photo_meta_records()
+                except SheetsRepositoryError as exc:
+                    children_load_error = True
+                    st.error(
+                        "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
+                        "Service-Account Zugriff auf die konfigurierte Tabelle hat "
+                        "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
+                        "verify that the service account has access to the configured "
+                        "sheet (gcp.stammdaten_sheet_id)."
+                    )
+                    st.caption(f"Details / Details: {exc}")
+                    photo_meta_records = []
+                except Exception:
+                    children_load_error = True
+                    st.error(
+                        "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
+                        "erneut versuchen. / Master data could not be loaded right now. "
+                        "Please try again later."
+                    )
+                    photo_meta_records = []
 
-            if not children_load_error and children:
-                st.markdown("**👥 Kinder-Übersicht / Children overview**")
-                overview_df = pd.DataFrame(
-                    _build_admin_overview_rows(children, photo_meta_records)
-                )
-                st.dataframe(
-                    overview_df,
-                    hide_index=True,
-                    width="stretch",
-                )
-            elif not children_load_error:
-                st.write(
-                    "*Noch keine Kinder registriert. / No children registered yet.*"
-                )
+                if not children_load_error and children:
+                    st.markdown("**👥 Kinder-Übersicht / Children overview**")
+                    overview_df = pd.DataFrame(
+                        _build_admin_overview_rows(children, photo_meta_records)
+                    )
+                    st.dataframe(
+                        overview_df,
+                        hide_index=True,
+                        width="stretch",
+                    )
+                elif not children_load_error:
+                    st.write(
+                        "*Noch keine Kinder registriert. / No children registered yet.*"
+                    )
 
         # ---- Admin: Stammdaten ----
         elif admin_view == "Stammdaten":
@@ -2474,84 +2314,95 @@ else:
         child = stammdaten_manager.get_child_by_parent(user_email)
         st.session_state.child = child
         if menu == "Mein Kind":
-            st.subheader("Mein Kind - Übersicht")
-            if child:
-                parent_record = (
-                    stammdaten_manager.get_parent_by_email(
-                        str(child.get("parent_email", "")).strip()
+            with st.container(border=True):
+                st.subheader("Mein Kind - Übersicht")
+                if child:
+                    parent_record = (
+                        stammdaten_manager.get_parent_by_email(
+                            str(child.get("parent_email", "")).strip()
+                        )
+                        or {}
                     )
-                    or {}
-                )
-                st.markdown("**Kinderdetails / Child details**")
-                st.write(f"**Name:** {_display_or_dash(child.get('name'))}")
-                st.write(
-                    "**Geburtsdatum / Birthdate:** "
-                    f"{_display_or_dash(child.get('birthdate'))}"
-                )
-                if child.get("start_date"):
-                    st.write(f"**Startdatum / Start date:** {child.get('start_date')}")
-                st.write(f"**Gruppe / Group:** {_display_or_dash(child.get('group'))}")
-                if child.get("primary_caregiver"):
+                    st.markdown("**Kinderdetails / Child details**")
+                    st.write(f"**Name:** {_display_or_dash(child.get('name'))}")
                     st.write(
-                        f"**Bezugserzieher:in / Primary caregiver:** {child.get('primary_caregiver')}"
+                        "**Geburtsdatum / Birthdate:** "
+                        f"{_display_or_dash(child.get('birthdate'))}"
                     )
-                if child.get("allergies"):
-                    st.write(f"**Allergien / Allergies:** {child.get('allergies')}")
-                if child.get("notes_parent_visible"):
-                    st.info(f"Hinweise / Notes:\n\n{child.get('notes_parent_visible')}")
-
-                child_pickup_records = (
-                    stammdaten_manager.get_pickup_authorizations_by_child_id(
-                        str(child.get("id", "")).strip(),
-                        active_only=True,
-                    )
-                )
-                st.markdown("**Wer ist eingetragen? / Who is listed?**")
-                if child_pickup_records:
-                    for record in child_pickup_records:
-                        period_parts = []
-                        if record.get("valid_from"):
-                            period_parts.append(f"ab / from {record.get('valid_from')}")
-                        if record.get("valid_to"):
-                            period_parts.append(f"bis / until {record.get('valid_to')}")
-                        period_label = (
-                            f" ({', '.join(period_parts)})" if period_parts else ""
-                        )
+                    if child.get("start_date"):
                         st.write(
-                            f"- **{record.get('name', '—')}** · "
-                            f"{record.get('relationship', '—')} · "
-                            f"{record.get('phone', '—')}{period_label}"
+                            f"**Startdatum / Start date:** {child.get('start_date')}"
                         )
-                else:
-                    st.caption(
-                        "Keine aktiven Abholberechtigten hinterlegt. / "
-                        "No active pickup authorizations listed."
+                    st.write(
+                        f"**Gruppe / Group:** {_display_or_dash(child.get('group'))}"
                     )
+                    if child.get("primary_caregiver"):
+                        st.write(
+                            f"**Bezugserzieher:in / Primary caregiver:** {child.get('primary_caregiver')}"
+                        )
+                    if child.get("allergies"):
+                        st.write(f"**Allergien / Allergies:** {child.get('allergies')}")
+                    if child.get("notes_parent_visible"):
+                        st.info(
+                            f"Hinweise / Notes:\n\n{child.get('notes_parent_visible')}"
+                        )
 
-                st.markdown("**Elterninformationen / Parent information**")
-                emergency_name = str(
-                    parent_record.get("emergency_contact_name", "")
-                ).strip()
-                emergency_phone = str(
-                    parent_record.get("emergency_contact_phone", "")
-                ).strip()
-                emergency_parts = [
-                    part for part in [emergency_name, emergency_phone] if part
-                ]
-                st.write(
-                    "**Notfallkontakt / Emergency contact:** "
-                    f"{' – '.join(emergency_parts) if emergency_parts else '-'}"
-                )
-                st.write(
-                    "**Bevorzugte Sprache / Preferred language:** "
-                    f"{_language_label(str(parent_record.get('preferred_language', '')))}"
-                )
-                st.write(
-                    "**Benachrichtigungen / Notifications:** "
-                    f"{'Ja / Yes' if _parse_opt_in_flag(parent_record.get('notifications_opt_in')) else 'Nein / No'}"
-                )
-            else:
-                st.write("Keine Kinderdaten gefunden. / No child data found.")
+                    child_pickup_records = (
+                        stammdaten_manager.get_pickup_authorizations_by_child_id(
+                            str(child.get("id", "")).strip(),
+                            active_only=True,
+                        )
+                    )
+                    st.markdown("**Wer ist eingetragen? / Who is listed?**")
+                    if child_pickup_records:
+                        for record in child_pickup_records:
+                            period_parts = []
+                            if record.get("valid_from"):
+                                period_parts.append(
+                                    f"ab / from {record.get('valid_from')}"
+                                )
+                            if record.get("valid_to"):
+                                period_parts.append(
+                                    f"bis / until {record.get('valid_to')}"
+                                )
+                            period_label = (
+                                f" ({', '.join(period_parts)})" if period_parts else ""
+                            )
+                            st.write(
+                                f"- **{record.get('name', '—')}** · "
+                                f"{record.get('relationship', '—')} · "
+                                f"{record.get('phone', '—')}{period_label}"
+                            )
+                    else:
+                        st.caption(
+                            "Keine aktiven Abholberechtigten hinterlegt. / "
+                            "No active pickup authorizations listed."
+                        )
+
+                    st.markdown("**Elterninformationen / Parent information**")
+                    emergency_name = str(
+                        parent_record.get("emergency_contact_name", "")
+                    ).strip()
+                    emergency_phone = str(
+                        parent_record.get("emergency_contact_phone", "")
+                    ).strip()
+                    emergency_parts = [
+                        part for part in [emergency_name, emergency_phone] if part
+                    ]
+                    st.write(
+                        "**Notfallkontakt / Emergency contact:** "
+                        f"{' – '.join(emergency_parts) if emergency_parts else '-'}"
+                    )
+                    st.write(
+                        "**Bevorzugte Sprache / Preferred language:** "
+                        f"{_language_label(str(parent_record.get('preferred_language', '')))}"
+                    )
+                    st.write(
+                        "**Benachrichtigungen / Notifications:** "
+                        f"{'Ja / Yes' if _parse_opt_in_flag(parent_record.get('notifications_opt_in')) else 'Nein / No'}"
+                    )
+                else:
+                    st.write("Keine Kinderdaten gefunden. / No child data found.")
         elif menu == "Infos":
             st.subheader("Infos / Information")
             language = st.radio(

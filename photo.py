@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from datetime import datetime
-from math import ceil
 from typing import Any, Callable
 
 import streamlit as st
-from st_clickable_images import clickable_images
 
+from domain.models import MediaItem
 from services.drive_service import DriveServiceError
 from storage import DriveAgent
+from ui.layout import card, error_banner, page_header
+from ui.media_gallery import render_media_gallery
+from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
 PHOTO_STATUS_OPTIONS: tuple[str, ...] = ("draft", "published", "archived")
 DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
@@ -32,17 +33,6 @@ class MediaPageContext:
     drive_agent: DriveAgent
     photos_folder_id: str
     trigger_rerun: Callable[[], None]
-
-
-@dataclass(slots=True)
-class MediaItem:
-    file_id: str
-    name: str
-    mime_type: str
-
-    @property
-    def is_video(self) -> bool:
-        return self.mime_type.startswith("video/")
 
 
 class PhotoAgent:
@@ -73,6 +63,13 @@ class PhotoAgent:
 
 
 def render_media_page(ctx: MediaPageContext) -> None:
+    ensure_defaults(
+        {
+            UIKeys.MEDIA_CHILD: None,
+            UIKeys.MEDIA_PAGE: 0,
+            UIKeys.MEDIA_SELECTED: None,
+        }
+    )
     tab_gallery, tab_upload, tab_status = st.tabs(
         ["Galerie / Gallery", "Upload", "Status"]
     )
@@ -103,7 +100,9 @@ def _get_media_bytes(file_id: str) -> bytes:
     return drive_agent.download_file(file_id)
 
 
-def _to_media_items(raw_items: list[dict[str, Any]]) -> list[MediaItem]:
+def _to_media_items(
+    raw_items: list[dict[str, Any]], *, child_id: str, source: str
+) -> list[MediaItem]:
     media_items: list[MediaItem] = []
     for raw_item in raw_items:
         mime_type = str(raw_item.get("mimeType", "")).strip()
@@ -111,33 +110,17 @@ def _to_media_items(raw_items: list[dict[str, Any]]) -> list[MediaItem]:
             continue
         media_items.append(
             MediaItem(
-                file_id=str(raw_item.get("id", "")).strip(),
+                id=str(raw_item.get("id", "")).strip(),
+                child_id=child_id,
                 name=str(raw_item.get("name", "media")).strip() or "media",
                 mime_type=mime_type,
+                kind="video" if mime_type.startswith("video/") else "image",
+                source="local" if source == "local" else "google",
+                created_time=str(raw_item.get("createdTime", "")).strip() or None,
+                modified_time=str(raw_item.get("modifiedTime", "")).strip() or None,
             )
         )
     return media_items
-
-
-def _video_placeholder_data_url(file_name: str) -> str:
-    safe_name = file_name.replace("&", "und")
-    svg = (
-        "<svg xmlns='http://www.w3.org/2000/svg' width='420' height='280'>"
-        "<rect width='100%' height='100%' fill='#2f2f2f'/>"
-        "<text x='50%' y='45%' dominant-baseline='middle' text-anchor='middle' "
-        "fill='white' font-size='28'>▶ Video</text>"
-        f"<text x='50%' y='66%' dominant-baseline='middle' text-anchor='middle' "
-        f"fill='#d6d6d6' font-size='16'>{safe_name}</text>"
-        "</svg>"
-    )
-    encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-    return f"data:image/svg+xml;base64,{encoded}"
-
-
-def _image_data_url(media_item: MediaItem) -> str:
-    media_bytes = _get_media_bytes(media_item.file_id)
-    encoded = base64.b64encode(media_bytes).decode("ascii")
-    return f"data:{media_item.mime_type};base64,{encoded}"
 
 
 def _get_media_folder_id(ctx: MediaPageContext) -> str:
@@ -155,7 +138,7 @@ def _filter_media_items_for_child(
 
     filtered_media_items: list[MediaItem] = []
     for media_item in media_items:
-        metadata = ctx.stammdaten_manager.get_photo_meta_by_file_id(media_item.file_id)
+        metadata = ctx.stammdaten_manager.get_photo_meta_by_file_id(media_item.id)
         if not metadata:
             continue
         if str(metadata.get("child_id", "")).strip() != normalized_child_id:
@@ -164,24 +147,43 @@ def _filter_media_items_for_child(
     return filtered_media_items
 
 
-def _paginate_media(
-    media_items: list[MediaItem], page: int, page_size: int
-) -> list[MediaItem]:
-    start_index = page * page_size
-    end_index = start_index + page_size
-    return media_items[start_index:end_index]
+def _with_preview_payload(media_items: list[MediaItem]) -> list[MediaItem]:
+    enriched_items: list[MediaItem] = []
+    for media_item in media_items:
+        payload = _get_media_bytes(media_item.id)
+        enriched_items.append(
+            MediaItem(
+                id=media_item.id,
+                child_id=media_item.child_id,
+                name=media_item.name,
+                mime_type=media_item.mime_type,
+                kind=media_item.kind,
+                source=media_item.source,
+                created_time=media_item.created_time,
+                modified_time=media_item.modified_time,
+                thumb_bytes=payload if media_item.is_image else None,
+                preview_bytes=payload,
+                preview_url=media_item.preview_url,
+            )
+        )
+    return enriched_items
 
 
 def render_gallery(ctx: MediaPageContext) -> None:
-    st.markdown("### Galerie / Gallery")
+    page_header("Galerie / Gallery")
     selected_child = st.selectbox(
         "Kind auswählen / Select child",
         options=ctx.children,
         format_func=lambda child: str(child.get("name", "")),
-        key="gallery_child_select",
+        key=UIKeys.MEDIA_GALLERY_CHILD_SELECT,
     )
 
     child_id = str(selected_child.get("id", "")).strip()
+    if child_id != ss_get(UIKeys.MEDIA_CHILD):
+        ss_set(UIKeys.MEDIA_CHILD, child_id)
+        ss_set(UIKeys.MEDIA_PAGE, 0)
+        ss_set(UIKeys.MEDIA_SELECTED, None)
+
     if not child_id:
         st.warning("Kein Kind ausgewählt. / No child selected.")
         return
@@ -197,105 +199,55 @@ def render_gallery(ctx: MediaPageContext) -> None:
         raw_media_items = _list_media(folder_id)
         media_items = _filter_media_items_for_child(
             ctx,
-            _to_media_items(raw_media_items),
+            _to_media_items(
+                raw_media_items,
+                child_id=child_id,
+                source=str(getattr(ctx.app_config, "storage_mode", "google")),
+            ),
             child_id,
         )
     except DriveServiceError as exc:
-        st.error(
-            "Medien konnten nicht geladen werden. Bitte Drive-Freigaben prüfen. / "
-            "Could not load media. Please verify Drive sharing."
+        error_banner(
+            "Medien konnten nicht geladen werden. Bitte Drive-Freigaben prüfen.",
+            "Could not load media. Please verify Drive sharing.",
+            details=str(exc),
         )
-        st.info(str(exc))
         return
 
     if not media_items:
         st.caption("Keine Medien gefunden. / No media found.")
         return
 
-    page_size = 24
-    page_key = f"gallery_page_{child_id}"
-    max_pages = max(1, ceil(len(media_items) / page_size))
-    current_page = int(st.session_state.get(page_key, 0))
-    current_page = min(max(current_page, 0), max_pages - 1)
-    st.session_state[page_key] = current_page
-
-    col_prev, col_page, col_next = st.columns([1, 2, 1])
-    with col_prev:
-        if st.button("⬅️ Zurück / Previous", key=f"gallery_prev_{child_id}"):
-            st.session_state[page_key] = max(0, current_page - 1)
-            st.rerun()
-    with col_page:
-        st.caption(f"Seite / Page {current_page + 1} von / of {max_pages}")
-    with col_next:
-        if st.button("Weiter / Next ➡️", key=f"gallery_next_{child_id}"):
-            st.session_state[page_key] = min(max_pages - 1, current_page + 1)
-            st.rerun()
-
-    page_items = _paginate_media(media_items, current_page, page_size)
-    thumbnails: list[str] = []
-    titles: list[str] = []
-
-    for media_item in page_items:
-        if media_item.is_video:
-            thumbnails.append(_video_placeholder_data_url(media_item.name))
-        else:
-            thumbnails.append(_image_data_url(media_item))
-        titles.append(f"{media_item.name} ({media_item.mime_type})")
-
-    clicked_idx = clickable_images(
-        thumbnails,
-        titles=titles,
-        div_style={
-            "display": "flex",
-            "justify-content": "flex-start",
-            "flex-wrap": "wrap",
-        },
-        img_style={"margin": "4px", "height": "130px"},
-        key=f"gallery_click_{child_id}_{current_page}",
+    selected_item = render_media_gallery(
+        _with_preview_payload(media_items), page_size=24
     )
-
-    if clicked_idx < 0 or clicked_idx >= len(page_items):
-        st.caption(
-            "Bitte ein Medium anklicken, um die Vorschau und Aktionen zu sehen. / "
-            "Click a media tile to open preview and actions."
-        )
+    if not selected_item:
         return
 
-    selected_item = page_items[clicked_idx]
-    preview_col, meta_col = st.columns([3, 2])
-    with preview_col:
-        if selected_item.is_video:
-            st.video(_get_media_bytes(selected_item.file_id))
-        else:
-            st.image(_get_media_bytes(selected_item.file_id), use_container_width=True)
-    with meta_col:
-        st.markdown("#### Aktionen / Actions")
+    with card("Aktionen / Actions"):
         st.write(f"**Datei / File:** {selected_item.name}")
-        st.caption(f"ID: {selected_item.file_id}")
+        st.caption(f"ID: {selected_item.id}")
         st.caption(f"MIME: {selected_item.mime_type}")
         st.download_button(
             "Download / Download",
-            data=_get_media_bytes(selected_item.file_id),
+            data=selected_item.preview_bytes or _get_media_bytes(selected_item.id),
             file_name=selected_item.name,
             mime=selected_item.mime_type,
-            key=f"gallery_download_{selected_item.file_id}",
+            key=f"gallery_download_{selected_item.id}",
         )
 
-        meta = (
-            ctx.stammdaten_manager.get_photo_meta_by_file_id(selected_item.file_id)
-            or {}
-        )
+        meta = ctx.stammdaten_manager.get_photo_meta_by_file_id(selected_item.id) or {}
         current_status = _normalize_photo_status(str(meta.get("status", "")))
         st.write(f"Status: **{current_status}**")
 
 
 def render_upload(ctx: MediaPageContext) -> None:
-    st.markdown("### Upload")
+    page_header("Upload")
     selected_child = st.selectbox(
         "Medium hochladen für Kind / Upload media for child",
         options=ctx.children,
         format_func=lambda child: str(child.get("name", "")),
-        key="upload_child_select",
+        key=UIKeys.MEDIA_UPLOAD_CHILD_SELECT,
     )
 
     with st.form("photo_upload_form", border=True):
@@ -343,32 +295,33 @@ def render_upload(ctx: MediaPageContext) -> None:
         else:
             st.image(upload_file, use_container_width=True)
     except DriveServiceError as exc:
-        st.error(
-            "Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe und Drive-ID. / "
-            "Upload failed. Verify folder sharing and Drive ID."
+        error_banner(
+            "Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe und Drive-ID.",
+            "Upload failed. Verify folder sharing and Drive ID.",
+            details=str(exc),
         )
-        st.info(str(exc))
     except ValueError as exc:
         st.error(f"Fehler beim Upload / Upload failed: {exc}")
 
 
 def render_photo_status(ctx: MediaPageContext) -> None:
-    st.markdown("### Status")
+    page_header("Status")
     selected_child = st.selectbox(
         "Status verwalten für Kind / Manage status for child",
         options=ctx.children,
         format_func=lambda child: str(child.get("name", "")),
-        key="status_child_select",
+        key=UIKeys.MEDIA_STATUS_CHILD_SELECT,
     )
     child_id = str(selected_child.get("id", "")).strip()
 
     try:
         folder_id = _get_media_folder_id(ctx)
     except DriveServiceError as exc:
-        st.error(
-            "Foto-Ordner konnte nicht geladen werden. / Could not load media folder."
+        error_banner(
+            "Foto-Ordner konnte nicht geladen werden.",
+            "Could not load media folder.",
+            details=str(exc),
         )
-        st.info(str(exc))
         return
 
     if not folder_id:
@@ -385,7 +338,11 @@ def render_photo_status(ctx: MediaPageContext) -> None:
     raw_media_items = _list_media(folder_id)
     media_items = _filter_media_items_for_child(
         ctx,
-        _to_media_items(raw_media_items),
+        _to_media_items(
+            raw_media_items,
+            child_id=child_id,
+            source=str(getattr(ctx.app_config, "storage_mode", "google")),
+        ),
         child_id,
     )
     if not media_items:
@@ -396,9 +353,7 @@ def render_photo_status(ctx: MediaPageContext) -> None:
         return
 
     for media_item in media_items:
-        meta = (
-            ctx.stammdaten_manager.get_photo_meta_by_file_id(media_item.file_id) or {}
-        )
+        meta = ctx.stammdaten_manager.get_photo_meta_by_file_id(media_item.id) or {}
         current_status = _normalize_photo_status(meta.get("status"))
         with st.expander(
             f"{media_item.name} · Status verwalten / Manage status",
@@ -408,10 +363,10 @@ def render_photo_status(ctx: MediaPageContext) -> None:
                 "Status / Status",
                 options=list(PHOTO_STATUS_OPTIONS),
                 index=list(PHOTO_STATUS_OPTIONS).index(current_status),
-                key=f"admin_media_status_{media_item.file_id}",
+                key=f"admin_media_status_{media_item.id}",
             )
 
-            media_bytes = _get_media_bytes(media_item.file_id)
+            media_bytes = _get_media_bytes(media_item.id)
             if media_item.is_video:
                 st.video(media_bytes)
             else:
@@ -421,7 +376,7 @@ def render_photo_status(ctx: MediaPageContext) -> None:
                 continue
 
             ctx.stammdaten_manager.upsert_photo_meta(
-                media_item.file_id,
+                media_item.id,
                 {
                     "child_id": child_id,
                     "status": selected_status,

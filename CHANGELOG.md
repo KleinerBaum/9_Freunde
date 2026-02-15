@@ -10,6 +10,7 @@
 ### Added
 - Neue UI-/Domain-Bausteine eingeführt: `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` für eine schlanke Trennung von Darstellung und Modellen ohne Änderungen an `services/`.
 - Foto-Galerie auf das neue `MediaItem`-Domain-Modell und die wiederverwendbare Galerie-Komponente umgestellt (Filter, Pagination, Vorschau, Auswahlzustand über zentrale UI-Keys).
+- OneDrive-Integration im Foto-Bereich ergänzt: Admin- und Elternansicht zeigen jetzt einen eingebetteten OneDrive-Ordner plus Direktlink, damit alle Nutzer (nach OneDrive-Passwort) Medien hoch- und herunterladen können; der Link ist optional über `[onedrive].shared_folder_url` konfigurierbar.
 
 - Admin-Bereich **Dokumente** erweitert: Berichte und Betreuungsverträge unterstützen jetzt eine explizite Sprachwahl (`de`/`en`, Default `de`) sowie einen optionalen Entwurfsstatus (`ENTWURF / DRAFT`) per Checkbox inklusive Dateinamen-Markierung.
 - Admin-UI in **„Stammdaten“** um den Expander **„Anmeldung importieren (PDF) / Import registration (PDF)“** erweitert: Download der Blanko-PDF-Vorlage aus `assets/forms/`, Upload eines ausgefüllten Formulars, Parsing via `registration_form_service`, strukturierte Vorschau (Kind/Eltern/Abholberechtigte/Einwilligungen), Validierungsanzeige mit Speicher-Blockade bei Fehlern sowie Speichern in bestehende Stammdaten-Upsert-Flows inkl. Success-Feedback mit `child_id` und direkter Vorauswahl für die Bearbeitung.

@@ -8,6 +8,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Admin-Start mit Gesamtübersicht:** Unter **„Stammdaten & Infos → Übersicht“** wird direkt nach dem Login eine kompakte Tabelle mit Kind, Elternkontakt, Fotoanzahl, letzter Aktivität sowie `photo_folder_id`/`folder_id` zur schnellen Datenkontrolle angezeigt.
 - **Direktlink zum zentralen Fotoordner:** Im Admin-Bereich **„Fotos“** wird ein direkter Google-Drive-Link (`📂`) auf den zentralen Foto-Ordner (`gcp.drive_photos_root_folder_id`) eingeblendet.
 - **Media-Gallery für Fotos & Videos (Admin):** Der Bereich **„Fotos & Medien“** ist jetzt in die Tabs **„Galerie / Gallery“**, **„Upload“** und **„Status“** aufgeteilt. Die Galerie nutzt ein klickbares Thumbnail-Grid mit Pagination (24 Items/Seite), Vorschau (Bild/Video), Datei-Metadaten und Direkt-Download pro Eintrag.
+- **OneDrive-Freigabe im Foto-Bereich (Admin + Eltern):** In den Foto-/Galerieansichten wird zusätzlich ein eingebetteter OneDrive-Ordner mit direktem Link angezeigt. Alle Nutzer können dort (nach Eingabe des in OneDrive gesetzten Passworts) Bilder hoch- und herunterladen. Optional konfigurierbar über `secrets.toml` unter `[onedrive].shared_folder_url`.
 - **UI-/Domain-Basisstruktur (minimal-invasiv):** Neue Module `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` kapseln Darstellung, Session-Keys und Datamodelle, ohne bestehende Service-/Storage-Logik unter `services/` zu verändern.
 - **Zentrale Fotoablage (Admin):** Im Foto-Bereich werden alle Uploads im konfigurierten zentralen Drive-Ordner gespeichert; die Kind-Auswahl steuert ausschließlich Filter und Statusverwaltung über Metadaten (`child_id`). / In the photo area, all uploads are stored in the configured central Drive folder; child selection is used only for filtering and status management via metadata (`child_id`).
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
@@ -90,6 +91,10 @@ admin_emails = ["leitung@example.org"]
 [auth.users]
 leitung@example.org = "demo123"
 eltern@example.org = "demo123"
+
+# Optional: OneDrive-Freigabe für den Foto-/Galerie-Bereich
+[onedrive]
+shared_folder_url = "https://1drv.ms/f/..."
 ```
 
 Optional können Sie später wieder auf Google umstellen:

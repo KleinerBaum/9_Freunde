@@ -20,7 +20,12 @@ from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
-from photo import MediaPageContext, PhotoAgent, render_media_page
+from photo import (
+    MediaPageContext,
+    PhotoAgent,
+    render_media_page,
+    render_onedrive_embed_panel,
+)
 from storage import DriveAgent
 from config import get_app_config, validate_config_or_stop
 from services.calendar_service import (
@@ -2551,6 +2556,7 @@ else:
                 st.write("Keine Dokumente verfügbar.")
         elif menu == "photos":
             st.subheader("Fotos / Photos")
+            render_onedrive_embed_panel()
             if child and child.get("id"):
                 try:
                     if app_config.storage_mode == "google":

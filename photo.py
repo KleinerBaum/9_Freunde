@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
-
 import streamlit as st
+import streamlit.components.v1 as components
 
 from domain.models import MediaItem
 from services.drive_service import DriveServiceError
@@ -22,6 +22,10 @@ _VIDEO_EXTENSIONS = {
     ".webm": "video/webm",
     ".m4v": "video/x-m4v",
 }
+DEFAULT_ONEDRIVE_SHARED_FOLDER_URL = (
+    "https://1drv.ms/f/c/497745699E449E1E/"
+    "IgC_uwMf-CvWTZZYgmWwxgTVAX2YNBIlVHHu2jTvxO3xOmA?e=sYtDLw"
+)
 
 
 @dataclass(slots=True)
@@ -60,6 +64,39 @@ class PhotoAgent:
     def face_detection_enabled(self) -> bool:
         """Face-Recognition ist im MVP deaktiviert."""
         return False
+
+
+def _resolve_onedrive_folder_url() -> str:
+    """Liest den konfigurierten OneDrive-Freigabelink (Fallback: Standard-Link)."""
+    onedrive_config = st.secrets.get("onedrive", {})
+    if isinstance(onedrive_config, dict):
+        configured_url = str(onedrive_config.get("shared_folder_url", "")).strip()
+        if configured_url:
+            return configured_url
+    return DEFAULT_ONEDRIVE_SHARED_FOLDER_URL
+
+
+def render_onedrive_embed_panel() -> None:
+    """Zeigt OneDrive-Freigabe mit Upload/Download-Möglichkeit für alle Nutzer."""
+    folder_url = _resolve_onedrive_folder_url()
+
+    with card("OneDrive-Ordner / OneDrive folder"):
+        st.info(
+            "Für Upload und Download den freigegebenen OneDrive-Ordner öffnen und "
+            "das hinterlegte Passwort eingeben. / To upload and download, open the "
+            "shared OneDrive folder and enter the configured password."
+        )
+        st.link_button(
+            "📂 OneDrive öffnen (Upload & Download) / Open OneDrive (upload & download)",
+            folder_url,
+            use_container_width=True,
+        )
+        st.caption(
+            "Hinweis: Manche Browser blockieren OneDrive in iFrames. Nutzen Sie in "
+            "diesem Fall den Button oben. / Note: Some browsers block OneDrive in "
+            "iframes. Use the button above in that case."
+        )
+        components.iframe(folder_url, height=520, scrolling=True)
 
 
 def render_media_page(ctx: MediaPageContext) -> None:
@@ -171,6 +208,7 @@ def _with_preview_payload(media_items: list[MediaItem]) -> list[MediaItem]:
 
 def render_gallery(ctx: MediaPageContext) -> None:
     page_header("Galerie / Gallery")
+    render_onedrive_embed_panel()
     selected_child = st.selectbox(
         "Kind auswählen / Select child",
         options=ctx.children,
@@ -243,6 +281,7 @@ def render_gallery(ctx: MediaPageContext) -> None:
 
 def render_upload(ctx: MediaPageContext) -> None:
     page_header("Upload")
+    render_onedrive_embed_panel()
     selected_child = st.selectbox(
         "Medium hochladen für Kind / Upload media for child",
         options=ctx.children,

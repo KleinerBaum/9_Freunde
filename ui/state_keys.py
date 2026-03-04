@@ -14,6 +14,7 @@ class UIKeys:
     MEDIA_GALLERY_CHILD_SELECT = "media.gallery_child_select"
     MEDIA_UPLOAD_CHILD_SELECT = "media.upload_child_select"
     MEDIA_STATUS_CHILD_SELECT = "media.status_child_select"
+    ONEDRIVE_SHOW_EMBED = "media.onedrive_show_embed"
 
 
 def ss_get(key: str, default: Any = None) -> Any:

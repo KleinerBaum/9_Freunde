@@ -149,6 +149,26 @@ def _normalize_active_flag(value: str | bool | None) -> bool:
     return str(value or "false").strip().lower() == "true"
 
 
+def _display_name_from_email(email: str) -> str:
+    """Leitet einen lesbaren Namen aus einer E-Mail-Adresse ab."""
+    local_part = email.split("@", maxsplit=1)[0].strip()
+    if not local_part:
+        return ""
+    normalized = local_part.replace(".", " ").replace("_", " ").replace("-", " ")
+    return " ".join(part.capitalize() for part in normalized.split() if part)
+
+
+def _render_brand_header() -> None:
+    """Rendert ein kompaktes Branding mit optimierter Logo-Einbettung."""
+    brand_col, hero_col = st.columns([1, 5], vertical_alignment="center")
+    with brand_col:
+        if LOGO_PATH.exists():
+            st.image(str(LOGO_PATH), width=140)
+    with hero_col:
+        if HEART_PATH.exists():
+            st.image(str(HEART_PATH), width=170)
+
+
 PHOTO_STATUS_OPTIONS = ("draft", "published", "archived")
 DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
 CONTRACT_LANGUAGE_OPTIONS = (
@@ -1409,13 +1429,7 @@ ensure_defaults(
 )
 _enable_ui_text_localization()
 
-if HEART_PATH.exists():
-    col_left, col_center, col_right = st.columns([1, 2, 1])
-    with col_center:
-        st.image(str(HEART_PATH), width=180)
-
-if LOGO_PATH.exists():
-    st.image(str(LOGO_PATH), width=180)
+_render_brand_header()
 
 # Initialize agents (ensure single instance per session)
 if "auth_agent" not in st.session_state:
@@ -1550,98 +1564,106 @@ else:
 
         # ---- Admin: Dashboard ----
         if admin_view == "Dashboard":
-            with st.container(border=True):
-                st.subheader("Dashboard / Dashboard")
-                try:
-                    dashboard_children = stammdaten_manager.get_children()
-                    active_children_count = len(
-                        [
-                            child
-                            for child in dashboard_children
-                            if str(child.get("status", "active")).strip().lower()
-                            == "active"
-                        ]
-                    )
-                except Exception:
-                    dashboard_children = []
-                    active_children_count = 0
+            greeting_name = _display_name_from_email(user_email)
+            greeting_target = greeting_name or user_email
+            st.subheader(
+                f"Willkommen zurück, {greeting_target}! / Welcome back, {greeting_target}!"
+            )
+            st.caption(
+                "Schnellzugriff auf Kinder, Termine und Verwaltung. / "
+                "Quick access to children, events and admin tasks."
+            )
 
-                col_total, col_active, col_inactive = st.columns(3)
-                with col_total:
-                    st.metric("Kinder gesamt / Total children", len(dashboard_children))
-                with col_active:
-                    st.metric("Aktiv / Active", active_children_count)
-                with col_inactive:
-                    st.metric(
-                        "Archiviert / Archived",
-                        len(dashboard_children) - active_children_count,
-                    )
-
-                st.subheader("Admin-Übersicht / Admin overview")
-                children: list[dict[str, str]] = []
-                children_load_error = False
-                try:
-                    children = stammdaten_manager.get_children()
-                    photo_meta_records = stammdaten_manager.get_photo_meta_records()
-                except SheetsRepositoryError as exc:
-                    children_load_error = True
-                    st.error(
-                        "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
-                        "Service-Account Zugriff auf die konfigurierte Tabelle hat "
-                        "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
-                        "verify that the service account has access to the configured "
-                        "sheet (gcp.stammdaten_sheet_id)."
-                    )
-                    st.caption(f"Details / Details: {exc}")
-                    photo_meta_records = []
-                except Exception:
-                    children_load_error = True
-                    st.error(
-                        "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
-                        "erneut versuchen. / Master data could not be loaded right now. "
-                        "Please try again later."
-                    )
-                    photo_meta_records = []
-
-                _render_admin_child_creation_and_import(
-                    stammdaten_manager,
-                    user_email=user_email,
+            children: list[dict[str, str]] = []
+            photo_meta_records: list[dict[str, str]] = []
+            children_load_error = False
+            try:
+                children = stammdaten_manager.get_children()
+                photo_meta_records = stammdaten_manager.get_photo_meta_records()
+            except SheetsRepositoryError as exc:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten nicht geladen werden. Bitte prüfen Sie, ob der "
+                    "Service-Account Zugriff auf die konfigurierte Tabelle hat "
+                    "(gcp.stammdaten_sheet_id). / Could not load master data. Please "
+                    "verify that the service account has access to the configured "
+                    "sheet (gcp.stammdaten_sheet_id)."
+                )
+                st.caption(f"Details / Details: {exc}")
+            except Exception:
+                children_load_error = True
+                st.error(
+                    "Stammdaten konnten aktuell nicht geladen werden. Bitte später "
+                    "erneut versuchen. / Master data could not be loaded right now. "
+                    "Please try again later."
                 )
 
-                if not children_load_error and children:
-                    st.markdown("**👥 Kinder-Übersicht / Children overview**")
-                    overview_df = pd.DataFrame(
-                        _build_admin_overview_rows(children, photo_meta_records)
-                    )
-                    st.dataframe(
-                        overview_df,
-                        hide_index=True,
-                        width="stretch",
-                    )
-                elif not children_load_error:
-                    st.write(
-                        "*Noch keine Kinder registriert. / No children registered yet.*"
+            active_children_count = len(
+                [
+                    child
+                    for child in children
+                    if str(child.get("status", "active")).strip().lower() == "active"
+                ]
+            )
+
+            metric_col_total, metric_col_active, metric_col_inactive = st.columns(3)
+            with metric_col_total:
+                st.metric("Kinder gesamt / Total children", len(children))
+            with metric_col_active:
+                st.metric("Aktiv / Active", active_children_count)
+            with metric_col_inactive:
+                st.metric(
+                    "Archiviert / Archived", len(children) - active_children_count
+                )
+
+            action_col, calendar_col = st.columns([1.3, 1.7], gap="large")
+            with action_col:
+                with st.container(border=True):
+                    st.markdown("**Schnellaktionen / Quick actions**")
+                    _render_admin_child_creation_and_import(
+                        stammdaten_manager,
+                        user_email=user_email,
                     )
 
-                st.markdown("**Bevorstehende Termine / Upcoming events**")
-                try:
-                    upcoming_events = list_events(max_results=10)
-                except CalendarServiceError as exc:
-                    upcoming_events = []
-                    st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+                with st.expander(
+                    "👥 Kinder-Übersicht / Children overview",
+                    expanded=not children_load_error,
+                ):
+                    if not children_load_error and children:
+                        overview_df = pd.DataFrame(
+                            _build_admin_overview_rows(children, photo_meta_records)
+                        )
+                        st.dataframe(
+                            overview_df,
+                            hide_index=True,
+                            width="stretch",
+                        )
+                    elif not children_load_error:
+                        st.write(
+                            "*Noch keine Kinder registriert. / No children registered yet.*"
+                        )
 
-                if upcoming_events:
-                    for event in upcoming_events:
-                        st.write(f"- {event['start']} · **{event['summary']}**")
-                        if event["description"]:
-                            st.caption(event["description"])
-                else:
-                    st.write(
-                        "Keine anstehenden Termine vorhanden. / No upcoming events."
-                    )
+            with calendar_col:
+                with st.container(border=True):
+                    st.markdown("**Bevorstehende Termine / Upcoming events**")
+                    try:
+                        upcoming_events = list_events(max_results=6)
+                    except CalendarServiceError as exc:
+                        upcoming_events = []
+                        st.error(f"Fehler beim Laden / Failed to load events: {exc}")
 
-                st.markdown("**Kalender / Calendar**")
-                _render_calendar_embed("admin_dashboard")
+                    if upcoming_events:
+                        for event in upcoming_events:
+                            st.write(f"- {event['start']} · **{event['summary']}**")
+                            if event["description"]:
+                                st.caption(event["description"])
+                    else:
+                        st.write(
+                            "Keine anstehenden Termine vorhanden. / No upcoming events."
+                        )
+
+                with st.expander("📅 Kalender / Calendar", expanded=False):
+                    _render_calendar_embed("admin_dashboard")
 
         # ---- Admin: Stammdaten ----
         if admin_view == "Stammdaten":
@@ -2030,12 +2052,19 @@ else:
                                     "Hinweis: Kein Consent-Dokument verknüpft (optional). / "
                                     "Note: No consent document linked (optional)."
                                 )
-                    else:
-                        st.caption("Noch keine Einträge vorhanden. / No entries yet.")
+                        else:
+                            st.caption(
+                                "Noch keine Einträge vorhanden. / No entries yet."
+                            )
 
         # ---- Admin: Dokumente ----
         elif admin_view == "Dokumente":
-            st.subheader("Dokumente generieren und verwalten")
+            st.subheader(
+                "Dokumente & Verträge organisieren / Organize documents & contracts"
+            )
+            st.caption(
+                "Mehr Übersicht durch Gruppen, Spalten und ausklappbare Details. / Better overview with groups, columns and collapsible details."
+            )
             children = stammdaten_manager.get_children()
             if not children:
                 st.warning(
@@ -2043,84 +2072,91 @@ else:
                     "No children available. Please add master data first."
                 )
             else:
-                # Formular für Dokumentenerstellung
-                sel_child = st.selectbox(
-                    "Für welches Kind soll ein Dokument erstellt werden? / "
-                    "Select child for document generation",
-                    options=children,
-                    format_func=lambda child: str(child.get("name", "")),
-                )
-                doc_notes = st.text_area(
-                    "Stichpunkte oder Notizen für das Dokument / Notes for the report"
-                )
-                document_language = st.selectbox(
-                    "Dokumentsprache / Document language",
-                    options=("de", "en"),
-                    index=0,
-                    format_func=_language_label,
-                    key="admin_document_language",
-                )
-                mark_document_as_draft = st.checkbox(
-                    "Als Entwurf markieren / Mark as draft",
-                    value=False,
-                    key="admin_document_draft",
-                )
-                save_to_drive = st.checkbox(
-                    "Dokument im Drive-Ordner des Kindes speichern? / "
-                    "Save document in child's Drive folder?"
-                )
-                if st.button("Bericht erstellen / Create report"):
-                    with st.spinner("Generiere Dokument mit OpenAI..."):
-                        try:
-                            doc_bytes, file_name = doc_agent.generate_document(
-                                sel_child,
-                                doc_notes,
-                                language=document_language,
-                                is_draft=mark_document_as_draft,
-                            )
-                            st.success("Dokument erstellt: " + file_name)
-                            with st.expander(
-                                "Vorschau des neuen Dokuments / Preview new document",
-                                expanded=True,
-                            ):
-                                st.markdown(_extract_docx_preview_text(doc_bytes))
-                            # Download-Button anzeigen
-                            st.download_button(
-                                "📄 Dokument herunterladen",
-                                data=doc_bytes,
-                                file_name=file_name,
-                            )
-                            # Optional: in Drive speichern
-                            if save_to_drive:
-                                folder_id = sel_child.get("folder_id")
-                                if folder_id:
-                                    drive_agent.upload_file(
-                                        file_name,
-                                        doc_bytes,
-                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                        folder_id,
-                                    )
-                                    st.info(
-                                        "Dokument wurde im Drive-Ordner gespeichert."
-                                    )
-                                else:
-                                    st.error(
-                                        "Kein Drive-Ordner für dieses Kind vorhanden."
-                                    )
-                        except DocumentGenerationError as e:
-                            st.error(
-                                "Dokument konnte nicht erstellt werden. Bitte Hinweise prüfen und erneut versuchen."
-                            )
-                            st.error(
-                                "Document could not be generated. Please review the message and retry."
-                            )
-                            st.info(str(e))
-                        except Exception as e:
-                            st.error(f"Fehler bei der Dokumentenerstellung: {e}")
+                with st.container(border=True):
+                    st.markdown("**Bericht erstellen / Create report**")
+                    select_col, options_col = st.columns([2, 1], gap="large")
+                    with select_col:
+                        sel_child = st.selectbox(
+                            "Für welches Kind soll ein Dokument erstellt werden? / "
+                            "Select child for document generation",
+                            options=children,
+                            format_func=lambda child: str(child.get("name", "")),
+                        )
+                        doc_notes = st.text_area(
+                            "Stichpunkte oder Notizen für das Dokument / Notes for the report"
+                        )
+                    with options_col:
+                        document_language = st.selectbox(
+                            "Dokumentsprache / Document language",
+                            options=("de", "en"),
+                            index=0,
+                            format_func=_language_label,
+                            key="admin_document_language",
+                        )
+                        mark_document_as_draft = st.checkbox(
+                            "Als Entwurf markieren / Mark as draft",
+                            value=False,
+                            key="admin_document_draft",
+                        )
+                        save_to_drive = st.checkbox(
+                            "Dokument im Drive-Ordner des Kindes speichern? / "
+                            "Save document in child's Drive folder?"
+                        )
+                    if st.button("Bericht erstellen / Create report"):
+                        with st.spinner("Generiere Dokument mit OpenAI..."):
+                            try:
+                                doc_bytes, file_name = doc_agent.generate_document(
+                                    sel_child,
+                                    doc_notes,
+                                    language=document_language,
+                                    is_draft=mark_document_as_draft,
+                                )
+                                st.success("Dokument erstellt: " + file_name)
+                                with st.expander(
+                                    "Vorschau des neuen Dokuments / Preview new document",
+                                    expanded=True,
+                                ):
+                                    st.markdown(_extract_docx_preview_text(doc_bytes))
+                                # Download-Button anzeigen
+                                st.download_button(
+                                    "📄 Dokument herunterladen",
+                                    data=doc_bytes,
+                                    file_name=file_name,
+                                )
+                                # Optional: in Drive speichern
+                                if save_to_drive:
+                                    folder_id = sel_child.get("folder_id")
+                                    if folder_id:
+                                        drive_agent.upload_file(
+                                            file_name,
+                                            doc_bytes,
+                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                            folder_id,
+                                        )
+                                        st.info(
+                                            "Dokument wurde im Drive-Ordner gespeichert."
+                                        )
+                                    else:
+                                        st.error(
+                                            "Kein Drive-Ordner für dieses Kind vorhanden."
+                                        )
+                            except DocumentGenerationError as e:
+                                st.error(
+                                    "Dokument konnte nicht erstellt werden. Bitte Hinweise prüfen und erneut versuchen."
+                                )
+                                st.error(
+                                    "Document could not be generated. Please review the message and retry."
+                                )
+                                st.info(str(e))
+                            except Exception as e:
+                                st.error(f"Fehler bei der Dokumentenerstellung: {e}")
 
                 st.divider()
-                st.write("**Vorlagen aus Stammdaten / Templates from master data**")
-                contract_col, invoice_col = st.columns(2)
+                with st.expander(
+                    "Vorlagen aus Stammdaten / Templates from master data",
+                    expanded=True,
+                ):
+                    contract_col, invoice_col = st.columns(2)
 
                 with contract_col:
                     st.write("Betreuungsvertrag / Childcare contract")
@@ -2223,40 +2259,48 @@ else:
                         except Exception as exc:
                             st.error(f"Fehler bei der Abrechnungserstellung: {exc}")
 
-                # Optionale Liste vorhandener Dokumente im Drive
-                if sel_child.get("folder_id"):
-                    docs_list = drive_agent.list_files(
-                        sel_child["folder_id"],
-                        mime_type_filter="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    )
-                    if docs_list:
-                        st.write("**Bereits gespeicherte Dokumente für dieses Kind:**")
-                        for doc in docs_list:
-                            file_name = doc.get("name")
-                            file_id = doc.get("id")
-                            doc_bytes = drive_agent.download_file(file_id)
-                            preview_title = (
-                                "Vorschau gespeichertes Dokument"
-                                " / Preview saved document"
-                            )
-                            with st.expander(f"📄 {file_name}"):
-                                st.caption(preview_title)
-                                st.markdown(_extract_docx_preview_text(doc_bytes))
-                                st.download_button(
-                                    "Download / Herunterladen",
-                                    data=doc_bytes,
-                                    file_name=file_name,
-                                    key=file_id,
-                                )
-                    else:
-                        st.write(
-                            "(Keine gespeicherten Dokumente vorhanden. / "
-                            "No saved documents available.)"
+                with st.expander(
+                    "Gespeicherte Dokumente / Saved documents", expanded=False
+                ):
+                    # Optionale Liste vorhandener Dokumente im Drive
+                    if sel_child.get("folder_id"):
+                        docs_list = drive_agent.list_files(
+                            sel_child["folder_id"],
+                            mime_type_filter="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         )
+                        if docs_list:
+                            st.write(
+                                "**Bereits gespeicherte Dokumente für dieses Kind:**"
+                            )
+                            for doc in docs_list:
+                                file_name = doc.get("name")
+                                file_id = doc.get("id")
+                                doc_bytes = drive_agent.download_file(file_id)
+                                preview_title = (
+                                    "Vorschau gespeichertes Dokument"
+                                    " / Preview saved document"
+                                )
+                                with st.expander(f"📄 {file_name}"):
+                                    st.caption(preview_title)
+                                    st.markdown(_extract_docx_preview_text(doc_bytes))
+                                    st.download_button(
+                                        "Download / Herunterladen",
+                                        data=doc_bytes,
+                                        file_name=file_name,
+                                        key=file_id,
+                                    )
+                        else:
+                            st.write(
+                                "(Keine gespeicherten Dokumente vorhanden. / "
+                                "No saved documents available.)"
+                            )
 
         # ---- Admin: Verträge ----
         elif admin_view == "Verträge":
             st.subheader("Vertragsablage / Contract storage")
+            st.caption(
+                "Upload links, Dateiliste rechts und Details aufklappbar. / Upload on the left, file list on the right with collapsible details."
+            )
             if app_config.storage_mode != "google" or app_config.google is None:
                 st.info(
                     "Die Vertragsablage ist nur im Google-Modus verfügbar. / "
@@ -2264,15 +2308,17 @@ else:
                 )
             else:
                 contracts_folder_id = app_config.google.drive_contracts_folder_id
-                with st.form("contracts_upload_form", border=True):
-                    contract_file = st.file_uploader(
-                        "Vertrag hochladen (PDF/DOCX) / Upload contract (PDF/DOCX)",
-                        type=["pdf", "docx"],
-                        key="contracts_uploader",
-                    )
-                    contract_upload_submitted = st.form_submit_button(
-                        "In Drive speichern / Save to Drive"
-                    )
+                upload_col, list_col = st.columns(2, gap="large")
+                with upload_col:
+                    with st.form("contracts_upload_form", border=True):
+                        contract_file = st.file_uploader(
+                            "Vertrag hochladen (PDF/DOCX) / Upload contract (PDF/DOCX)",
+                            type=["pdf", "docx"],
+                            key="contracts_uploader",
+                        )
+                        contract_upload_submitted = st.form_submit_button(
+                            "In Drive speichern / Save to Drive"
+                        )
 
                 if contract_upload_submitted:
                     if contract_file is None:
@@ -2302,28 +2348,33 @@ else:
                             )
                             st.info(str(exc))
 
-                st.write("**Vorhandene Vertragsdateien / Existing contract files**")
-                try:
-                    contract_files = drive_agent.list_files(contracts_folder_id)
-                    if contract_files:
-                        for file_meta in contract_files:
-                            st.markdown(
-                                f"- **{file_meta.get('name', '-')}** "
-                                f"`{file_meta.get('mimeType', '-')}` · "
-                                f"{file_meta.get('modifiedTime', '-')}"
+                with list_col:
+                    st.write("**Vorhandene Vertragsdateien / Existing contract files**")
+                    try:
+                        contract_files = drive_agent.list_files(contracts_folder_id)
+                        if contract_files:
+                            for file_meta in contract_files:
+                                with st.expander(
+                                    f"📄 {file_meta.get('name', '-')}", expanded=False
+                                ):
+                                    st.caption(
+                                        f"Typ / Type: `{file_meta.get('mimeType', '-')}`"
+                                    )
+                                    st.caption(
+                                        f"Geändert / Modified: {file_meta.get('modifiedTime', '-')}"
+                                    )
+                        else:
+                            st.caption(
+                                "Noch keine Dateien vorhanden. / No files available yet."
                             )
-                    else:
-                        st.caption(
-                            "Noch keine Dateien vorhanden. / No files available yet."
+                    except DriveServiceError as exc:
+                        st.error(
+                            "Dateiliste konnte nicht geladen werden. Stellen Sie sicher, "
+                            "dass der Zielordner mit dem Service-Account geteilt ist. / "
+                            "Could not load file list. Ensure the folder is shared with "
+                            "the service account."
                         )
-                except DriveServiceError as exc:
-                    st.error(
-                        "Dateiliste konnte nicht geladen werden. Stellen Sie sicher, "
-                        "dass der Zielordner mit dem Service-Account geteilt ist. / "
-                        "Could not load file list. Ensure the folder is shared with "
-                        "the service account."
-                    )
-                    st.info(str(exc))
+                        st.info(str(exc))
 
         # ---- Admin: Fotos ----
         elif admin_view == "Fotos":

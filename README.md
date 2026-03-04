@@ -12,6 +12,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Direktlink zum zentralen Fotoordner:** Im Admin-Bereich **„Fotos“** wird ein direkter Google-Drive-Link (`📂`) auf den zentralen Foto-Ordner (`gcp.drive_photos_root_folder_id`) eingeblendet.
 - **Media-Gallery für Fotos & Videos (Admin):** Der Bereich **„Fotos & Medien“** ist jetzt in die Tabs **„Galerie / Gallery“**, **„Upload“** und **„Status“** aufgeteilt. Die Galerie nutzt ein klickbares Thumbnail-Grid mit Pagination (24 Items/Seite), Vorschau (Bild/Video), Datei-Metadaten und Direkt-Download pro Eintrag.
 - **OneDrive-Freigabe im Foto-Bereich (Admin + Eltern):** In den Foto-/Galerieansichten wird standardmäßig ein OneDrive-Linkbutton angezeigt; eine iFrame-Einbettung ist optional per Toggle **„Einbettung anzeigen / Show embed“** aktivierbar. Wenn iFrames blockiert sind, bleibt der Upload/Download über den Button im neuen Tab möglich. Die OneDrive-Karte wird nur angezeigt, wenn `[onedrive].enabled = true` gesetzt ist; Upload/Galerie bleiben dabei ausschließlich vom Graph-Setup abhängig. Optional konfigurierbar über `secrets.toml` unter `[onedrive].shared_folder_url`.
+- **DriveAgent mit OneDrive-Backend (optional):** Sobald `[onedrive].enabled = true` aktiv ist, nutzt `services/drive_service.py` für Upload, Download, Listing und Ordneranlage Microsoft Graph statt Google Drive. So können bestehende Drive-Aufrufe ohne UI-Änderung auf OneDrive laufen.
 - **UI-/Domain-Basisstruktur (minimal-invasiv):** Neue Module `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` kapseln Darstellung, Session-Keys und Datamodelle, ohne bestehende Service-/Storage-Logik unter `services/` zu verändern.
 - **Zentrale Fotoablage (Admin):** Im Foto-Bereich werden alle Uploads im konfigurierten zentralen Drive-Ordner gespeichert; die Kind-Auswahl steuert ausschließlich Filter und Statusverwaltung über Metadaten (`child_id`). / In the photo area, all uploads are stored in the configured central Drive folder; child selection is used only for filtering and status management via metadata (`child_id`).
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
@@ -158,7 +159,8 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 
 | API | Status | Nachweis im Code |
 |---|---|---|
-| Google Drive API (`drive.googleapis.com`) | **aktiv genutzt** | `storage.py`, `services/drive_service.py`, `app.py` |
+| Google Drive API (`drive.googleapis.com`) | **aktiv genutzt (Fallback)** | `storage.py`, `services/drive_service.py`, `app.py` |
+| Microsoft Graph Drive (`graph.microsoft.com`) | **aktiv genutzt (bei `[onedrive].enabled = true`)** | `services/drive_service.py`, `onedrive_auth.py`, `photo.py` |
 | Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `services/calendar_service.py`, `app.py` |
 | Google Sheets API (`sheets.googleapis.com`) | **aktiv genutzt** | `services/google_clients.py`, `services/sheets_repo.py`, `stammdaten.py` |
 | Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- OneDrive Graph-Flow für App-Only-Tokens korrigiert: `/me/drive/...` wurde auf app-kompatible Ziele (`/users/{user-id}/drive/...` oder `/drives/{drive-id}/...`) umgestellt; neue Secrets `drive_user_id`/`drive_id` ergänzt.
+- OneDrive-Fehler in der UI differenziert (DE/EN): Authentifizierung, Ordnerpfad nicht gefunden und Berechtigungsfehler werden getrennt angezeigt.
+- Tests für OneDrive-Auth und Foto-Flow erweitert (`tests/test_onedrive_auth.py`, `tests/test_photo_onedrive.py`) und auf neue Endpunkte angepasst.
 ### Changed
 - Admin-Hauptnavigation bereinigt: Der separate Menüpunkt **„Kalender / Calendar“** wurde entfernt. Die Funktion **„Neuer Termin / New event“** ist jetzt im Dashboard direkt unter **„Bevorstehende Termine / Upcoming events“** integriert; die Kalenderansicht wird dort ohne Dropdown angezeigt.
 - Kalendererstellung erweitert: Beim Anlegen eines Termins können Admins hinterlegte User-E-Mails auswählen. Diese werden als `attendees` an Google Calendar übergeben; bei vorhandenen Empfängern wird `sendUpdates="all"` genutzt, damit Einladungen per Mail versendet werden.

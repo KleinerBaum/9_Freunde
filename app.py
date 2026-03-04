@@ -1494,7 +1494,6 @@ else:
             "master_data": "Stammdaten & Infos / Master data & info",
             "photos": "Fotos & Medien / Photos & media",
             "documents": "Dokumente & Verträge / Documents & contracts",
-            "calendar": "Kalender / Calendar",
             "system": "System / Healthchecks",
         }
         admin_options = tuple(admin_menu_labels.keys())
@@ -1557,8 +1556,6 @@ else:
             )
         elif menu == "photos":
             admin_view = "Fotos"
-        elif menu == "calendar":
-            admin_view = "Kalender"
         elif menu == "system":
             admin_view = "System / Healthchecks"
 
@@ -1662,8 +1659,82 @@ else:
                             "Keine anstehenden Termine vorhanden. / No upcoming events."
                         )
 
-                with st.expander("📅 Kalender / Calendar", expanded=False):
-                    _render_calendar_embed("admin_dashboard")
+                    st.markdown("---")
+                    st.markdown("**Neuer Termin / New event**")
+                    title = st.text_input(
+                        "Titel / Title",
+                        key="dashboard_new_event_title",
+                    )
+                    event_date = st.date_input(
+                        "Datum / Date",
+                        key="dashboard_new_event_date",
+                    )
+                    event_time = st.time_input(
+                        "Uhrzeit (Start) / Start time",
+                        key="dashboard_new_event_time",
+                    )
+                    description = st.text_area(
+                        "Beschreibung / Description",
+                        key="dashboard_new_event_description",
+                    )
+
+                    parent_user_emails: set[str] = set()
+                    try:
+                        parent_user_emails = {
+                            str(parent.get("email", "")).strip().lower()
+                            for parent in stammdaten_manager.get_parents()
+                            if str(parent.get("email", "")).strip()
+                        }
+                    except SheetsRepositoryError as exc:
+                        st.caption(
+                            "Eltern-User konnten nicht vollständig geladen werden. / "
+                            "Parent users could not be fully loaded. "
+                            f"Details: {exc}"
+                        )
+
+                    configured_user_emails = {
+                        str(email).strip().lower()
+                        for email in st.secrets.get("auth", {}).get("users", {})
+                        if str(email).strip()
+                    }
+                    available_users = sorted(
+                        parent_user_emails | configured_user_emails
+                    )
+                    selected_notification_recipients = st.multiselect(
+                        "Benachrichtigung an User senden / Notify users by email",
+                        options=available_users,
+                        default=[],
+                        help=(
+                            "Ausgewählte User erhalten eine Kalender-Einladung per E-Mail. / "
+                            "Selected users receive a calendar invitation by email."
+                        ),
+                        key="dashboard_new_event_recipients",
+                    )
+
+                    if st.button(
+                        "Termin hinzufügen / Add event",
+                        key="dashboard_new_event_submit",
+                    ):
+                        if not title.strip():
+                            st.error("Bitte Titel eingeben. / Please enter a title.")
+                        else:
+                            try:
+                                add_event(
+                                    title=title,
+                                    event_date=event_date,
+                                    event_time=event_time,
+                                    description=description,
+                                    notification_emails=selected_notification_recipients,
+                                )
+                                st.success("Termin wurde hinzugefügt. / Event created.")
+                            except CalendarServiceError as exc:
+                                st.error(
+                                    "Fehler beim Speichern / Failed to save event: "
+                                    f"{exc}"
+                                )
+
+                st.markdown("**📅 Kalender / Calendar**")
+                _render_calendar_embed("admin_dashboard")
 
         # ---- Admin: Stammdaten ----
         if admin_view == "Stammdaten":
@@ -2401,28 +2472,6 @@ else:
                         trigger_rerun=_trigger_rerun,
                     )
                 )
-
-        # ---- Admin: Kalender ----
-        elif admin_view == "Kalender":
-            st.subheader("Neuer Termin / New event")
-            title = st.text_input("Titel / Title")
-            event_date = st.date_input("Datum / Date")
-            event_time = st.time_input("Uhrzeit (Start) / Start time")
-            description = st.text_area("Beschreibung / Description")
-            if st.button("Termin hinzufügen / Add event"):
-                if not title:
-                    st.error("Bitte Titel eingeben. / Please enter a title.")
-                else:
-                    try:
-                        add_event(
-                            title=title,
-                            event_date=event_date,
-                            event_time=event_time,
-                            description=description,
-                        )
-                        st.success("Termin wurde hinzugefügt. / Event created.")
-                    except CalendarServiceError as exc:
-                        st.error(f"Fehler beim Speichern / Failed to save event: {exc}")
 
         elif admin_view == "System / Healthchecks":
             st.subheader("System / Healthchecks")

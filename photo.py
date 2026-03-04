@@ -145,7 +145,10 @@ def download_photo_from_onedrive(item_id: str) -> bytes:
 
 
 def render_onedrive_embed_panel() -> None:
-    """Zeigt OneDrive-Freigabe mit Upload/Download-Möglichkeit für alle Nutzer."""
+    """Zeigt OneDrive-Freigabe mit optionaler iFrame-Einbettung."""
+    if not _is_onedrive_enabled():
+        return
+
     folder_url = _resolve_onedrive_folder_url()
 
     with card("OneDrive-Ordner / OneDrive folder"):
@@ -160,25 +163,30 @@ def render_onedrive_embed_panel() -> None:
             use_container_width=True,
         )
         st.caption(
-            "Hinweis: Manche Browser blockieren OneDrive in iFrames. Nutzen Sie in "
-            "diesem Fall den Button oben. / Note: Some browsers block OneDrive in "
-            "iframes. Use the button above in that case."
+            "Wenn iFrame blockiert ist, OneDrive über Button im neuen Tab öffnen. / "
+            "If the iFrame is blocked, open OneDrive in a new tab using the button."
         )
-        if _is_onedrive_enabled():
-            try:
-                folder_ref = get_onedrive_folder(_onedrive_folder_path())
-                st.success(
-                    "OneDrive-Authentifizierung aktiv. Ordner gefunden: "
-                    f"{folder_ref.name} ({folder_ref.id}). / "
-                    "OneDrive authentication active."
-                )
-            except OneDriveAuthError as exc:
-                st.error(
-                    "OneDrive-Authentifizierung fehlgeschlagen. Bitte Azure-App und "
-                    "Graph-Berechtigungen prüfen. / OneDrive authentication failed: "
-                    f"{exc}"
-                )
-        components.iframe(folder_url, height=520, scrolling=True)
+        try:
+            folder_ref = get_onedrive_folder(_onedrive_folder_path())
+            st.success(
+                "OneDrive-Authentifizierung aktiv. Ordner gefunden: "
+                f"{folder_ref.name} ({folder_ref.id}). / "
+                "OneDrive authentication active."
+            )
+        except OneDriveAuthError as exc:
+            st.error(
+                "OneDrive-Authentifizierung fehlgeschlagen. Bitte Azure-App und "
+                "Graph-Berechtigungen prüfen. / OneDrive authentication failed: "
+                f"{exc}"
+            )
+
+        show_embed = st.toggle(
+            "Einbettung anzeigen / Show embed",
+            value=False,
+            key=UIKeys.ONEDRIVE_SHOW_EMBED,
+        )
+        if show_embed:
+            components.iframe(folder_url, height=520, scrolling=True)
 
 
 def render_media_page(ctx: MediaPageContext) -> None:

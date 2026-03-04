@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 import streamlit as st
 import streamlit.components.v1 as components
 
 from domain.models import MediaItem
+from onedrive_auth import OneDriveAuthError, get_graph_client, get_onedrive_folder
 from services.drive_service import DriveServiceError
 from storage import DriveAgent
 from ui.layout import card, error_banner, page_header
@@ -26,6 +28,9 @@ DEFAULT_ONEDRIVE_SHARED_FOLDER_URL = (
     "https://1drv.ms/f/c/497745699E449E1E/"
     "IgC_uwMf-CvWTZZYgmWwxgTVAX2YNBIlVHHu2jTvxO3xOmA?e=sYtDLw"
 )
+DEFAULT_ONEDRIVE_FOLDER_PATH = "Documents/9 Freunde"
+ONEDRIVE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+_memo_decorator = getattr(st, "experimental_memo", st.cache_data)
 
 
 @dataclass(slots=True)
@@ -76,6 +81,69 @@ def _resolve_onedrive_folder_url() -> str:
     return DEFAULT_ONEDRIVE_SHARED_FOLDER_URL
 
 
+def _is_onedrive_enabled() -> bool:
+    onedrive_config = st.secrets.get("onedrive", {})
+    return bool(
+        isinstance(onedrive_config, dict) and onedrive_config.get("enabled", False)
+    )
+
+
+def _onedrive_folder_path() -> str:
+    onedrive_config = st.secrets.get("onedrive", {})
+    if isinstance(onedrive_config, dict):
+        configured_path = str(onedrive_config.get("folder_path", "")).strip()
+        if configured_path:
+            return configured_path
+    return DEFAULT_ONEDRIVE_FOLDER_PATH
+
+
+def list_photos_from_onedrive() -> list[dict[str, str]]:
+    folder = get_onedrive_folder(_onedrive_folder_path())
+    client = get_graph_client()
+    response = client.request("GET", f"/me/drive/items/{folder.id}/children")
+
+    payload = response.json().get("value", [])
+    if not isinstance(payload, list):
+        return []
+
+    photos: list[dict[str, str]] = []
+    for raw_item in payload:
+        if not isinstance(raw_item, dict):
+            continue
+        name = str(raw_item.get("name", "")).strip()
+        if Path(name.lower()).suffix not in ONEDRIVE_IMAGE_EXTENSIONS:
+            continue
+        photos.append({"id": str(raw_item.get("id", "")).strip(), "name": name})
+    return photos
+
+
+def upload_photo_to_onedrive(file_bytes: bytes, file_name: str) -> dict[str, str]:
+    normalized_name = Path(file_name).name
+    if not normalized_name:
+        raise ValueError("Dateiname darf nicht leer sein.")
+
+    folder_path = _onedrive_folder_path().strip("/")
+    client = get_graph_client()
+    response = client.request(
+        "PUT",
+        f"/me/drive/root:/{folder_path}/{normalized_name}:/content",
+        headers={"Content-Type": "application/octet-stream"},
+        data=file_bytes,
+    )
+    payload = response.json()
+    return {
+        "id": str(payload.get("id", "")).strip(),
+        "name": str(payload.get("name", normalized_name)).strip(),
+    }
+
+
+@_memo_decorator(show_spinner=False, ttl=120)
+def download_photo_from_onedrive(item_id: str) -> bytes:
+    client = get_graph_client()
+    response = client.request("GET", f"/me/drive/items/{item_id}/content")
+    return response.content
+
+
 def render_onedrive_embed_panel() -> None:
     """Zeigt OneDrive-Freigabe mit Upload/Download-Möglichkeit für alle Nutzer."""
     folder_url = _resolve_onedrive_folder_url()
@@ -96,6 +164,20 @@ def render_onedrive_embed_panel() -> None:
             "diesem Fall den Button oben. / Note: Some browsers block OneDrive in "
             "iframes. Use the button above in that case."
         )
+        if _is_onedrive_enabled():
+            try:
+                folder_ref = get_onedrive_folder(_onedrive_folder_path())
+                st.success(
+                    "OneDrive-Authentifizierung aktiv. Ordner gefunden: "
+                    f"{folder_ref.name} ({folder_ref.id}). / "
+                    "OneDrive authentication active."
+                )
+            except OneDriveAuthError as exc:
+                st.error(
+                    "OneDrive-Authentifizierung fehlgeschlagen. Bitte Azure-App und "
+                    "Graph-Berechtigungen prüfen. / OneDrive authentication failed: "
+                    f"{exc}"
+                )
         components.iframe(folder_url, height=520, scrolling=True)
 
 
@@ -187,7 +269,11 @@ def _filter_media_items_for_child(
 def _with_preview_payload(media_items: list[MediaItem]) -> list[MediaItem]:
     enriched_items: list[MediaItem] = []
     for media_item in media_items:
-        payload = _get_media_bytes(media_item.id)
+        payload = (
+            download_photo_from_onedrive(media_item.id)
+            if media_item.source == "onedrive"
+            else _get_media_bytes(media_item.id)
+        )
         enriched_items.append(
             MediaItem(
                 id=media_item.id,
@@ -227,27 +313,47 @@ def render_gallery(ctx: MediaPageContext) -> None:
         return
 
     try:
-        folder_id = _get_media_folder_id(ctx)
-        if not folder_id:
-            st.warning(
-                "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
-            )
-            return
+        if _is_onedrive_enabled():
+            media_items = [
+                MediaItem(
+                    id=item["id"],
+                    child_id=child_id,
+                    name=item["name"],
+                    mime_type="image/jpeg",
+                    kind="image",
+                    source="onedrive",
+                )
+                for item in list_photos_from_onedrive()
+            ]
+        else:
+            folder_id = _get_media_folder_id(ctx)
+            if not folder_id:
+                st.warning(
+                    "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
+                )
+                return
 
-        raw_media_items = _list_media(folder_id)
-        media_items = _filter_media_items_for_child(
-            ctx,
-            _to_media_items(
-                raw_media_items,
-                child_id=child_id,
-                source=str(getattr(ctx.app_config, "storage_mode", "google")),
-            ),
-            child_id,
-        )
+            raw_media_items = _list_media(folder_id)
+            media_items = _filter_media_items_for_child(
+                ctx,
+                _to_media_items(
+                    raw_media_items,
+                    child_id=child_id,
+                    source=str(getattr(ctx.app_config, "storage_mode", "google")),
+                ),
+                child_id,
+            )
     except DriveServiceError as exc:
         error_banner(
             "Medien konnten nicht geladen werden. Bitte Drive-Freigaben prüfen.",
             "Could not load media. Please verify Drive sharing.",
+            details=str(exc),
+        )
+        return
+    except OneDriveAuthError as exc:
+        error_banner(
+            "OneDrive-Bilder konnten nicht geladen werden.",
+            "Could not load OneDrive photos.",
             details=str(exc),
         )
         return
@@ -268,7 +374,12 @@ def render_gallery(ctx: MediaPageContext) -> None:
         st.caption(f"MIME: {selected_item.mime_type}")
         st.download_button(
             "Download / Download",
-            data=selected_item.preview_bytes or _get_media_bytes(selected_item.id),
+            data=selected_item.preview_bytes
+            or (
+                download_photo_from_onedrive(selected_item.id)
+                if selected_item.source == "onedrive"
+                else _get_media_bytes(selected_item.id)
+            ),
             file_name=selected_item.name,
             mime=selected_item.mime_type,
             key=f"gallery_download_{selected_item.id}",
@@ -292,7 +403,9 @@ def render_upload(ctx: MediaPageContext) -> None:
     with st.form("photo_upload_form", border=True):
         upload_file = st.file_uploader(
             "Datei auswählen / Select media",
-            type=["jpg", "jpeg", "png", "mp4", "mov", "webm"],
+            type=["jpg", "jpeg", "png"]
+            if _is_onedrive_enabled()
+            else ["jpg", "jpeg", "png", "mp4", "mov", "webm"],
         )
         upload_submitted = st.form_submit_button("Upload / Upload")
 
@@ -305,13 +418,21 @@ def render_upload(ctx: MediaPageContext) -> None:
 
     child_id = str(selected_child.get("id", "")).strip()
     try:
-        folder_id = _get_media_folder_id(ctx)
-        if not folder_id:
-            raise ValueError(
-                "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
+        if _is_onedrive_enabled():
+            upload_result = upload_photo_to_onedrive(
+                upload_file.getvalue(), upload_file.name
             )
+            file_id = str(upload_result.get("id", "")).strip()
+            if not file_id:
+                raise ValueError("OneDrive hat keine Datei-ID zurückgegeben.")
+        else:
+            folder_id = _get_media_folder_id(ctx)
+            if not folder_id:
+                raise ValueError(
+                    "Kein zentraler Medien-Ordner vorhanden. / No central media folder configured."
+                )
 
-        file_id = PhotoAgent().upload_photo(upload_file, folder_id)
+            file_id = PhotoAgent().upload_photo(upload_file, folder_id)
         ctx.stammdaten_manager.upsert_photo_meta(
             file_id,
             {
@@ -326,6 +447,7 @@ def render_upload(ctx: MediaPageContext) -> None:
 
         _list_media.clear()
         _get_media_bytes.clear()
+        download_photo_from_onedrive.clear()
         st.success(
             "Upload erfolgreich (Status: draft). / Upload successful (status: draft)."
         )
@@ -341,6 +463,8 @@ def render_upload(ctx: MediaPageContext) -> None:
         )
     except ValueError as exc:
         st.error(f"Fehler beim Upload / Upload failed: {exc}")
+    except OneDriveAuthError as exc:
+        st.error(f"OneDrive-Upload fehlgeschlagen. / OneDrive upload failed: {exc}")
 
 
 def render_photo_status(ctx: MediaPageContext) -> None:

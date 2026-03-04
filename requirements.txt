@@ -12,3 +12,5 @@ opencv-python-headless
 Pillow
 odfpy
 st-clickable-images
+msal
+requests

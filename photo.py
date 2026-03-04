@@ -246,6 +246,15 @@ def _get_media_folder_id(ctx: MediaPageContext) -> str:
     return str(ctx.photos_folder_id).strip()
 
 
+def _format_drive_error_details(exc: DriveServiceError) -> str:
+    details = str(exc)
+    if exc.status_code is not None:
+        details += f" (status_code={exc.status_code})"
+    if exc.cause:
+        details += f" (cause={exc.cause})"
+    return details
+
+
 def _filter_media_items_for_child(
     ctx: MediaPageContext,
     media_items: list[MediaItem],
@@ -347,7 +356,7 @@ def render_gallery(ctx: MediaPageContext) -> None:
         error_banner(
             "Medien konnten nicht geladen werden. Bitte Drive-Freigaben prüfen.",
             "Could not load media. Please verify Drive sharing.",
-            details=str(exc),
+            details=_format_drive_error_details(exc),
         )
         return
     except OneDriveAuthError as exc:
@@ -459,7 +468,7 @@ def render_upload(ctx: MediaPageContext) -> None:
         error_banner(
             "Upload fehlgeschlagen. Prüfen Sie die Ordnerfreigabe und Drive-ID.",
             "Upload failed. Verify folder sharing and Drive ID.",
-            details=str(exc),
+            details=_format_drive_error_details(exc),
         )
     except ValueError as exc:
         st.error(f"Fehler beim Upload / Upload failed: {exc}")
@@ -483,7 +492,7 @@ def render_photo_status(ctx: MediaPageContext) -> None:
         error_banner(
             "Foto-Ordner konnte nicht geladen werden.",
             "Could not load media folder.",
-            details=str(exc),
+            details=_format_drive_error_details(exc),
         )
         return
 

@@ -100,7 +100,9 @@ def _onedrive_folder_path() -> str:
 def list_photos_from_onedrive() -> list[dict[str, str]]:
     folder = get_onedrive_folder(_onedrive_folder_path())
     client = get_graph_client()
-    response = client.request("GET", f"/me/drive/items/{folder.id}/children")
+    response = client.request(
+        "GET", f"{client.drive_base_path}/items/{folder.id}/children"
+    )
 
     payload = response.json().get("value", [])
     if not isinstance(payload, list):
@@ -126,7 +128,7 @@ def upload_photo_to_onedrive(file_bytes: bytes, file_name: str) -> dict[str, str
     client = get_graph_client()
     response = client.request(
         "PUT",
-        f"/me/drive/root:/{folder_path}/{normalized_name}:/content",
+        f"{client.drive_base_path}/root:/{folder_path}/{normalized_name}:/content",
         headers={"Content-Type": "application/octet-stream"},
         data=file_bytes,
     )
@@ -140,7 +142,9 @@ def upload_photo_to_onedrive(file_bytes: bytes, file_name: str) -> dict[str, str
 @_memo_decorator(show_spinner=False, ttl=120)
 def download_photo_from_onedrive(item_id: str) -> bytes:
     client = get_graph_client()
-    response = client.request("GET", f"/me/drive/items/{item_id}/content")
+    response = client.request(
+        "GET", f"{client.drive_base_path}/items/{item_id}/content"
+    )
     return response.content
 
 
@@ -174,11 +178,29 @@ def render_onedrive_embed_panel() -> None:
                 "OneDrive authentication active."
             )
         except OneDriveAuthError as exc:
-            st.error(
-                "OneDrive-Authentifizierung fehlgeschlagen. Bitte Azure-App und "
-                "Graph-Berechtigungen prüfen. / OneDrive authentication failed: "
-                f"{exc}"
-            )
+            if exc.reason == "auth":
+                st.error(
+                    "OneDrive-Authentifizierung fehlgeschlagen. Bitte App-Registrierung "
+                    "und Secrets prüfen. / OneDrive authentication failed. Please "
+                    "verify app registration and secrets."
+                )
+            elif exc.reason == "path":
+                st.error(
+                    "OneDrive-Ordnerpfad nicht gefunden. Bitte [onedrive].folder_path "
+                    "korrigieren. / OneDrive folder path not found. Please check "
+                    "[onedrive].folder_path."
+                )
+            elif exc.reason == "permission":
+                st.error(
+                    "OneDrive-Berechtigung fehlt. Bitte Graph-Rechte/Consent für den "
+                    "Ziel-Drive prüfen. / OneDrive permission denied. Please verify "
+                    "Graph permissions/consent for the target drive."
+                )
+            else:
+                st.error(
+                    "OneDrive-Fehler beim Ordnercheck. / OneDrive folder validation "
+                    f"failed: {exc}"
+                )
 
         show_embed = st.toggle(
             "Einbettung anzeigen / Show embed",
@@ -481,7 +503,25 @@ def render_upload(ctx: MediaPageContext) -> None:
     except ValueError as exc:
         st.error(f"Fehler beim Upload / Upload failed: {exc}")
     except OneDriveAuthError as exc:
-        st.error(f"OneDrive-Upload fehlgeschlagen. / OneDrive upload failed: {exc}")
+        if exc.reason == "auth":
+            st.error(
+                "OneDrive-Upload fehlgeschlagen: Authentifizierung ungültig. Bitte "
+                "Azure-Secrets prüfen. / OneDrive upload failed: authentication "
+                "invalid. Please verify Azure secrets."
+            )
+        elif exc.reason == "path":
+            st.error(
+                "OneDrive-Upload fehlgeschlagen: Zielordner nicht gefunden. Bitte "
+                "[onedrive].folder_path prüfen. / OneDrive upload failed: target "
+                "folder not found. Please verify [onedrive].folder_path."
+            )
+        elif exc.reason == "permission":
+            st.error(
+                "OneDrive-Upload fehlgeschlagen: Fehlende Berechtigung auf dem Ziel-"
+                "Drive. / OneDrive upload failed: missing permission on target drive."
+            )
+        else:
+            st.error(f"OneDrive-Upload fehlgeschlagen. / OneDrive upload failed: {exc}")
 
 
 def render_photo_status(ctx: MediaPageContext) -> None:

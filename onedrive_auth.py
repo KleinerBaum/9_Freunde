@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import msal
 import requests
@@ -14,12 +14,31 @@ GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
 class OneDriveAuthError(RuntimeError):
     """Fehler bei OneDrive/Graph-Authentifizierung."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: Literal[
+            "auth",
+            "permission",
+            "path",
+            "config",
+            "request",
+        ] = "request",
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.status_code = status_code
+
 
 @dataclass(frozen=True)
 class OneDriveAuthConfig:
     client_id: str
     client_secret: str
     tenant_id: str
+    drive_user_id: str | None
+    drive_id: str | None
 
 
 @dataclass(frozen=True)
@@ -33,6 +52,7 @@ class GraphClient:
     """Kleiner Graph-Client für OneDrive-Zugriffe."""
 
     def __init__(self, config: OneDriveAuthConfig) -> None:
+        self._config = config
         authority = f"https://login.microsoftonline.com/{config.tenant_id}"
         self._app = msal.ConfidentialClientApplication(
             client_id=config.client_id,
@@ -50,9 +70,21 @@ class GraphClient:
             error_description = str(token_result.get("error_description", "")).strip()
             raise OneDriveAuthError(
                 "Microsoft Graph Token konnte nicht geladen werden. "
-                f"Details: {error_description or 'unbekannt'}"
+                f"Details: {error_description or 'unbekannt'}",
+                reason="auth",
             )
         return access_token
+
+    @property
+    def drive_base_path(self) -> str:
+        if self._config.drive_id:
+            return f"/drives/{self._config.drive_id}"
+        if self._config.drive_user_id:
+            return f"/users/{self._config.drive_user_id}/drive"
+        raise OneDriveAuthError(
+            "OneDrive-Secrets unvollständig. Benötigt: drive_user_id oder drive_id.",
+            reason="config",
+        )
 
     def request(
         self,
@@ -80,8 +112,34 @@ class GraphClient:
         )
         if response.status_code >= 400:
             message = response.text[:400]
+            error_payload: dict[str, Any] = {}
+            try:
+                parsed_payload = response.json()
+                if isinstance(parsed_payload, dict):
+                    error_payload = parsed_payload.get("error", {})
+            except ValueError:
+                error_payload = {}
+
+            code = str(error_payload.get("code", "")).strip().lower()
+            reason: Literal["auth", "permission", "path", "config", "request"]
+            reason = "request"
+            if response.status_code in {401, 407} or code in {
+                "invalidauthenticationtoken",
+                "unauthenticated",
+            }:
+                reason = "auth"
+            elif response.status_code == 403 or code in {
+                "accessdenied",
+                "authorization_requestdenied",
+            }:
+                reason = "permission"
+            elif response.status_code == 404 or code in {"itemnotfound"}:
+                reason = "path"
+
             raise OneDriveAuthError(
-                f"Graph-Request fehlgeschlagen ({response.status_code}): {message}"
+                f"Graph-Request fehlgeschlagen ({response.status_code}): {message}",
+                reason=reason,
+                status_code=response.status_code,
             )
         return response
 
@@ -96,16 +154,27 @@ def _load_onedrive_config() -> OneDriveAuthConfig:
     client_id = str(raw.get("client_id", "")).strip()
     client_secret = str(raw.get("client_secret", "")).strip()
     tenant_id = str(raw.get("tenant_id", "")).strip()
+    drive_user_id = str(raw.get("drive_user_id", "")).strip() or None
+    drive_id = str(raw.get("drive_id", "")).strip() or None
 
     if not client_id or not client_secret or not tenant_id:
         raise OneDriveAuthError(
-            "OneDrive-Secrets unvollständig. Benötigt: client_id, client_secret, tenant_id."
+            "OneDrive-Secrets unvollständig. Benötigt: client_id, client_secret, tenant_id.",
+            reason="config",
+        )
+
+    if not drive_user_id and not drive_id:
+        raise OneDriveAuthError(
+            "OneDrive-Secrets unvollständig. Benötigt: drive_user_id oder drive_id.",
+            reason="config",
         )
 
     return OneDriveAuthConfig(
         client_id=client_id,
         client_secret=client_secret,
         tenant_id=tenant_id,
+        drive_user_id=drive_user_id,
+        drive_id=drive_id,
     )
 
 
@@ -116,10 +185,15 @@ def get_graph_client() -> GraphClient:
 def get_onedrive_folder(path: str) -> OneDriveFolderRef:
     normalized_path = path.strip().lstrip("/")
     if not normalized_path:
-        raise OneDriveAuthError("OneDrive-Ordnerpfad darf nicht leer sein.")
+        raise OneDriveAuthError(
+            "OneDrive-Ordnerpfad darf nicht leer sein.",
+            reason="path",
+        )
 
     client = get_graph_client()
-    response = client.request("GET", f"/me/drive/root:/{normalized_path}")
+    response = client.request(
+        "GET", f"{client.drive_base_path}/root:/{normalized_path}"
+    )
     payload = response.json()
     return OneDriveFolderRef(
         id=str(payload.get("id", "")),

@@ -100,6 +100,9 @@ eltern@example.org = "demo123"
 enabled = true
 shared_folder_url = "https://1drv.ms/f/..."
 folder_path = "Documents/9 Freunde"
+# App-only Ziel: entweder Benutzerlaufwerk ODER konkrete Drive-ID
+drive_user_id = "kita-admin@tenant.onmicrosoft.com"
+# drive_id = "b!abcDEF..."
 client_id = "<azure-app-client-id>"
 client_secret = "<azure-app-client-secret>"
 tenant_id = "<azure-tenant-id>"
@@ -120,12 +123,12 @@ Dann werden die bereits dokumentierten `gcp_service_account`- und `gcp`-Einträg
 Für die direkte Upload-/Download-Integration via Graph API braucht die App eine Azure-App-Registrierung:
 
 1. **Azure App registrieren** im Microsoft Entra Portal.
-2. Unter **API permissions** mindestens **Microsoft Graph → Delegated → `Files.ReadWrite.All`** hinzufügen und Admin-Consent erteilen.
-3. In Streamlit-Secrets den Abschnitt `[onedrive]` mit `enabled`, `client_id`, `client_secret`, `tenant_id` und `folder_path` setzen.
-4. Die App prüft den Zielordner über Graph (`/me/drive/root:/Documents/9 Freunde`) und nutzt danach diese Endpunkte:
-   - Listing: `GET /me/drive/items/{folder_id}/children`
-   - Upload: `PUT /me/drive/root:/Documents/9 Freunde/{file_name}:/content`
-   - Download: `GET /me/drive/items/{item_id}/content`
+2. Unter **API permissions** mindestens **Microsoft Graph → Application → `Files.ReadWrite.All`** hinzufügen und Admin-Consent erteilen (für `acquire_token_for_client`).
+3. In Streamlit-Secrets den Abschnitt `[onedrive]` mit `enabled`, `client_id`, `client_secret`, `tenant_id`, `folder_path` und **entweder** `drive_user_id` **oder** `drive_id` setzen.
+4. Die App prüft den Zielordner über app-kompatible Graph-Endpunkte (`/users/{user-id}/drive/...` oder `/drives/{drive-id}/...`) und nutzt danach diese Endpunkte:
+   - Listing: `GET /users/{user-id}/drive/items/{folder_id}/children` (bzw. `/drives/{drive-id}/items/...`)
+   - Upload: `PUT /users/{user-id}/drive/root:/Documents/9 Freunde/{file_name}:/content`
+   - Download: `GET /users/{user-id}/drive/items/{item_id}/content`
 
 Hinweis: Falls Listing/Upload leer oder mit 403 fehlschlägt, sind Berechtigungen oder Consent in Azure meist noch nicht vollständig.
 

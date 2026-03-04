@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- Admin-Hauptnavigation bereinigt: Der separate Menüpunkt **„Kalender / Calendar“** wurde entfernt. Die Funktion **„Neuer Termin / New event“** ist jetzt im Dashboard direkt unter **„Bevorstehende Termine / Upcoming events“** integriert; die Kalenderansicht wird dort ohne Dropdown angezeigt.
+- Kalendererstellung erweitert: Beim Anlegen eines Termins können Admins hinterlegte User-E-Mails auswählen. Diese werden als `attendees` an Google Calendar übergeben; bei vorhandenen Empfängern wird `sendUpdates="all"` genutzt, damit Einladungen per Mail versendet werden.
+
 - OneDrive-Medienfluss erweitert: optionale Microsoft-Graph-Authentifizierung (MSAL über `[onedrive].client_id/client_secret/tenant_id`), Verzeichnisprüfung für `Documents/9 Freunde`, Bild-Listing/Upload/Download über Graph-Endpoints und direkte Gallery-Einbindung mit Byte-Preview-Caching.
 - Admin-UI überarbeitet: Branding kompakter (Logo + Herzgrafik in einer Zeile), Dashboard-Header-Doppelung entfernt und durch personalisierte Begrüßung ersetzt; Dashboard sowie Bereich **Dokumente & Verträge** wurden mit Spaltenlayout, gruppierten Karten und zusätzlichen Expandern deutlich verdichtet.
 - `DocumentAgent._generate_with_retry()` behandelt OpenAI-Fehler jetzt differenziert (Authentifizierung/Berechtigung, ungültige Anfrage, Tool-nicht-erlaubt, Timeout/Rate-Limit) mit klaren DE/EN-Fehlermeldungen; bei `web_search_preview`-Toolfehlern wird einmalig automatisch ohne Web-Tool erneut versucht. Interne Logs enthalten nur nicht-sensitive Diagnosedaten ohne Prompt-/PII-Dump oder Secrets.

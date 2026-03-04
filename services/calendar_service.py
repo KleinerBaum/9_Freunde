@@ -102,6 +102,7 @@ def add_event(
     event_date: date,
     event_time: time | None,
     description: str,
+    notification_emails: list[str] | None = None,
 ) -> None:
     """Erstellt einen Termin im konfigurierten Kalender."""
     normalized_title = title.strip()
@@ -127,11 +128,29 @@ def add_event(
         },
     }
 
+    normalized_notification_emails = sorted(
+        {
+            str(email).strip().lower()
+            for email in (notification_emails or [])
+            if str(email).strip()
+        }
+    )
+    if normalized_notification_emails:
+        event_body["attendees"] = [
+            {"email": email} for email in normalized_notification_emails
+        ]
+
     if app_config.storage_mode == "google":
         calendar = _get_calendar_client()
         calendar_id = _get_calendar_id()
         try:
-            calendar.events().insert(calendarId=calendar_id, body=event_body).execute()
+            insert_kwargs: dict[str, Any] = {
+                "calendarId": calendar_id,
+                "body": event_body,
+            }
+            if normalized_notification_emails:
+                insert_kwargs["sendUpdates"] = "all"
+            calendar.events().insert(**insert_kwargs).execute()
         except HttpError as exc:
             raise _translate_calendar_http_error(exc) from exc
     else:

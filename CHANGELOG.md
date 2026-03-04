@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- DriveAgent auf OneDrive umschaltbar gemacht: Bei `[onedrive].enabled = true` werden bestehende Drive-Operationen (`create_folder`, `upload`, `list`, `download`) in `services/drive_service.py` über Microsoft Graph ausgeführt; Google Drive bleibt als Fallback erhalten.
+- Neue Tests für den umgeschalteten Drive-Service ergänzt (`tests/test_drive_service_onedrive.py`) mit Endpoint-Checks für Create/Upload/List/Download.
 - OneDrive Graph-Flow für App-Only-Tokens korrigiert: `/me/drive/...` wurde auf app-kompatible Ziele (`/users/{user-id}/drive/...` oder `/drives/{drive-id}/...`) umgestellt; neue Secrets `drive_user_id`/`drive_id` ergänzt.
 - OneDrive-Fehler in der UI differenziert (DE/EN): Authentifizierung, Ordnerpfad nicht gefunden und Berechtigungsfehler werden getrennt angezeigt.
 - Tests für OneDrive-Auth und Foto-Flow erweitert (`tests/test_onedrive_auth.py`, `tests/test_photo_onedrive.py`) und auf neue Endpunkte angepasst.

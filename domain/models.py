@@ -26,7 +26,7 @@ class MediaItem:
     name: str
     mime_type: str
     kind: Literal["image", "video"]
-    source: Literal["google", "local"]
+    source: Literal["google", "local", "onedrive"]
     created_time: str | None = None
     modified_time: str | None = None
     thumb_bytes: bytes | None = None

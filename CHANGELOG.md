@@ -11,6 +11,7 @@
 - `DocumentAgent._generate_with_retry()` behandelt OpenAI-Fehler jetzt differenziert (Authentifizierung/Berechtigung, ungültige Anfrage, Tool-nicht-erlaubt, Timeout/Rate-Limit) mit klaren DE/EN-Fehlermeldungen; bei `web_search_preview`-Toolfehlern wird einmalig automatisch ohne Web-Tool erneut versucht. Interne Logs enthalten nur nicht-sensitive Diagnosedaten ohne Prompt-/PII-Dump oder Secrets.
 - Google-Healthcheck in `app.py` erweitert: getrennte Drive-Checks für Foto-/Vertragsordner mit expliziter Anzeige der betroffenen Ordner-ID und differenzierten 403/404-Hinweisen; Kalender-Checks zeigen jetzt zusätzlich verwendete `calendar_id` sowie erforderliche Freigabe für `gcp_service_account.client_email`.
 - `DriveServiceError` und `CalendarServiceError` transportieren jetzt strukturierte Fehlerdetails (`status_code`, `cause`) für präzisere UI-Hinweise bei Google-API-Fehlern.
+- Foto-Fehlerbanner zeigen bei Drive-Fehlern jetzt zusätzlich strukturierte Details aus `DriveServiceError` (`status_code`, `cause`), damit Upload-/Listen-Fehler leichter mit Healthchecks korreliert werden können.
 
 ### Added
 - Neue UI-/Domain-Bausteine eingeführt: `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` für eine schlanke Trennung von Darstellung und Modellen ohne Änderungen an `services/`.

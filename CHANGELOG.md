@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Added
+- Dokumenten-Wizard (Admin, Dokumente): 4-stufiger Flow für Kind/Vertragspartner, Vertrags-/Abrechnungsparameter, KI-Review sowie Export/Versand (DE/EN).
+- Einheitliche Vorlagenbibliothek (`contract`, `addendum`, `monthly_invoice`) im `DocumentAgent`.
+- Neue Exportformate für Wizard-Payloads: DOCX, PDF, JSON, Markdown.
+- Standardisierte Dateibenennung über alle Wizard-Exporte (`YYYYMMDD_<child_id>_<document_type>.<ext>`).
+- UX-Smoke-Hinweispfad in `tools/smoke_check.py` für Wizard-, Summary- und Export-Checks ergänzt.
+
+### Changed
+- Dokumenten-UI in `app.py` auf Wizard-basierten Workflow erweitert und Gmail-Versandoption direkt im Export-Schritt ergänzt.
+
 # Changelog
 
 ## Unreleased

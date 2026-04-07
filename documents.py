@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import time
 import logging
+import json
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -12,6 +13,8 @@ from typing import Any
 
 from docx import Document
 from docx.shared import Inches
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 from openai import (
     APITimeoutError,
     AuthenticationError,
@@ -257,6 +260,173 @@ class DocumentAgent:
     @staticmethod
     def _normalized_language(language: str) -> str:
         return "en" if language.strip().lower() == "en" else "de"
+
+    @staticmethod
+    def get_template_library() -> dict[str, dict[str, str]]:
+        """Liefert eine zentrale Vorlagenbibliothek für den Dokument-Wizard."""
+        return {
+            "contract": {
+                "label_de": "Betreuungsvertrag",
+                "label_en": "Childcare contract",
+            },
+            "addendum": {
+                "label_de": "Vertragsnachtrag",
+                "label_en": "Contract addendum",
+            },
+            "monthly_invoice": {
+                "label_de": "Monatsabrechnung",
+                "label_en": "Monthly invoice",
+            },
+        }
+
+    @staticmethod
+    def build_standardized_filename(
+        *,
+        child_id: str,
+        document_type: str,
+        extension: str,
+        generated_on: datetime | None = None,
+    ) -> str:
+        timestamp = (generated_on or datetime.now()).strftime("%Y%m%d")
+        normalized_child_id = (
+            "".join(
+                char if char.isalnum() or char in {"-", "_"} else "_"
+                for char in child_id.strip()
+            )
+            or "unknown_child"
+        )
+        normalized_doc_type = (
+            "".join(
+                char if char.isalnum() or char in {"-", "_"} else "_"
+                for char in document_type.strip().lower()
+            )
+            or "document"
+        )
+        normalized_extension = extension.strip().lstrip(".").lower() or "txt"
+        return (
+            f"{timestamp}_{normalized_child_id}_{normalized_doc_type}."
+            f"{normalized_extension}"
+        )
+
+    def build_wizard_payload(
+        self,
+        *,
+        child_data: dict[str, Any],
+        document_type: str,
+        contract_partner: str,
+        billing_month: str,
+        monthly_amount_eur: float,
+        language: str,
+        ai_text_suggestion: str,
+    ) -> dict[str, Any]:
+        selected_language = self._normalized_language(language)
+        child_name = self._safe_child_name(child_data)
+        child_id = str(child_data.get("id", "")).strip() or child_name.replace(" ", "_")
+        template = self.get_template_library().get(
+            document_type, self.get_template_library()["contract"]
+        )
+        return {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "document_type": document_type,
+            "template_label": template["label_de"]
+            if selected_language == "de"
+            else template["label_en"],
+            "language": selected_language,
+            "child": {
+                "id": child_id,
+                "name": child_name,
+                "parent_email": str(child_data.get("parent_email", "")).strip(),
+            },
+            "contract_partner": contract_partner.strip(),
+            "billing_month": billing_month.strip(),
+            "monthly_amount_eur": round(float(monthly_amount_eur), 2),
+            "ai_text_suggestion": ai_text_suggestion.strip(),
+        }
+
+    def _wizard_markdown(self, payload: dict[str, Any]) -> str:
+        child = payload.get("child", {})
+        return (
+            f"# {payload.get('template_label', 'Document')}\n\n"
+            f"- Generated at: {payload.get('generated_at', '-')}\n"
+            f"- Language: {payload.get('language', '-')}\n"
+            f"- Child ID: {child.get('id', '-')}\n"
+            f"- Child name: {child.get('name', '-')}\n"
+            f"- Contract partner: {payload.get('contract_partner', '-')}\n"
+            f"- Billing month: {payload.get('billing_month', '-')}\n"
+            f"- Monthly amount EUR: {payload.get('monthly_amount_eur', '-')}\n\n"
+            "## AI Draft\n\n"
+            f"{payload.get('ai_text_suggestion', '').strip() or '-'}\n"
+        )
+
+    def export_wizard_markdown(self, payload: dict[str, Any]) -> tuple[bytes, str]:
+        markdown_text = self._wizard_markdown(payload)
+        child_id = (
+            str(payload.get("child", {}).get("id", "")).strip() or "unknown_child"
+        )
+        document_type = str(payload.get("document_type", "document"))
+        file_name = self.build_standardized_filename(
+            child_id=child_id,
+            document_type=document_type,
+            extension="md",
+        )
+        return markdown_text.encode("utf-8"), file_name
+
+    def export_wizard_json(self, payload: dict[str, Any]) -> tuple[bytes, str]:
+        child_id = (
+            str(payload.get("child", {}).get("id", "")).strip() or "unknown_child"
+        )
+        document_type = str(payload.get("document_type", "document"))
+        file_name = self.build_standardized_filename(
+            child_id=child_id,
+            document_type=document_type,
+            extension="json",
+        )
+        return json.dumps(payload, ensure_ascii=False, indent=2).encode(
+            "utf-8"
+        ), file_name
+
+    def export_wizard_pdf(self, payload: dict[str, Any]) -> tuple[bytes, str]:
+        child_id = (
+            str(payload.get("child", {}).get("id", "")).strip() or "unknown_child"
+        )
+        document_type = str(payload.get("document_type", "document"))
+        file_name = self.build_standardized_filename(
+            child_id=child_id,
+            document_type=document_type,
+            extension="pdf",
+        )
+        pdf_buffer = BytesIO()
+        pdf_canvas = canvas.Canvas(pdf_buffer, pagesize=A4)
+        _, height = A4
+        y_position = height - 48
+        for line in self._wizard_markdown(payload).splitlines():
+            if y_position < 48:
+                pdf_canvas.showPage()
+                y_position = height - 48
+            pdf_canvas.drawString(48, y_position, line[:110])
+            y_position -= 16
+        pdf_canvas.save()
+        return pdf_buffer.getvalue(), file_name
+
+    def export_wizard_docx(self, payload: dict[str, Any]) -> tuple[bytes, str]:
+        child_id = (
+            str(payload.get("child", {}).get("id", "")).strip() or "unknown_child"
+        )
+        document_type = str(payload.get("document_type", "document"))
+        file_name = self.build_standardized_filename(
+            child_id=child_id,
+            document_type=document_type,
+            extension="docx",
+        )
+        doc = Document()
+        self._add_logo_and_generation_date(doc)
+        doc.add_heading(str(payload.get("template_label", "Document")), level=1)
+        for line in self._wizard_markdown(payload).splitlines():
+            if line.strip():
+                doc.add_paragraph(line)
+        output = BytesIO()
+        doc.save(output)
+        return output.getvalue(), file_name
 
     def generate_document(
         self,

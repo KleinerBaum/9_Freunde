@@ -45,6 +45,7 @@ from services.mail_service import (
     MailServiceError,
     build_parent_recipient_list,
     send_bulk_message,
+    send_message,
 )
 from ui.layout import bootstrap_page
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
@@ -2162,83 +2163,249 @@ else:
                 )
             else:
                 with st.container(border=True):
-                    st.markdown("**Bericht erstellen / Create report**")
-                    select_col, options_col = st.columns([2, 1], gap="large")
-                    with select_col:
-                        sel_child = st.selectbox(
-                            "Für welches Kind soll ein Dokument erstellt werden? / "
-                            "Select child for document generation",
+                    st.markdown("**Dokumenten-Wizard / Document wizard**")
+                    wizard_state = st.session_state.setdefault(
+                        "document_wizard_state",
+                        {
+                            "step": 1,
+                            "selected_child": children[0],
+                            "document_type": "contract",
+                            "language": "de",
+                            "contract_partner": "",
+                            "billing_month": date.today().strftime("%Y-%m"),
+                            "monthly_amount_eur": 120.0,
+                            "notes": "",
+                            "ai_text_suggestion": "",
+                            "payload": None,
+                        },
+                    )
+                    template_library = doc_agent.get_template_library()
+
+                    if wizard_state["step"] == 1:
+                        st.caption(
+                            "1) Kind/Vertragspartner wählen / Select child and contract partner"
+                        )
+                        selected_child = st.selectbox(
+                            "Kind auswählen / Select child",
                             options=children,
                             format_func=lambda child: str(child.get("name", "")),
+                            key="wizard_child_select",
                         )
-                        doc_notes = st.text_area(
-                            "Stichpunkte oder Notizen für das Dokument / Notes for the report"
+                        contract_partner = st.text_input(
+                            "Vertragspartner / Contract partner",
+                            value=str(
+                                wizard_state.get("contract_partner")
+                                or selected_child.get("parent_email", "")
+                            ),
                         )
-                    with options_col:
-                        document_language = st.selectbox(
+                        if st.button("Weiter zu Schritt 2 / Continue to step 2"):
+                            wizard_state["selected_child"] = selected_child
+                            wizard_state["contract_partner"] = contract_partner
+                            wizard_state["step"] = 2
+                            _trigger_rerun()
+
+                    elif wizard_state["step"] == 2:
+                        st.caption(
+                            "2) Vertrags-/Abrechnungsparameter erfassen / Capture contract and billing parameters"
+                        )
+                        selected_document_type = st.selectbox(
+                            "Dokumenttyp / Document type",
+                            options=list(template_library.keys()),
+                            format_func=lambda key: (
+                                f"{template_library[key]['label_de']} / "
+                                f"{template_library[key]['label_en']}"
+                            ),
+                            index=list(template_library.keys()).index(
+                                wizard_state["document_type"]
+                            )
+                            if wizard_state["document_type"] in template_library
+                            else 0,
+                        )
+                        selected_language = st.selectbox(
                             "Dokumentsprache / Document language",
                             options=("de", "en"),
-                            index=0,
+                            index=0 if wizard_state["language"] == "de" else 1,
                             format_func=_language_label,
-                            key="admin_document_language",
                         )
-                        mark_document_as_draft = st.checkbox(
-                            "Als Entwurf markieren / Mark as draft",
-                            value=False,
-                            key="admin_document_draft",
+                        billing_month = st.text_input(
+                            "Abrechnungsmonat (YYYY-MM) / Billing month (YYYY-MM)",
+                            value=wizard_state["billing_month"],
                         )
-                        save_to_drive = st.checkbox(
-                            "Dokument im Drive-Ordner des Kindes speichern? / "
-                            "Save document in child's Drive folder?"
+                        monthly_amount = st.number_input(
+                            "Monatlicher Betrag (€) / Monthly amount (€)",
+                            min_value=0.0,
+                            value=float(wizard_state["monthly_amount_eur"]),
+                            step=5.0,
                         )
-                    if st.button("Bericht erstellen / Create report"):
-                        with st.spinner("Generiere Dokument mit OpenAI..."):
-                            try:
-                                doc_bytes, file_name = doc_agent.generate_document(
-                                    sel_child,
-                                    doc_notes,
-                                    language=document_language,
-                                    is_draft=mark_document_as_draft,
+                        notes = st.text_area(
+                            "Stichpunkte für KI-Vorschlag / Notes for AI draft",
+                            value=wizard_state["notes"],
+                        )
+                        back_col, next_col = st.columns(2)
+                        with back_col:
+                            if st.button("Zurück / Back"):
+                                wizard_state["step"] = 1
+                                _trigger_rerun()
+                        with next_col:
+                            if st.button("Weiter zu Schritt 3 / Continue to step 3"):
+                                wizard_state["document_type"] = selected_document_type
+                                wizard_state["language"] = selected_language
+                                wizard_state["billing_month"] = billing_month
+                                wizard_state["monthly_amount_eur"] = float(
+                                    monthly_amount
                                 )
-                                st.success("Dokument erstellt: " + file_name)
-                                with st.expander(
-                                    "Vorschau des neuen Dokuments / Preview new document",
-                                    expanded=True,
+                                wizard_state["notes"] = notes
+                                with st.spinner(
+                                    "Erzeuge KI-Textvorschlag... / Generating AI text draft..."
                                 ):
-                                    st.markdown(_extract_docx_preview_text(doc_bytes))
-                                # Download-Button anzeigen
-                                st.download_button(
-                                    "📄 Dokument herunterladen",
-                                    data=doc_bytes,
-                                    file_name=file_name,
-                                )
-                                # Optional: in Drive speichern
-                                if save_to_drive:
-                                    folder_id = sel_child.get("folder_id")
-                                    if folder_id:
-                                        drive_agent.upload_file(
-                                            file_name,
-                                            doc_bytes,
-                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                            folder_id,
+                                    try:
+                                        _, _ = doc_agent.generate_document(
+                                            wizard_state["selected_child"],
+                                            notes or "Dokumentenentwurf",
+                                            language=selected_language,
+                                            is_draft=True,
                                         )
-                                        st.info(
-                                            "Dokument wurde im Drive-Ordner gespeichert."
+                                        suggestion = (
+                                            "Bitte prüfen Sie die Inhalte für "
+                                            f"{template_library[selected_document_type]['label_de']}."
                                         )
-                                    else:
+                                        wizard_state["ai_text_suggestion"] = suggestion
+                                        wizard_state["step"] = 3
+                                        _trigger_rerun()
+                                    except DocumentGenerationError as exc:
                                         st.error(
-                                            "Kein Drive-Ordner für dieses Kind vorhanden."
+                                            "KI-Vorschlag konnte nicht erstellt werden. / "
+                                            "AI suggestion could not be generated."
                                         )
-                            except DocumentGenerationError as e:
-                                st.error(
-                                    "Dokument konnte nicht erstellt werden. Bitte Hinweise prüfen und erneut versuchen."
+                                        st.info(str(exc))
+
+                    elif wizard_state["step"] == 3:
+                        st.caption("3) KI-Textvorschlag prüfen / Review AI draft")
+                        ai_text = st.text_area(
+                            "KI-Textvorschlag / AI draft",
+                            value=wizard_state["ai_text_suggestion"],
+                            height=180,
+                        )
+                        payload = doc_agent.build_wizard_payload(
+                            child_data=wizard_state["selected_child"],
+                            document_type=wizard_state["document_type"],
+                            contract_partner=wizard_state["contract_partner"],
+                            billing_month=wizard_state["billing_month"],
+                            monthly_amount_eur=float(
+                                wizard_state["monthly_amount_eur"]
+                            ),
+                            language=wizard_state["language"],
+                            ai_text_suggestion=ai_text,
+                        )
+                        wizard_state["payload"] = payload
+                        st.json(payload)
+                        back_col, export_col = st.columns(2)
+                        with back_col:
+                            if st.button("Zurück zu Schritt 2 / Back to step 2"):
+                                wizard_state["step"] = 2
+                                _trigger_rerun()
+                        with export_col:
+                            if st.button("Weiter zu Schritt 4 / Continue to step 4"):
+                                wizard_state["step"] = 4
+                                _trigger_rerun()
+
+                    else:
+                        st.caption("4) Export & Versand / Export and Gmail delivery")
+                        payload = wizard_state.get("payload")
+                        if not isinstance(payload, dict):
+                            st.warning(
+                                "Keine Zusammenfassung vorhanden. Bitte Schritt 3 erneut ausführen. / "
+                                "No summary available. Please run step 3 again."
+                            )
+                        else:
+                            st.markdown("**Zusammenfassung / Summary**")
+                            st.json(payload)
+                            docx_bytes, docx_name = doc_agent.export_wizard_docx(
+                                payload
+                            )
+                            pdf_bytes, pdf_name = doc_agent.export_wizard_pdf(payload)
+                            json_bytes, json_name = doc_agent.export_wizard_json(
+                                payload
+                            )
+                            md_bytes, md_name = doc_agent.export_wizard_markdown(
+                                payload
+                            )
+                            st.download_button(
+                                "DOCX export",
+                                data=docx_bytes,
+                                file_name=docx_name,
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            )
+                            st.download_button(
+                                "PDF export",
+                                data=pdf_bytes,
+                                file_name=pdf_name,
+                                mime="application/pdf",
+                            )
+                            st.download_button(
+                                "JSON export",
+                                data=json_bytes,
+                                file_name=json_name,
+                                mime="application/json",
+                            )
+                            st.download_button(
+                                "Markdown export",
+                                data=md_bytes,
+                                file_name=md_name,
+                                mime="text/markdown",
+                            )
+                            save_to_drive = st.checkbox(
+                                "DOCX im Drive-Ordner speichern / Save DOCX to child Drive folder",
+                                value=False,
+                            )
+                            if st.button("In Drive speichern / Save to Drive"):
+                                folder_id = wizard_state["selected_child"].get(
+                                    "folder_id"
                                 )
-                                st.error(
-                                    "Document could not be generated. Please review the message and retry."
-                                )
-                                st.info(str(e))
-                            except Exception as e:
-                                st.error(f"Fehler bei der Dokumentenerstellung: {e}")
+                                if save_to_drive and folder_id:
+                                    drive_agent.upload_file(
+                                        docx_name,
+                                        docx_bytes,
+                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        folder_id,
+                                    )
+                                    st.success(
+                                        "Dokument im Drive gespeichert. / Document saved to Drive."
+                                    )
+                                else:
+                                    st.warning(
+                                        "Drive-Speicherung übersprungen oder kein Ordner vorhanden. / "
+                                        "Drive save skipped or folder missing."
+                                    )
+
+                            gmail_recipient = st.text_input(
+                                "Gmail Empfänger / Gmail recipient",
+                                value=str(
+                                    wizard_state["selected_child"].get(
+                                        "parent_email", ""
+                                    )
+                                ),
+                            )
+                            if st.button("Per Gmail versenden / Send via Gmail"):
+                                try:
+                                    send_message(
+                                        recipient_email=gmail_recipient,
+                                        subject=f"9 Freunde Dokument: {payload.get('template_label', '')}",
+                                        body_text=md_bytes.decode("utf-8"),
+                                    )
+                                    st.success(
+                                        "Gmail-Versand erfolgreich. / Gmail sent successfully."
+                                    )
+                                except MailServiceError as exc:
+                                    st.error(
+                                        "Gmail-Versand fehlgeschlagen. / Gmail delivery failed."
+                                    )
+                                    st.info(str(exc))
+                            if st.button("Wizard zurücksetzen / Reset wizard"):
+                                st.session_state.pop("document_wizard_state", None)
+                                _trigger_rerun()
+
+                    sel_child = wizard_state["selected_child"]
 
                 st.divider()
                 with st.expander(

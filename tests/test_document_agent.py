@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from datetime import datetime
+import json
 
 from docx import Document
 
@@ -92,3 +94,41 @@ def test_generate_document_supports_language_and_draft(monkeypatch) -> None:
     assert "Weekly report" in text
     assert filename.startswith("Report_Luca_")
     assert filename.endswith("_Entwurf.docx")
+
+
+def test_build_standardized_filename(monkeypatch) -> None:
+    agent = _agent(monkeypatch)
+    file_name = agent.build_standardized_filename(
+        child_id="child-1",
+        document_type="monthly_invoice",
+        extension="pdf",
+        generated_on=datetime(2026, 4, 7),
+    )
+    assert file_name == "20260407_child-1_monthly_invoice.pdf"
+
+
+def test_wizard_exports(monkeypatch) -> None:
+    agent = _agent(monkeypatch)
+    payload = agent.build_wizard_payload(
+        child_data={"id": "c1", "name": "Mia", "parent_email": "mia@example.org"},
+        document_type="contract",
+        contract_partner="Mia Familie",
+        billing_month="2026-04",
+        monthly_amount_eur=250.0,
+        language="de",
+        ai_text_suggestion="Entwurfstext",
+    )
+
+    docx_bytes, docx_name = agent.export_wizard_docx(payload)
+    pdf_bytes, pdf_name = agent.export_wizard_pdf(payload)
+    json_bytes, json_name = agent.export_wizard_json(payload)
+    md_bytes, md_name = agent.export_wizard_markdown(payload)
+
+    assert docx_name.endswith("_contract.docx")
+    assert pdf_name.endswith("_contract.pdf")
+    assert json_name.endswith("_contract.json")
+    assert md_name.endswith("_contract.md")
+    assert len(docx_bytes) > 100
+    assert len(pdf_bytes) > 100
+    assert json.loads(json_bytes.decode("utf-8"))["child"]["id"] == "c1"
+    assert "AI Draft" in md_bytes.decode("utf-8")

@@ -47,7 +47,14 @@ from services.mail_service import (
     send_bulk_message,
     send_message,
 )
-from ui.layout import bootstrap_page
+from ui.layout import (
+    bootstrap_page,
+    empty_state,
+    form_feedback,
+    render_kpi_widgets,
+    section_card,
+    table_toolbar,
+)
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
 # Streamlit page configuration
@@ -548,6 +555,64 @@ def _build_admin_overview_rows(
         )
 
     return overview_rows
+
+
+def _collect_dashboard_tiles(
+    *,
+    children: list[dict[str, str]],
+    drive_agent: DriveAgent,
+    upcoming_events_count: int,
+) -> list[dict[str, str | int]]:
+    active_children = [
+        child
+        for child in children
+        if str(child.get("status", "active")).strip().lower() == "active"
+    ]
+
+    open_contracts = 0
+    due_invoices = 0
+    contracts_folder_id = get_app_config().google.drive_contracts_folder_id
+    if contracts_folder_id:
+        try:
+            contract_files = drive_agent.list_files(contracts_folder_id)
+            normalized_names = {
+                str(file_meta.get("name", "")).strip().lower()
+                for file_meta in contract_files
+            }
+            for child in active_children:
+                child_id = str(child.get("id", "")).strip().lower()
+                has_contract = any(
+                    child_id and child_id in file_name and "contract" in file_name
+                    for file_name in normalized_names
+                )
+                has_invoice = any(
+                    child_id and child_id in file_name and "invoice" in file_name
+                    for file_name in normalized_names
+                )
+                if not has_contract:
+                    open_contracts += 1
+                if not has_invoice:
+                    due_invoices += 1
+        except Exception:
+            open_contracts = len(active_children)
+            due_invoices = len(active_children)
+    else:
+        open_contracts = len(active_children)
+        due_invoices = len(active_children)
+
+    unread_parent_inquiries = int(st.session_state.get("unread_parent_inquiries", 0))
+    return [
+        {"label": "📝 Offene Verträge / Open contracts", "value": open_contracts},
+        {"label": "💶 Fällige Abrechnungen / Due invoices", "value": due_invoices},
+        {
+            "label": "📨 Ungelesene Elternanfragen / Unread parent inquiries",
+            "value": unread_parent_inquiries,
+        },
+        {
+            "label": "📅 Nächste Termine / Next appointments",
+            "value": upcoming_events_count,
+        },
+    ]
 
 
 def _render_child_selection_editor(
@@ -1511,12 +1576,12 @@ else:
     healthcheck_requested = False
     if user_role == "admin":
         admin_menu_labels: dict[str, str] = {
-            "dashboard": "Dashboard / Dashboard",
-            "master_data": "Stammdaten & Infos / Master data & info",
-            "documents": "Dokumente & Verträge / Documents & contracts",
-            "communication": "Kommunikation / Communication",
-            "calendar": "Kalender / Calendar",
-            "system": "System / Healthchecks",
+            "dashboard": "🏠 Dashboard / Dashboard",
+            "master_data": "👥 Stammdaten & Infos / Master data & info",
+            "documents": "🧾 Dokumente & Verträge / Documents & contracts",
+            "communication": "💬 Kommunikation / Communication",
+            "calendar": "📆 Kalender / Calendar",
+            "system": "🛠️ System / Healthchecks",
         }
         admin_options = tuple(admin_menu_labels.keys())
         if ss_get(UIKeys.NAV_MAIN) not in admin_options:
@@ -1529,11 +1594,11 @@ else:
         )
     else:
         parent_menu_labels: dict[str, str] = {
-            "child": "Mein Kind / My child",
-            "info": "Infos / Info",
-            "documents": "Dokumente / Documents",
-            "appointments": "Termine / Appointments",
-            "medication": "Medikationen / Medication",
+            "child": "👶 Mein Kind / My child",
+            "info": "ℹ️ Infos / Info",
+            "documents": "📄 Dokumente / Documents",
+            "appointments": "📅 Termine / Appointments",
+            "medication": "💊 Medikationen / Medication",
         }
         parent_options = tuple(parent_menu_labels.keys())
         if ss_get(UIKeys.NAV_MAIN) not in parent_options:
@@ -1624,133 +1689,164 @@ else:
                 ]
             )
 
-            metric_col_total, metric_col_active, metric_col_inactive = st.columns(3)
-            with metric_col_total:
-                st.metric("Kinder gesamt / Total children", len(children))
-            with metric_col_active:
-                st.metric("Aktiv / Active", active_children_count)
-            with metric_col_inactive:
-                st.metric(
-                    "Archiviert / Archived", len(children) - active_children_count
+            try:
+                upcoming_events = list_events(max_results=6)
+            except CalendarServiceError as exc:
+                upcoming_events = []
+                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+
+            render_kpi_widgets(
+                _collect_dashboard_tiles(
+                    children=children,
+                    drive_agent=drive_agent,
+                    upcoming_events_count=len(upcoming_events),
                 )
+            )
 
             action_col, calendar_col = st.columns([1.3, 1.7], gap="large")
             with action_col:
-                with st.container(border=True):
-                    st.markdown("**Schnellaktionen / Quick actions**")
+                with section_card(
+                    "Schnellaktionen / Quick actions",
+                    description=(
+                        "Wichtige Aufgaben für Stammdaten und Aufnahme direkt starten. / "
+                        "Start key tasks for master data and onboarding directly."
+                    ),
+                    icon="⚡",
+                ):
                     _render_admin_child_creation_and_import(
                         stammdaten_manager,
                         user_email=user_email,
                     )
 
                 with st.expander(
-                    "👥 Kinder-Übersicht / Children overview",
-                    expanded=not children_load_error,
+                    "👥 Kinder-Übersicht / Children overview", expanded=True
                 ):
+                    search_query, _ = table_toolbar(
+                        search_key="admin_children_overview_search",
+                        refresh_label="Neu laden / Refresh",
+                    )
                     if not children_load_error and children:
-                        overview_df = pd.DataFrame(_build_admin_overview_rows(children))
+                        overview_rows = _build_admin_overview_rows(children)
+                        if search_query:
+                            search_value = search_query.lower()
+                            overview_rows = [
+                                row
+                                for row in overview_rows
+                                if search_value
+                                in " ".join(
+                                    str(value).lower() for value in row.values()
+                                )
+                            ]
+                        overview_df = pd.DataFrame(overview_rows)
                         st.dataframe(
                             overview_df,
                             hide_index=True,
                             width="stretch",
                         )
                     elif not children_load_error:
-                        st.write(
-                            "*Noch keine Kinder registriert. / No children registered yet.*"
+                        empty_state(
+                            "Noch keine Kinder registriert / No children registered yet",
+                            "Bitte zuerst ein Kind in den Stammdaten anlegen. / Please add a child in master data first.",
                         )
 
             with calendar_col:
-                with st.container(border=True):
-                    st.markdown("**Bevorstehende Termine / Upcoming events**")
-                    try:
-                        upcoming_events = list_events(max_results=6)
-                    except CalendarServiceError as exc:
-                        upcoming_events = []
-                        st.error(f"Fehler beim Laden / Failed to load events: {exc}")
-
+                with section_card(
+                    "Bevorstehende Termine / Upcoming events",
+                    description="Nächste Kalenderereignisse inkl. Schnellanlage. / Next calendar entries including quick create.",
+                    icon="📅",
+                ):
                     if upcoming_events:
                         for event in upcoming_events:
                             st.write(f"- {event['start']} · **{event['summary']}**")
                             if event["description"]:
                                 st.caption(event["description"])
                     else:
-                        st.write(
-                            "Keine anstehenden Termine vorhanden. / No upcoming events."
+                        empty_state(
+                            "Keine anstehenden Termine / No upcoming events",
+                            "Neue Termine können direkt im Formular darunter erfasst werden. / You can create events directly using the form below.",
                         )
 
-                    st.markdown("---")
-                    st.markdown("**Neuer Termin / New event**")
-                    title = st.text_input(
-                        "Titel / Title",
-                        key="dashboard_new_event_title",
-                    )
-                    event_date = st.date_input(
-                        "Datum / Date",
-                        key="dashboard_new_event_date",
-                    )
-                    event_time = st.time_input(
-                        "Uhrzeit (Start) / Start time",
-                        key="dashboard_new_event_time",
-                    )
-                    description = st.text_area(
-                        "Beschreibung / Description",
-                        key="dashboard_new_event_description",
-                    )
-
-                    parent_user_emails: set[str] = set()
-                    try:
-                        parent_user_emails = {
-                            str(parent.get("email", "")).strip().lower()
-                            for parent in stammdaten_manager.get_parents()
-                            if str(parent.get("email", "")).strip()
-                        }
-                    except SheetsRepositoryError as exc:
-                        st.caption(
-                            "Eltern-User konnten nicht vollständig geladen werden. / "
-                            "Parent users could not be fully loaded. "
-                            f"Details: {exc}"
-                        )
-
-                    configured_user_emails = {
-                        str(email).strip().lower()
-                        for email in st.secrets.get("auth", {}).get("users", {})
-                        if str(email).strip()
-                    }
-                    available_users = sorted(
-                        parent_user_emails | configured_user_emails
-                    )
-                    selected_notification_recipients = st.multiselect(
-                        "Benachrichtigung an User senden / Notify users by email",
-                        options=available_users,
-                        default=[],
-                        help=(
-                            "Ausgewählte User erhalten eine Kalender-Einladung per E-Mail. / "
-                            "Selected users receive a calendar invitation by email."
-                        ),
-                        key="dashboard_new_event_recipients",
-                    )
-
-                    if st.button(
-                        "Termin hinzufügen / Add event",
-                        key="dashboard_new_event_submit",
+                    st.markdown("#### Neuer Termin / New event")
+                    with st.expander(
+                        "Termindetails anzeigen / Show event details",
+                        expanded=False,
                     ):
-                        if not title.strip():
-                            st.error("Bitte Titel eingeben. / Please enter a title.")
-                        else:
+                        with st.form("dashboard_new_event_form", border=True):
+                            title = st.text_input(
+                                "Titel / Title",
+                                key="dashboard_new_event_title",
+                            )
+                            event_date = st.date_input(
+                                "Datum / Date",
+                                key="dashboard_new_event_date",
+                            )
+                            event_time = st.time_input(
+                                "Uhrzeit (Start) / Start time",
+                                key="dashboard_new_event_time",
+                            )
+                            description = st.text_area(
+                                "Beschreibung / Description",
+                                key="dashboard_new_event_description",
+                            )
+
+                            parent_user_emails: set[str] = set()
                             try:
-                                add_event(
-                                    title=title,
-                                    event_date=event_date,
-                                    event_time=event_time,
-                                    description=description,
-                                    notification_emails=selected_notification_recipients,
+                                parent_user_emails = {
+                                    str(parent.get("email", "")).strip().lower()
+                                    for parent in stammdaten_manager.get_parents()
+                                    if str(parent.get("email", "")).strip()
+                                }
+                            except SheetsRepositoryError as exc:
+                                st.caption(
+                                    "Eltern-User konnten nicht vollständig geladen werden. / "
+                                    "Parent users could not be fully loaded. "
+                                    f"Details: {exc}"
                                 )
-                                st.success("Termin wurde hinzugefügt. / Event created.")
-                            except CalendarServiceError as exc:
-                                st.error(
-                                    "Fehler beim Speichern / Failed to save event: "
-                                    f"{exc}"
+
+                            configured_user_emails = {
+                                str(email).strip().lower()
+                                for email in st.secrets.get("auth", {}).get("users", {})
+                                if str(email).strip()
+                            }
+                            available_users = sorted(
+                                parent_user_emails | configured_user_emails
+                            )
+                            selected_notification_recipients = st.multiselect(
+                                "Benachrichtigung an User senden / Notify users by email",
+                                options=available_users,
+                                default=[],
+                                help=(
+                                    "Ausgewählte User erhalten eine Kalender-Einladung per E-Mail. / "
+                                    "Selected users receive a calendar invitation by email."
+                                ),
+                                key="dashboard_new_event_recipients",
+                            )
+                            event_submit = st.form_submit_button(
+                                "Termin hinzufügen / Add event",
+                                use_container_width=True,
+                            )
+
+                        if event_submit:
+                            if not title.strip():
+                                form_feedback(
+                                    error_message="Bitte Titel eingeben. / Please enter a title."
                                 )
+                            else:
+                                try:
+                                    add_event(
+                                        title=title,
+                                        event_date=event_date,
+                                        event_time=event_time,
+                                        description=description,
+                                        notification_emails=selected_notification_recipients,
+                                    )
+                                    form_feedback(
+                                        success_message="Termin wurde hinzugefügt. / Event created."
+                                    )
+                                except CalendarServiceError as exc:
+                                    form_feedback(
+                                        error_message=f"Fehler beim Speichern / Failed to save event: {exc}"
+                                    )
 
                 st.markdown("**📅 Kalender / Calendar**")
                 _render_calendar_embed("admin_dashboard")

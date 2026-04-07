@@ -45,8 +45,13 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
 - **Admin-Navigation modernisiert:** Die Sidebar führt jetzt nur noch Hauptbereiche (**Dashboard**, **Stammdaten & Infos**, **Fotos & Medien**, **Dokumente & Verträge**, **Kalender**, **System / Healthchecks**). Der Google-Verbindungscheck ist im Bereich **„System / Healthchecks“** gebündelt; **„Medikationen“** bleibt als eingeklappter Abschnitt in **„Stammdaten“** integriert.
+- **Navigationsstruktur vereinfacht (DE/EN + Icons):** Die Hauptnavigation bleibt auf maximal 6 klar benannten Bereichen und nutzt eindeutige Icons für schnellere Orientierung (Admin + Eltern).
+- **Dashboard-Kacheln geschärft:** Das Admin-Dashboard zeigt jetzt die vier Kern-KPIs **Offene Verträge**, **Fällige Abrechnungen**, **Ungelesene Elternanfragen** und **Nächste Termine**.
+- **Form-Pattern vereinheitlicht:** Neue Formbereiche folgen konsistenten Section-Cards, optionaler Progression via Expander, Inline-Validierung sowie klaren Success-/Error-States.
+- **Erweiterte UI-Bausteine in `ui/layout.py`:** `section_card`, `render_kpi_widgets`, `table_toolbar`, `empty_state`, `form_feedback` ergänzen die bestehenden Layout-Helfer und reduzieren UI-Duplikate in `app.py`.
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung).
+
 
 ## Installation und Voraussetzungen
 

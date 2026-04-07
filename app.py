@@ -1684,7 +1684,14 @@ else:
                 upcoming_events = list_events(max_results=6)
             except CalendarServiceError as exc:
                 upcoming_events = []
-                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+                st.warning(
+                    "Termine konnten für das Dashboard nicht geladen werden. "
+                    "Andere Dashboard-Karten bleiben verfügbar. / "
+                    "Could not load events for the dashboard. Other dashboard cards remain available."
+                )
+                st.caption(
+                    f"Technisches Detail / Technical detail: {type(exc).__name__}"
+                )
 
             render_kpi_widgets(
                 _collect_dashboard_tiles(
@@ -2886,7 +2893,13 @@ else:
                 upcoming_events = list_events(max_results=10)
             except CalendarServiceError as exc:
                 upcoming_events = []
-                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+                st.warning(
+                    "Terminvorschau konnte nicht geladen werden. Der restliche Bereich "
+                    "bleibt nutzbar. / Event preview could not be loaded. The rest of this section remains usable."
+                )
+                st.caption(
+                    f"Technisches Detail / Technical detail: {type(exc).__name__}"
+                )
 
             if upcoming_events:
                 for event in upcoming_events:

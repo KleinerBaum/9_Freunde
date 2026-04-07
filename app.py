@@ -20,12 +20,6 @@ from googleapiclient.errors import HttpError
 from auth import AuthAgent
 from stammdaten import StammdatenManager
 from documents import DocumentAgent, DocumentGenerationError
-from photo import (
-    MediaPageContext,
-    PhotoAgent,
-    render_media_page,
-    render_onedrive_embed_panel,
-)
 from storage import DriveAgent
 from config import get_app_config, validate_config_or_stop
 from services.calendar_service import (
@@ -35,7 +29,7 @@ from services.calendar_service import (
     add_event,
     list_events,
 )
-from services.drive_service import DriveServiceError, get_photos_root_folder_id
+from services.drive_service import DriveServiceError
 from services.content_repo import ContentRepository, ContentRepositoryError
 from services.registration_form_service import (
     RegistrationPayload,
@@ -47,7 +41,6 @@ from services.sheets_repo import (
     map_schema_v1_payload_to_tab_records,
 )
 from services.sheets_service import SheetsServiceError, read_sheet_values
-from services.photos_service import get_download_bytes
 from ui.layout import bootstrap_page
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
@@ -169,8 +162,6 @@ def _render_brand_header() -> None:
             st.image(str(HEART_PATH), width=170)
 
 
-PHOTO_STATUS_OPTIONS = ("draft", "published", "archived")
-DEFAULT_PARENT_VISIBILITY_STATUS = "draft"
 CONTRACT_LANGUAGE_OPTIONS = (
     "de",
     "en",
@@ -351,13 +342,6 @@ def _render_calendar_embed(section_key: str) -> None:
     )
 
 
-def _normalize_photo_status(value: str | None) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized in PHOTO_STATUS_OPTIONS:
-        return normalized
-    return DEFAULT_PARENT_VISIBILITY_STATUS
-
-
 def _active_flag_to_string(value: bool) -> str:
     return "true" if value else "false"
 
@@ -466,44 +450,20 @@ def _display_or_dash(value: object) -> str:
 
 
 def _folder_status_label(child_record: dict[str, str]) -> str:
-    has_photo_folder = bool(str(child_record.get("photo_folder_id", "")).strip())
     has_drive_folder = bool(str(child_record.get("folder_id", "")).strip())
-    return "✅ Ready" if has_photo_folder or has_drive_folder else "⚠️ Missing"
+    return "✅ Ready" if has_drive_folder else "⚠️ Missing"
 
 
 def _build_admin_overview_rows(
     children: list[dict[str, str]],
-    photo_meta_records: list[dict[str, object]],
 ) -> list[dict[str, str | int]]:
-    photo_count_by_child_id: dict[str, int] = {}
-    latest_activity_by_child_id: dict[str, str] = {}
-
-    for record in photo_meta_records:
-        child_id = str(record.get("child_id", "")).strip()
-        if not child_id:
-            continue
-
-        photo_count_by_child_id[child_id] = photo_count_by_child_id.get(child_id, 0) + 1
-
-        uploaded_at = str(record.get("uploaded_at", "")).strip()
-        if uploaded_at and uploaded_at > latest_activity_by_child_id.get(child_id, ""):
-            latest_activity_by_child_id[child_id] = uploaded_at
-
     overview_rows: list[dict[str, str | int]] = []
     for child_record in children:
-        child_id = str(child_record.get("id", "")).strip()
         overview_rows.append(
             {
                 "Name / Name": _display_or_dash(child_record.get("name")),
                 "Eltern E-Mail / Parent email": _display_or_dash(
                     child_record.get("parent_email")
-                ),
-                "Fotos / Photos": photo_count_by_child_id.get(child_id, 0),
-                "Letzte Aktivität / Last activity": _display_or_dash(
-                    latest_activity_by_child_id.get(child_id)
-                ),
-                "photo_folder_id": _display_or_dash(
-                    child_record.get("photo_folder_id")
                 ),
                 "folder_id": _display_or_dash(child_record.get("folder_id")),
                 "Ordnerstatus / Folder status": _folder_status_label(child_record),
@@ -900,12 +860,6 @@ def _render_admin_child_creation_and_import(
                         st.caption(f"Details / Details: {exc}")
 
 
-@st.cache_data(show_spinner=False)
-def _get_photo_download_bytes(file_id: str, consent_mode: str) -> bytes:
-    original_bytes = drive_agent.download_file(file_id)
-    return get_download_bytes(original_bytes, consent_mode)
-
-
 def _run_google_connection_check() -> list[tuple[str, bool, str]]:
     """Prüft Drive-, Calendar- und Sheets-Verbindung mit lesenden Testaufrufen."""
     checks: list[tuple[str, bool, str]] = []
@@ -913,10 +867,6 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
 
     if app_config.storage_mode == "google" and app_config.google is not None:
         drive_checks = [
-            (
-                "Fotos-Ordner / Photos folder",
-                app_config.google.drive_photos_root_folder_id,
-            ),
             (
                 "Verträge-Ordner / Contracts folder",
                 app_config.google.drive_contracts_folder_id,
@@ -1422,9 +1372,6 @@ st.session_state.setdefault("ui_language", "de")
 ensure_defaults(
     {
         UIKeys.NAV_MAIN: "dashboard",
-        UIKeys.MEDIA_CHILD: None,
-        UIKeys.MEDIA_PAGE: 0,
-        UIKeys.MEDIA_SELECTED: None,
     }
 )
 _enable_ui_text_localization()
@@ -1440,14 +1387,11 @@ if "drive_agent" not in st.session_state:
     st.session_state.drive_agent = DriveAgent()
 if "doc_agent" not in st.session_state:
     st.session_state.doc_agent = DocumentAgent()
-if "photo_agent" not in st.session_state:
-    st.session_state.photo_agent = PhotoAgent()
 
 auth = st.session_state.auth_agent
 stammdaten_manager = st.session_state.stammdaten_manager
 drive_agent = st.session_state.drive_agent
 doc_agent = st.session_state.doc_agent
-photo_agent = st.session_state.photo_agent
 content_repo = ContentRepository()
 
 # Check if user is logged in
@@ -1492,8 +1436,9 @@ else:
         admin_menu_labels: dict[str, str] = {
             "dashboard": "Dashboard / Dashboard",
             "master_data": "Stammdaten & Infos / Master data & info",
-            "photos": "Fotos & Medien / Photos & media",
             "documents": "Dokumente & Verträge / Documents & contracts",
+            "communication": "Kommunikation / Communication",
+            "calendar": "Kalender / Calendar",
             "system": "System / Healthchecks",
         }
         admin_options = tuple(admin_menu_labels.keys())
@@ -1510,7 +1455,6 @@ else:
             "child": "Mein Kind / My child",
             "info": "Infos / Info",
             "documents": "Dokumente / Documents",
-            "photos": "Fotos / Photos",
             "appointments": "Termine / Appointments",
             "medication": "Medikationen / Medication",
         }
@@ -1554,8 +1498,10 @@ else:
                 horizontal=True,
                 key="admin_documents_section",
             )
-        elif menu == "photos":
-            admin_view = "Fotos"
+        elif menu == "communication":
+            admin_view = "Kommunikation"
+        elif menu == "calendar":
+            admin_view = "Kalender"
         elif menu == "system":
             admin_view = "System / Healthchecks"
 
@@ -1572,11 +1518,9 @@ else:
             )
 
             children: list[dict[str, str]] = []
-            photo_meta_records: list[dict[str, str]] = []
             children_load_error = False
             try:
                 children = stammdaten_manager.get_children()
-                photo_meta_records = stammdaten_manager.get_photo_meta_records()
             except SheetsRepositoryError as exc:
                 children_load_error = True
                 st.error(
@@ -1627,9 +1571,7 @@ else:
                     expanded=not children_load_error,
                 ):
                     if not children_load_error and children:
-                        overview_df = pd.DataFrame(
-                            _build_admin_overview_rows(children, photo_meta_records)
-                        )
+                        overview_df = pd.DataFrame(_build_admin_overview_rows(children))
                         st.dataframe(
                             overview_df,
                             hide_index=True,
@@ -2447,31 +2389,31 @@ else:
                         )
                         st.info(str(exc))
 
-        # ---- Admin: Fotos ----
-        elif admin_view == "Fotos":
-            st.subheader("Fotos & Videos verwalten / Manage photos & videos")
-            children = stammdaten_manager.get_children()
-            if not children:
-                st.warning(
-                    "Bitte legen Sie zuerst Kinder-Stammdaten an. / "
-                    "Please create child records first."
-                )
+        elif admin_view == "Kommunikation":
+            st.subheader("Kommunikation / Communication")
+            st.info(
+                "Kommunikationsinhalte werden im Bereich 'Stammdaten & Infos' "
+                "verwaltet. / Communication content is maintained in the 'Master "
+                "data & info' section."
+            )
+
+        elif admin_view == "Kalender":
+            st.subheader("Kalender / Calendar")
+            _render_calendar_embed("admin_calendar")
+            st.divider()
+            try:
+                upcoming_events = list_events(max_results=10)
+            except CalendarServiceError as exc:
+                upcoming_events = []
+                st.error(f"Fehler beim Laden / Failed to load events: {exc}")
+
+            if upcoming_events:
+                for event in upcoming_events:
+                    st.write(f"- {event['start']} · **{event['summary']}**")
+                    if event["description"]:
+                        st.caption(event["description"])
             else:
-                render_media_page(
-                    MediaPageContext(
-                        app_config=app_config,
-                        user_email=user_email,
-                        children=children,
-                        stammdaten_manager=stammdaten_manager,
-                        drive_agent=drive_agent,
-                        photos_folder_id=(
-                            get_photos_root_folder_id()
-                            if app_config.storage_mode == "google"
-                            else "root"
-                        ),
-                        trigger_rerun=_trigger_rerun,
-                    )
-                )
+                st.write("Keine anstehenden Termine vorhanden. / No upcoming events.")
 
         elif admin_view == "System / Healthchecks":
             st.subheader("System / Healthchecks")
@@ -2654,117 +2596,6 @@ else:
                     st.write("Keine Dokumente vorhanden.")
             else:
                 st.write("Keine Dokumente verfügbar.")
-        elif menu == "photos":
-            st.subheader("Fotos / Photos")
-            render_onedrive_embed_panel()
-            if child and child.get("id"):
-                try:
-                    if app_config.storage_mode == "google":
-                        photo_folder_id = get_photos_root_folder_id()
-                    else:
-                        photo_folder_id = "root"
-                    photos = (
-                        drive_agent.list_files(
-                            photo_folder_id, mime_type_filter="image/"
-                        )
-                        if photo_folder_id
-                        else []
-                    )
-                    published_photos: list[dict[str, str]] = []
-                    current_child_id = str(child.get("id", "")).strip()
-                    for photo in photos:
-                        file_id = str(photo.get("id", "")).strip()
-                        if not file_id:
-                            continue
-                        meta = stammdaten_manager.get_photo_meta_by_file_id(file_id)
-                        if not meta:
-                            continue
-                        if str(meta.get("child_id", "")).strip() != current_child_id:
-                            continue
-                        status = _normalize_photo_status(meta.get("status"))
-                        if status == "published":
-                            published_photos.append(photo)
-                    photos = published_photos
-                except Exception as exc:
-                    photos = []
-                    st.error(
-                        "Fotos konnten nicht geladen werden. / Could not load photos."
-                    )
-                    st.info(str(exc))
-
-                if child:
-                    current_download_consent = (
-                        str(child.get("download_consent", "pixelated")).strip().lower()
-                    )
-                    consent_options = ["pixelated", "unpixelated", "denied"]
-                    if current_download_consent not in consent_options:
-                        current_download_consent = "pixelated"
-                    selected_download_consent = st.selectbox(
-                        "Foto-Download Consent / Photo download consent",
-                        options=consent_options,
-                        index=consent_options.index(current_download_consent),
-                        format_func=lambda mode: (
-                            "Downloads verpixelt / Downloads pixelated"
-                            if mode == "pixelated"
-                            else (
-                                "Downloads unverpixelt / Downloads unpixelated"
-                                if mode == "unpixelated"
-                                else "Download verweigert / Download denied"
-                            )
-                        ),
-                        key="parent_download_consent_select",
-                    )
-                    if selected_download_consent != current_download_consent:
-                        try:
-                            stammdaten_manager.update_child(
-                                str(child.get("id", "")),
-                                {"download_consent": selected_download_consent},
-                            )
-                            st.success("Consent aktualisiert. / Consent updated.")
-                            _trigger_rerun()
-                        except Exception as exc:
-                            st.error(
-                                "Consent konnte nicht gespeichert werden. / Could not save consent."
-                            )
-                            st.info(str(exc))
-                    st.caption(
-                        "In der App bleibt die Vorschau unverändert. Der Consent betrifft nur den Download. / "
-                        "In-app preview remains unchanged. Consent affects download only."
-                    )
-                if photos:
-                    active_consent_mode = (
-                        str((child or {}).get("download_consent", "pixelated"))
-                        .strip()
-                        .lower()
-                    )
-                    for photo in photos:
-                        file_name = str(photo.get("name", "photo"))
-                        file_id = str(photo.get("id", ""))
-                        img_bytes = drive_agent.download_file(file_id)
-                        st.image(
-                            img_bytes,
-                            caption=f"{file_name} · Vorschau / Preview",
-                            width="stretch",
-                        )
-                        if active_consent_mode == "denied":
-                            st.caption("Download nicht erlaubt / Download not allowed.")
-                        else:
-                            download_bytes = _get_photo_download_bytes(
-                                file_id=file_id,
-                                consent_mode=active_consent_mode,
-                            )
-                            st.download_button(
-                                "Foto herunterladen / Download photo",
-                                data=download_bytes,
-                                file_name=file_name,
-                                key=f"download_photo_{file_id}_{active_consent_mode}",
-                            )
-                else:
-                    st.write(
-                        "Keine veröffentlichten Fotos vorhanden. / No published photos available."
-                    )
-            else:
-                st.write("Keine Fotos verfügbar. / No photos available.")
         elif menu == "medication":
             st.subheader("Medikamentengabe / Medication log")
             if child and child.get("id"):

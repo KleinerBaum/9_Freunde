@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Foto-Menü und Foto-Views in `app.py` entfernt (Admin + Eltern): Navigationseinträge **„Fotos / Photos“** und **„Fotos & Medien / Photos & media“** sowie alle dazugehörigen Lade-/Render-Aufrufe wurden entfernt.
+- Dashboard-/Übersichtsbereinigung in `app.py`: Foto-Kennzahlen und Spalten wie `photo_folder_id` werden nicht mehr angezeigt; die Übersicht enthält nur noch Kernfelder inkl. `folder_id` und Ordnerstatus.
+- Session-State-Bereinigung in `app.py`: Fotoagent-Initialisierung (`photo_agent`) und Media-UI-State-Defaults wurden entfernt.
+- Admin-Menüstruktur auf Kernbereiche fokussiert: **Dashboard**, **Stammdaten & Infos**, **Dokumente & Verträge**, **Kommunikation**, **Kalender**, **System / Healthchecks**.
+
 - DriveAgent auf OneDrive umschaltbar gemacht: Bei `[onedrive].enabled = true` werden bestehende Drive-Operationen (`create_folder`, `upload`, `list`, `download`) in `services/drive_service.py` über Microsoft Graph ausgeführt; Google Drive bleibt als Fallback erhalten.
 - Neue Tests für den umgeschalteten Drive-Service ergänzt (`tests/test_drive_service_onedrive.py`) mit Endpoint-Checks für Create/Upload/List/Download.
 - OneDrive Graph-Flow für App-Only-Tokens korrigiert: `/me/drive/...` wurde auf app-kompatible Ziele (`/users/{user-id}/drive/...` oder `/drives/{drive-id}/...`) umgestellt; neue Secrets `drive_user_id`/`drive_id` ergänzt.

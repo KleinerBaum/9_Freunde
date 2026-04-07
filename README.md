@@ -1,5 +1,7 @@
 # 9 Freunde – Eltern- und Verwaltungsapp
 
+> ⚠️ **Produktfokus (April 2026):** Die App fokussiert jetzt auf Stammdaten, Dokumente/Verträge, Gmail-Kommunikation und Kalender. Foto-Funktionen sind als Produktfeature entfernt und nicht mehr Bestandteil der aktiven Nutzerflows.
+
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Sidebar-Sprach-Toggle (DE/EN):** Oberhalb von **„Angemeldet als / Logged in as“** kann die UI-Sprache umgeschaltet werden; zweisprachige Labels im Format `DE / EN` werden app-weit automatisch auf die aktive Sprache reduziert (inkl. Toggle-Beschriftungen, Navigation und Inhaltsbereiche) und blenden den nicht gewählten Teil inklusive Trennzeichen aus.
@@ -12,12 +14,12 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Kalender-Workflow im Dashboard vereinfacht:** Der separate Admin-Navigationspunkt **„Kalender / Calendar“** entfällt. Das Formular **„Neuer Termin / New event“** ist direkt im Dashboard unter **„Bevorstehende Termine / Upcoming events“** integriert; die Kalenderansicht wird darunter dauerhaft (ohne Dropdown) angezeigt. Optional können Admins hinterlegte User-E-Mails auswählen, die beim Erstellen als Kalender-Teilnehmende eingeladen und per Mail benachrichtigt werden.
 - **Dokumente & Verträge übersichtlicher:** Formulare und Dateilisten sind gruppiert, in Spalten angeordnet und enthalten aufklappbare Detailbereiche für gespeicherte Dateien und Vorschauen.
 - **Kommunikation / Communication (Admin):** Neuer Bereich für E-Mail-Kommunikation mit Zielgruppensteuerung (alle Eltern, Gruppe, einzelnes Kind), Vorlagen (Info/Rückfrage/Erinnerung), Vorschau, Versandprotokoll ohne PII sowie verständlichen DE/EN-Fehlermeldungen mit Retry (exponentielles Backoff) bei transienten Gmail-API-Fehlern.
-- **Direktlink zum zentralen Fotoordner:** Im Admin-Bereich **„Fotos“** wird ein direkter Google-Drive-Link (`📂`) auf den zentralen Foto-Ordner (`gcp.drive_photos_root_folder_id`) eingeblendet.
-- **Media-Gallery für Fotos & Videos (Admin):** Der Bereich **„Fotos & Medien“** ist jetzt in die Tabs **„Galerie / Gallery“**, **„Upload“** und **„Status“** aufgeteilt. Die Galerie nutzt ein klickbares Thumbnail-Grid mit Pagination (24 Items/Seite), Vorschau (Bild/Video), Datei-Metadaten und Direkt-Download pro Eintrag.
-- **OneDrive-Freigabe im Foto-Bereich (Admin + Eltern):** In den Foto-/Galerieansichten wird standardmäßig ein OneDrive-Linkbutton angezeigt; eine iFrame-Einbettung ist optional per Toggle **„Einbettung anzeigen / Show embed“** aktivierbar. Wenn iFrames blockiert sind, bleibt der Upload/Download über den Button im neuen Tab möglich. Die OneDrive-Karte wird nur angezeigt, wenn `[onedrive].enabled = true` gesetzt ist; Upload/Galerie bleiben dabei ausschließlich vom Graph-Setup abhängig. Optional konfigurierbar über `secrets.toml` unter `[onedrive].shared_folder_url`.
+- **Kein Foto-Produktpfad mehr:** Es gibt keine aktive Foto-Galerie, keine Foto-Statuspflege und keine Foto-spezifischen Drive-Workflows in der UI.
+- **Kommunikation (Gmail) als Kernfeature:** Admins senden Elternnachrichten zielgruppengenau (alle Eltern/Gruppe/ein Kind) mit Vorlagen, Vorschau und Versandprotokoll ohne PII.
+- **Kalender + Dokumente im Fokus:** Verträge/Abrechnungen und Kalenderprozesse sind zentrale Admin-Workflows; Eltern erhalten nur die für sie freigegebenen Informationen.
 - **DriveAgent mit OneDrive-Backend (optional):** Sobald `[onedrive].enabled = true` aktiv ist, nutzt `services/drive_service.py` für Upload, Download, Listing und Ordneranlage Microsoft Graph statt Google Drive. So können bestehende Drive-Aufrufe ohne UI-Änderung auf OneDrive laufen.
 - **UI-/Domain-Basisstruktur (minimal-invasiv):** Neue Module `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` kapseln Darstellung, Session-Keys und Datamodelle, ohne bestehende Service-/Storage-Logik unter `services/` zu verändern.
-- **Zentrale Fotoablage (Admin):** Im Foto-Bereich werden alle Uploads im konfigurierten zentralen Drive-Ordner gespeichert; die Kind-Auswahl steuert ausschließlich Filter und Statusverwaltung über Metadaten (`child_id`). / In the photo area, all uploads are stored in the configured central Drive folder; child selection is used only for filtering and status management via metadata (`child_id`).
+- **Schema ohne Foto-Felder:** Aktive Stammdaten-/Consent-Mappings enthalten keine produktiv genutzten Foto-Felder mehr.
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Geführtes Bearbeiten in Stammdaten:** Editierfelder für Kinder und Abholberechtigungen werden erst nach aktiver Auswahl eines Eintrags angezeigt; die Bereiche **„Neues Kind anlegen / Add child“**, **„Abholberechtigte / Pickup authorizations“** und **„Medikationen“** sind standardmäßig eingeklappt.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
@@ -52,6 +54,24 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung).
 
+
+
+### Konfiguration: OpenAI, Gmail, Calendar
+
+Für die produktiven Kernfunktionen sollten folgende Secrets gesetzt sein:
+
+```toml
+[gcp]
+calendar_id = "<google-calendar-id>"
+gmail_delegated_user = "leitung@example.org" # optional, empfohlen bei Domain-Delegation
+
+[openai]
+api_key = "<openai-api-key>"
+model_fast = "gpt-4o-mini"
+model_precise = "o3-mini"
+```
+
+Hinweis: Für Gmail-Versand benötigt der Service-Account Scope `https://www.googleapis.com/auth/gmail.send` und ggf. Domain-Wide Delegation.
 
 ## Installation und Voraussetzungen
 

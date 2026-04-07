@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 import json
 
 from docx import Document
+import pytest
 
 from config import AppConfig, LocalConfig, OpenAIConfig
-from documents import DocumentAgent
+from documents import DocumentAgent, DocumentGenerationError
 
 
 def _doc_text(doc_bytes: bytes) -> str:
@@ -132,3 +133,31 @@ def test_wizard_exports(monkeypatch) -> None:
     assert len(pdf_bytes) > 100
     assert json.loads(json_bytes.decode("utf-8"))["child"]["id"] == "c1"
     assert "AI Draft" in md_bytes.decode("utf-8")
+
+
+def test_generate_food_allowance_invoice_validates_period(monkeypatch) -> None:
+    agent = _agent(monkeypatch)
+
+    with pytest.raises(DocumentGenerationError):
+        agent.generate_food_allowance_invoice(
+            {"name": "Mia"},
+            period_start=date(2026, 5, 1),
+            period_end=date(2026, 4, 1),
+            monthly_amount_eur=120.0,
+        )
+
+
+def test_generate_food_allowance_invoice_contains_billing_content(monkeypatch) -> None:
+    agent = _agent(monkeypatch)
+
+    doc_bytes, filename = agent.generate_food_allowance_invoice(
+        {"name": "Mia", "parent_email": "eltern@example.org"},
+        period_start=date(2026, 4, 1),
+        period_end=date(2026, 4, 30),
+        monthly_amount_eur=120.0,
+    )
+
+    text = _doc_text(doc_bytes)
+    assert "Food allowance invoice" in text
+    assert "eltern@example.org" in text
+    assert filename.startswith("Lebensmittelpauschale_Mia_")

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Neues Modul `services/mail_service.py` ergänzt: Gmail-Integration (Service-Account mit optionaler Domain-Delegation), Funktionen `send_message`, `send_bulk_message` und `build_parent_recipient_list` mit Typing-Hints sowie strukturierter Fehlerklassifizierung inkl. transienter API-Fehler.
+- Admin-Bereich **Kommunikation / Communication** in `app.py` ausgebaut: Zielgruppenwahl (alle Eltern, Gruppe, einzelnes Kind), Vorlagen (Info, Rückfrage, Erinnerung), Nachrichtenvorschau und Versandprotokoll ohne PII-Ausgabe.
+- UI-Fehlerbehandlung für Kommunikationsversand erweitert: klare DE/EN-Meldungen und automatischer Retry mit exponentiellem Backoff bei transienten Gmail-API-Fehlern.
+- Unit-Tests für Empfängerlogik ergänzt (`tests/test_mail_service.py`).
+
 - CS_SCHEMA_PROPAGATE: `services/sheets_repo.py` auf reduziertes Stammdaten-Schema umgestellt. Entfernt wurden `children.photo_folder_id`, `consents.photo_download` sowie alle `photo_meta`-Tab-Strukturen; aktiv bleiben `children`, `parents`, `pickup_authorizations`, `medications` und Notfall-/Kontaktfelder.
 - Registrierungs-Mapping konsolidiert: `download_consent` wird nur noch aus dem Feld `download_consent` gelesen (kein Mapping der legacy-Felder `consent__photo_download_*` mehr).
 - `constants_forms.py` ergänzt um explizite Import-/Mapping-Excludes für `consent__photo_download_*`; PDF-Felder bleiben lesbar, aber diese Felder werden nicht mehr in UI-/Payload-Mappings aufgenommen.

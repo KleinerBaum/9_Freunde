@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import streamlit as st
@@ -41,6 +41,11 @@ from services.sheets_repo import (
     map_schema_v1_payload_to_tab_records,
 )
 from services.sheets_service import SheetsServiceError, read_sheet_values
+from services.mail_service import (
+    MailServiceError,
+    build_parent_recipient_list,
+    send_bulk_message,
+)
 from ui.layout import bootstrap_page
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
@@ -151,6 +156,45 @@ def _display_name_from_email(email: str) -> str:
     return " ".join(part.capitalize() for part in normalized.split() if part)
 
 
+def _is_transient_mail_error(exc: Exception) -> bool:
+    if isinstance(exc, MailServiceError):
+        return exc.transient
+    if isinstance(exc, HttpError):
+        status_code = int(getattr(exc.resp, "status", 0) or 0)
+        return status_code in {429, 500, 502, 503, 504}
+    return False
+
+
+def _send_bulk_message_with_retry(
+    *,
+    recipients: list[str],
+    subject: str,
+    body: str,
+    max_attempts: int = 3,
+) -> dict[str, int]:
+    delay_seconds = 1.0
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return send_bulk_message(
+                recipient_emails=recipients,
+                subject=subject,
+                body_text=body,
+            )
+        except Exception as exc:
+            is_transient = _is_transient_mail_error(exc)
+            if attempt >= max_attempts or not is_transient:
+                raise
+            st.warning(
+                "Temporärer Fehler beim Versand. "
+                f"Automatischer Retry {attempt}/{max_attempts - 1} in "
+                f"{delay_seconds:.0f}s… / Temporary send error. "
+                f"Automatic retry {attempt}/{max_attempts - 1} in {delay_seconds:.0f}s…"
+            )
+            time.sleep(delay_seconds)
+            delay_seconds *= 2
+    raise RuntimeError("Unreachable")
+
+
 def _render_brand_header() -> None:
     """Rendert ein kompaktes Branding mit optimierter Logo-Einbettung."""
     brand_col, hero_col = st.columns([1, 5], vertical_alignment="center")
@@ -205,6 +249,38 @@ LANGUAGE_LABELS = {
     "sr": "Serbisch / Serbian",
     "hr": "Kroatisch / Croatian",
     "bs": "Bosnisch / Bosnian",
+}
+COMMUNICATION_TEMPLATES: dict[str, dict[str, str]] = {
+    "info": {
+        "label": "Info / Information",
+        "subject": "Information aus der Kita / Information from daycare",
+        "body": (
+            "Guten Tag,\n\n"
+            "wir möchten Sie über eine aktuelle Neuigkeit informieren.\n\n"
+            "Good day,\n\n"
+            "we would like to share an important update with you."
+        ),
+    },
+    "request": {
+        "label": "Rückfrage / Follow-up question",
+        "subject": "Rückfrage zu Ihrem Kind / Question about your child",
+        "body": (
+            "Guten Tag,\n\n"
+            "wir haben eine kurze Rückfrage und freuen uns über Ihre Rückmeldung.\n\n"
+            "Good day,\n\n"
+            "we have a brief question and would appreciate your feedback."
+        ),
+    },
+    "reminder": {
+        "label": "Erinnerung / Reminder",
+        "subject": "Erinnerung: Bitte beachten / Reminder: please note",
+        "body": (
+            "Guten Tag,\n\n"
+            "dies ist eine freundliche Erinnerung an einen wichtigen Termin.\n\n"
+            "Good day,\n\n"
+            "this is a friendly reminder of an important date."
+        ),
+    },
 }
 
 
@@ -2391,11 +2467,162 @@ else:
 
         elif admin_view == "Kommunikation":
             st.subheader("Kommunikation / Communication")
-            st.info(
-                "Kommunikationsinhalte werden im Bereich 'Stammdaten & Infos' "
-                "verwaltet. / Communication content is maintained in the 'Master "
-                "data & info' section."
+            st.caption(
+                "Direkter E-Mail-Versand an Eltern mit Zielgruppe, Vorlagen und "
+                "Versandprotokoll (ohne PII in Logs). / Direct email delivery to "
+                "parents with audience targeting, templates and send log (without "
+                "PII in logs)."
             )
+            st.session_state.setdefault("communication_send_log", [])
+            children = stammdaten_manager.get_children()
+            parents = stammdaten_manager.get_parents()
+
+            with st.container(border=True):
+                audience = st.radio(
+                    "Zielgruppe / Audience",
+                    options=("all_parents", "group", "single_child"),
+                    format_func=lambda value: {
+                        "all_parents": "Alle Eltern / All parents",
+                        "group": "Gruppe / Group",
+                        "single_child": "Einzelnes Kind / Single child",
+                    }[value],
+                    horizontal=True,
+                    key="communication_audience",
+                )
+
+                selected_group = None
+                selected_child_id = None
+                if audience == "group":
+                    groups = sorted(
+                        {
+                            str(child.get("group", "")).strip()
+                            for child in children
+                            if str(child.get("group", "")).strip()
+                        }
+                    )
+                    selected_group = st.selectbox(
+                        "Gruppe wählen / Select group",
+                        options=groups,
+                        key="communication_group",
+                        index=None,
+                        placeholder="Gruppe auswählen / Select group",
+                    )
+                elif audience == "single_child":
+                    selected_child = st.selectbox(
+                        "Kind wählen / Select child",
+                        options=children,
+                        format_func=lambda child: str(child.get("name", "")),
+                        key="communication_child",
+                        index=None,
+                        placeholder="Kind auswählen / Select child",
+                    )
+                    if selected_child is not None:
+                        selected_child_id = str(selected_child.get("id", "")).strip()
+
+                template_key = st.selectbox(
+                    "Vorlage / Template",
+                    options=tuple(COMMUNICATION_TEMPLATES.keys()),
+                    format_func=lambda key: COMMUNICATION_TEMPLATES[key]["label"],
+                    key="communication_template",
+                )
+                template_data = COMMUNICATION_TEMPLATES[template_key]
+                subject = st.text_input(
+                    "Betreff / Subject",
+                    value=template_data["subject"],
+                    key="communication_subject",
+                )
+                body = st.text_area(
+                    "Nachricht / Message",
+                    value=template_data["body"],
+                    height=220,
+                    key="communication_body",
+                )
+
+                recipients = build_parent_recipient_list(
+                    children=children,
+                    parents=parents,
+                    audience=audience,
+                    selected_group=selected_group,
+                    selected_child_id=selected_child_id,
+                )
+                st.caption(
+                    f"Empfänger gesamt / Total recipients: {len(recipients)} "
+                    "(ohne Anzeige einzelner E-Mail-Adressen)."
+                )
+
+                with st.expander("Vorschau / Preview", expanded=True):
+                    st.markdown(f"**{subject.strip() or '—'}**")
+                    st.text(body.strip() or "—")
+
+                if st.button("Senden / Send", key="communication_send_button"):
+                    if not subject.strip() or not body.strip():
+                        st.error(
+                            "Bitte Betreff und Nachricht ausfüllen. / "
+                            "Please fill in subject and message."
+                        )
+                    elif not recipients:
+                        st.error(
+                            "Keine Empfänger gefunden. Bitte Zielgruppe prüfen. / "
+                            "No recipients found. Please review the selected audience."
+                        )
+                    else:
+                        try:
+                            send_result = _send_bulk_message_with_retry(
+                                recipients=recipients,
+                                subject=subject,
+                                body=body,
+                            )
+                            st.success(
+                                "Versand abgeschlossen. / Sending completed. "
+                                f"Erfolgreich / Successful: {send_result['success_count']}, "
+                                f"Fehlgeschlagen / Failed: {send_result['failure_count']}."
+                            )
+                            st.session_state["communication_send_log"].insert(
+                                0,
+                                {
+                                    "timestamp": datetime.now().isoformat(
+                                        timespec="seconds"
+                                    ),
+                                    "audience": audience,
+                                    "template": template_key,
+                                    "recipient_count": len(recipients),
+                                    "success_count": send_result["success_count"],
+                                    "failure_count": send_result["failure_count"],
+                                },
+                            )
+                        except MailServiceError as exc:
+                            st.error(
+                                "Versand fehlgeschlagen. Bitte prüfen Sie Gmail-Setup "
+                                "und Berechtigungen. / Sending failed. Please verify "
+                                "Gmail setup and permissions."
+                            )
+                            st.info(
+                                f"Technisches Detail / Technical detail: "
+                                f"{type(exc).__name__} (status={exc.status_code})"
+                            )
+                        except Exception as exc:
+                            st.error(
+                                "Unerwarteter Fehler beim Versand. Bitte erneut "
+                                "versuchen. / Unexpected send error. Please retry."
+                            )
+                            st.info(
+                                f"Technisches Detail / Technical detail: "
+                                f"{type(exc).__name__}"
+                            )
+
+            with st.container(border=True):
+                st.markdown("**Versandprotokoll / Send log**")
+                send_log = st.session_state.get("communication_send_log", [])
+                if not send_log:
+                    st.caption(
+                        "Noch kein Versand protokolliert. / No messages logged yet."
+                    )
+                else:
+                    st.dataframe(
+                        pd.DataFrame(send_log),
+                        hide_index=True,
+                        width="stretch",
+                    )
 
         elif admin_view == "Kalender":
             st.subheader("Kalender / Calendar")

@@ -53,6 +53,14 @@ def _translate_calendar_http_error(exc: HttpError) -> CalendarServiceError:
     )
 
 
+def _translate_calendar_transport_error(exc: OSError) -> CalendarServiceError:
+    return CalendarServiceError(
+        "Temporäres Netzwerkproblem beim Kalenderzugriff. Bitte erneut versuchen. / "
+        "Temporary network issue while accessing calendar. Please retry.",
+        cause="transport_error",
+    )
+
+
 @st.cache_resource(show_spinner=False)
 def _get_calendar_client():
     app_config = get_app_config()
@@ -153,6 +161,8 @@ def add_event(
             calendar.events().insert(**insert_kwargs).execute()
         except HttpError as exc:
             raise _translate_calendar_http_error(exc) from exc
+        except (BrokenPipeError, TimeoutError, ConnectionError, OSError) as exc:
+            raise _translate_calendar_transport_error(exc) from exc
     else:
         local_event = {"id": uuid.uuid4().hex, **event_body}
         events = _read_local_events()
@@ -185,6 +195,8 @@ def list_events(max_results: int = 10) -> list[dict[str, str]]:
             )
         except HttpError as exc:
             raise _translate_calendar_http_error(exc) from exc
+        except (BrokenPipeError, TimeoutError, ConnectionError, OSError) as exc:
+            raise _translate_calendar_transport_error(exc) from exc
         raw_events = response.get("items", [])
     else:
         now_iso = datetime.utcnow().isoformat()

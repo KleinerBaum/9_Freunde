@@ -14,7 +14,6 @@ from datetime import date, datetime
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from docx import Document
 from googleapiclient.errors import HttpError
 from auth import AuthAgent
@@ -386,14 +385,6 @@ def _build_google_calendar_embed_url(calendar_id: str) -> str:
     return f"https://calendar.google.com/calendar/embed?{query}"
 
 
-def _build_google_calendar_embed_html(calendar_id: str) -> str:
-    embed_url = _build_google_calendar_embed_url(calendar_id)
-    return (
-        f'<iframe src="{embed_url}" style="border-width:0" width="800" height="300" '
-        'frameborder="0" scrolling="no"></iframe>'
-    )
-
-
 def _render_calendar_embed(section_key: str) -> None:
     app_config = get_app_config()
     if app_config.storage_mode == "google":
@@ -417,7 +408,7 @@ def _render_calendar_embed(section_key: str) -> None:
             key=f"show_embed_calendar_{section_key}",
         )
         if show_embed:
-            components.html(_build_google_calendar_embed_html(calendar_id), height=320)
+            st.iframe(embed_url, height=320)
         return
 
     st.info(

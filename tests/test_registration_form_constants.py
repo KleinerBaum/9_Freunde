@@ -3,6 +3,8 @@ from __future__ import annotations
 from PyPDF2 import PdfReader
 
 from constants import (
+    REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1,
+    REGISTRATION_MAPPABLE_FIELDS_V1,
     REGISTRATION_FORM_SCHEMA_VERSION,
     REGISTRATION_FORM_TEMPLATE_FILENAME,
     REGISTRATION_FORM_TEMPLATE_PATH,
@@ -34,7 +36,7 @@ def test_required_fields_are_subset_of_pdf_fields() -> None:
 
 
 def test_ui_and_payload_keys_are_centralized_for_each_field() -> None:
-    expected_fields = set(REGISTRATION_PDF_FIELDS_V1)
+    expected_fields = set(REGISTRATION_MAPPABLE_FIELDS_V1)
 
     assert set(REGISTRATION_UI_KEYS_V1.keys()) == expected_fields
     assert set(REGISTRATION_PAYLOAD_KEYS_V1.keys()) == expected_fields
@@ -42,6 +44,17 @@ def test_ui_and_payload_keys_are_centralized_for_each_field() -> None:
         f"registration_{field_name}" for field_name in expected_fields
     }
     assert set(REGISTRATION_PAYLOAD_KEYS_V1.values()) == expected_fields
+
+
+def test_photo_download_fields_are_excluded_from_import_mapping() -> None:
+    assert REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1 == {
+        "consent__photo_download_pixelated",
+        "consent__photo_download_unpixelated",
+        "consent__photo_download_denied",
+    }
+    assert not (
+        REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1 & set(REGISTRATION_MAPPABLE_FIELDS_V1)
+    )
 
 
 def test_get_registration_pdf_template_bytes_returns_pdf_bytes() -> None:

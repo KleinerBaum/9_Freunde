@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- CS_SCHEMA_PROPAGATE: `services/sheets_repo.py` auf reduziertes Stammdaten-Schema umgestellt. Entfernt wurden `children.photo_folder_id`, `consents.photo_download` sowie alle `photo_meta`-Tab-Strukturen; aktiv bleiben `children`, `parents`, `pickup_authorizations`, `medications` und Notfall-/Kontaktfelder.
+- Registrierungs-Mapping konsolidiert: `download_consent` wird nur noch aus dem Feld `download_consent` gelesen (kein Mapping der legacy-Felder `consent__photo_download_*` mehr).
+- `constants_forms.py` ergänzt um explizite Import-/Mapping-Excludes für `consent__photo_download_*`; PDF-Felder bleiben lesbar, aber diese Felder werden nicht mehr in UI-/Payload-Mappings aufgenommen.
+- Tests und Doku aktualisiert (inkl. Migrationsanleitung für bestehende Sheets ohne Datenverlust in `README.md`).
+
 - Foto-Module deaktiviert/entfernt: `photo.py`, `services/photos_service.py` und `ui/media_gallery.py` wurden aus dem Codepfad entfernt; der dazugehörige Test `tests/test_photo_onedrive.py` entfällt.
 - Drive-Service bereinigt: foto-spezifische Helper-Logik (`get_photos_root_folder_id`) wurde aus `services/drive_service.py` entfernt.
 - Konstanten bereinigt: `constants.GcpSecretFields.PHOTOS_ROOT` wurde entfernt, damit `drive_photos_root_folder_id` nicht mehr in aktiver Laufzeitlogik verwendet wird.

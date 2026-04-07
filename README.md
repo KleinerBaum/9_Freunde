@@ -278,7 +278,6 @@ Für Stammdaten wird Google Sheets als zentrale Quelle genutzt (Tabellenblätter
 
 Der Tab `pickup_authorizations` wird bei Bedarf automatisch erstellt, wenn er im Spreadsheet noch fehlt. Bei nicht auflösbaren Range-/Tab-Problemen zeigt die App eine klare DE/EN-Fehlermeldung mit Hinweis auf `gcp.pickup_authorizations_tab`.
    - `gcp.medications_tab` (Default: `medications`)
-   - `gcp.photo_meta_tab` (Default: `photo_meta`)
    - `gcp.content_pages_tab` (Default: `content_pages`)
 
 Die App validiert diese Tabnamen beim Start (nicht leer, max. 100 Zeichen, keine verbotenen Zeichen `: \ / ? * [ ]`) und zeigt bei ungültigen Werten eine klare DE/EN-Fehlermeldung an.
@@ -289,9 +288,9 @@ Unterhalb dieses Bereichs steht zusätzlich ein **Export/Backup-Block (CSV + JSO
 
 Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`
-- Erweitert (automatisch ergänzt): `folder_id`, `photo_folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`, `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional`
+- Erweitert (automatisch ergänzt): `folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`, `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional`
 - Mapping-Regel: Falls `parent1__email` gesetzt ist, wird `children.parent_email` automatisch auf diesen Wert synchronisiert.
-- Consent-Regel: `children.download_consent` wird aus `consent__photo_download_pixelated`, `consent__photo_download_unpixelated`, `consent__photo_download_denied` abgeleitet (`denied` > `unpixelated` > `pixelated`).
+- Consent-Regel: `children.download_consent` wird direkt aus dem Feld `download_consent` übernommen (Default: `pixelated` bei ungültigem/leerem Wert).
 - Admin-Formulare „Neues Kind anlegen“ und „Kind bearbeiten“ nutzen für `birthdate` und `start_date` den Streamlit-Datumspicker (`st.date_input`) und speichern ISO-Werte (`YYYY-MM-DD`) oder leer bei optionalen Feldern.
 
 Empfohlener Eltern-Tab (`parents`):
@@ -334,9 +333,7 @@ Serialisierung von Mehrfachstrukturen: `pa1__*` bis `pa4__*` werden als geordnet
 | `parent1__notifications_opt_in` | `parents` | `notifications_opt_in` | Bool-Normalisierung (`true/1/ja` → `true`, sonst `false`). |
 | `parent2__*` | `parents` | wie `parent1__*` | Zweiter Eltern-Datensatz als eigener Upsert; Beziehung zum Kind über `parent_email`-Logik und/oder interne Zuordnung. |
 | `pa1__*`, `pa2__*`, `pa3__*`, `pa4__*` | `pickup_authorizations` | `name`, `phone`, `relationship`, `active`, `valid_from`, `valid_to`, `created_at`, `created_by` | Je Präfix ein Datensatz. Bool-Normalisierung für `active`; `notes` ist **out of scope** (keine Persistenz im Pickup-Schema). |
-| `consent__photo_download_pixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Bool-Normalisierung; wirkt nur, wenn keine höhere Priorität greift. |
-| `consent__photo_download_unpixelated` | `children` (optional zusätzlich `consents`) | `download_consent` | Priorität vor `pixelated`: bei `true` → `unpixelated`, außer `denied=true`. |
-| `consent__photo_download_denied` | `children` (optional zusätzlich `consents`) | `download_consent` | Höchste Priorität: bei `true` immer `denied`. |
+| `download_consent` | `children` | `download_consent` | Direkte Übernahme (zulässig: `pixelated`, `unpixelated`, `denied`; sonst Fallback `pixelated`). |
 | weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Out of scope** für das produktive Pflichtschema (nur Download-Consent wird aktiv ausgewertet); optional im `consents`-Tab oder JSON-Fallback in `children.notes_internal`. |
 | `sign__parent1_name`, `sign__parent1_date` | optional `consents` | z. B. `sign_parent1_name`, `sign_parent1_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); bevorzugt im `consents`-Tab ablegen. |
 | `sign__parent2_name`, `sign__parent2_date` | optional `consents` | z. B. `sign_parent2_name`, `sign_parent2_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); alternativ JSON-Fallback in `children.notes_internal`. |
@@ -348,8 +345,19 @@ Aktuell gelten folgende Gruppen als **nicht Teil des Pflichtschemas** und werden
 
 - Erweiterte `meta__*`-Felder (außer einer möglichen ID-Übernahme für `child_id`)
   → Speicherung als JSON-Fallback in `children.notes_internal`.
-- Erweiterte `consent__*`-Felder jenseits der Download-Freigabe (`pixelated`, `unpixelated`, `denied`)
+- Erweiterte `consent__*`-Felder jenseits der Pflicht-Flags (`privacy_notice_ack`, `excursions`, `emergency_treatment`, `whatsapp_group`)
   → bevorzugt eigener Tab `consents`; alternativ JSON-Fallback in `children.notes_internal`.
+
+### Migration bestehender Sheets auf das neue Schema (ohne Datenverlust)
+
+1. **Backup erstellen**: komplette Tabelle als XLSX/CSV exportieren.
+2. **Header migrieren**:
+   - Tab `children`: Spalte `photo_folder_id` aus Header entfernen (Daten bleiben in Backup erhalten).
+   - Tab `consents`: Spalte `photo_download` aus Header entfernen.
+   - Tab `photo_meta`: Tab nicht mehr erforderlich (kann archiviert oder gelöscht werden).
+3. **Werte übernehmen**:
+   - Falls bisher nur alte PDF-Felder genutzt wurden, `children.download_consent` einmalig aus Altdaten befüllen (z. B. mit vorhandenen Werten aus `consents.photo_download`).
+4. **App starten**: Header-Selbstheilung ergänzt fehlende Pflichtspalten automatisch (`children`, `parents`, `pickup_authorizations`, `medications`, `consents`).
 - Alle `sign__*`-Felder (Signatur-/Ort-/Datum-Metadaten)
   → bevorzugt eigener Tab `consents`; falls nicht vorhanden, JSON-Fallback in `children.notes_internal`.
 

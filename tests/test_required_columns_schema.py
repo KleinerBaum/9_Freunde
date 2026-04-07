@@ -18,5 +18,4 @@ def test_consents_schema_v1_required_columns_supported() -> None:
         "excursions",
         "emergency_treatment",
         "whatsapp_group",
-        "photo_download",
     ]

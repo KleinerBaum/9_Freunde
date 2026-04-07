@@ -12,24 +12,8 @@ def test_sync_child_parent_email_uses_parent1_email() -> None:
     assert payload["parent_email"] == "new@example.com"
 
 
-def test_derive_download_consent_prioritizes_denied() -> None:
-    payload = {
-        "download_consent": "unpixelated",
-        "consent__photo_download_pixelated": "true",
-        "consent__photo_download_unpixelated": "true",
-        "consent__photo_download_denied": "true",
-    }
-
-    assert sheets_repo._derive_download_consent(payload) == "denied"
-
-
-def test_derive_download_consent_uses_unpixelated_before_pixelated() -> None:
-    payload = {
-        "download_consent": "pixelated",
-        "consent__photo_download_pixelated": "true",
-        "consent__photo_download_unpixelated": "true",
-        "consent__photo_download_denied": "false",
-    }
+def test_derive_download_consent_uses_download_consent_field() -> None:
+    payload = {"download_consent": "unpixelated"}
 
     assert sheets_repo._derive_download_consent(payload) == "unpixelated"
 
@@ -58,7 +42,7 @@ def test_map_schema_v1_payload_to_tab_records_maps_children_and_parents() -> Non
         "parent2__email": "p2@example.com",
         "parent2__name": "Parent Two",
         "parent2__notifications_opt_in": "0",
-        "consent__photo_download_pixelated": "true",
+        "download_consent": "pixelated",
     }
 
     mapped = sheets_repo.map_schema_v1_payload_to_tab_records(payload)
@@ -129,7 +113,7 @@ def test_map_schema_v1_payload_to_tab_records_maps_consents() -> None:
         "consent__excursions": "no",
         "consent__emergency_treatment": "1",
         "consent__whatsapp_group": "0",
-        "consent__photo_download_unpixelated": "true",
+        "download_consent": "unpixelated",
     }
 
     mapped = sheets_repo.map_schema_v1_payload_to_tab_records(payload)
@@ -140,4 +124,3 @@ def test_map_schema_v1_payload_to_tab_records_maps_consents() -> None:
     assert records["excursions"] == "false"
     assert records["emergency_treatment"] == "true"
     assert records["whatsapp_group"] == "false"
-    assert records["photo_download"] == "unpixelated"

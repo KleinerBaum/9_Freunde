@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Breaking Changes
+- **Photo functionality removed**: Produktfokus liegt auf Stammdaten, Dokumenten/Verträgen, Gmail-Kommunikation und Kalender. Foto-spezifische Nutzerflows und zugehörige Tests gelten als entfernt/obsolet.
+
+### Added
+- Neue Testabdeckung für Gmail-Kommunikation (`tests/test_mail_service.py`), Vertrags-/Abrechnungsworkflow (`tests/test_document_agent.py`), schema-konforme Mappings ohne Foto-Felder (`tests/test_stammdaten_schema_mapping.py`, `tests/test_registration_form_constants.py`) und Rollenrechte für Kommunikationsfunktionen (`tests/test_auth_roles.py`).
+
+### Changed
+- README-Konfiguration für Kernintegrationen (Gmail/Calendar/OpenAI) und Produktfokus ohne Foto-Features aktualisiert.
+
 ### Added
 - Dokumenten-Wizard (Admin, Dokumente): 4-stufiger Flow für Kind/Vertragspartner, Vertrags-/Abrechnungsparameter, KI-Review sowie Export/Versand (DE/EN).
 - Einheitliche Vorlagenbibliothek (`contract`, `addendum`, `monthly_invoice`) im `DocumentAgent`.

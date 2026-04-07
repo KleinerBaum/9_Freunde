@@ -46,15 +46,14 @@ def test_ui_and_payload_keys_are_centralized_for_each_field() -> None:
     assert set(REGISTRATION_PAYLOAD_KEYS_V1.values()) == expected_fields
 
 
-def test_photo_download_fields_are_excluded_from_import_mapping() -> None:
+def test_import_mapping_has_no_active_photo_fields() -> None:
     assert REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1 == {
         "consent__photo_download_pixelated",
         "consent__photo_download_unpixelated",
         "consent__photo_download_denied",
     }
-    assert not (
-        REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1 & set(REGISTRATION_MAPPABLE_FIELDS_V1)
-    )
+    assert not any("photo" in field for field in REGISTRATION_MAPPABLE_FIELDS_V1)
+    assert not any("photo" in key for key in REGISTRATION_PAYLOAD_KEYS_V1.values())
 
 
 def test_get_registration_pdf_template_bytes_returns_pdf_bytes() -> None:

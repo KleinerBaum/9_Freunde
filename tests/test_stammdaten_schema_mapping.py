@@ -124,3 +124,19 @@ def test_map_schema_v1_payload_to_tab_records_maps_consents() -> None:
     assert records["excursions"] == "false"
     assert records["emergency_treatment"] == "true"
     assert records["whatsapp_group"] == "false"
+
+
+def test_schema_mapping_excludes_photo_related_fields() -> None:
+    payload = {
+        "child__child_id": "child-8",
+        "child__name": "Noah",
+        "child__photo_folder_id": "legacy-photo-folder",
+        "consent__photo_download_denied": "yes",
+        "download_consent": "denied",
+    }
+
+    mapped = sheets_repo.map_schema_v1_payload_to_tab_records(payload)
+
+    assert "photo_folder_id" not in mapped["children"]
+    assert "photo_download" not in mapped["consents"]
+    assert mapped["children"]["download_consent"] == "denied"

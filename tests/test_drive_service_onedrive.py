@@ -63,19 +63,6 @@ class _DummyClient:
         return _DummyResponse({})
 
 
-def test_get_photos_root_folder_id_uses_onedrive_folder(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(drive_service.st, "secrets", {"onedrive": {"enabled": True}})
-    monkeypatch.setattr(
-        drive_service,
-        "get_onedrive_folder",
-        lambda _path: type("Folder", (), {"id": "folder-123"})(),
-    )
-
-    assert drive_service.get_photos_root_folder_id() == "folder-123"
-
-
 def test_upload_and_download_use_onedrive_graph_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

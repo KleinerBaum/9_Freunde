@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Foto-Module deaktiviert/entfernt: `photo.py`, `services/photos_service.py` und `ui/media_gallery.py` wurden aus dem Codepfad entfernt; der dazugehörige Test `tests/test_photo_onedrive.py` entfällt.
+- Drive-Service bereinigt: foto-spezifische Helper-Logik (`get_photos_root_folder_id`) wurde aus `services/drive_service.py` entfernt.
+- Konstanten bereinigt: `constants.GcpSecretFields.PHOTOS_ROOT` wurde entfernt, damit `drive_photos_root_folder_id` nicht mehr in aktiver Laufzeitlogik verwendet wird.
+
 - Foto-Menü und Foto-Views in `app.py` entfernt (Admin + Eltern): Navigationseinträge **„Fotos / Photos“** und **„Fotos & Medien / Photos & media“** sowie alle dazugehörigen Lade-/Render-Aufrufe wurden entfernt.
 - Dashboard-/Übersichtsbereinigung in `app.py`: Foto-Kennzahlen und Spalten wie `photo_folder_id` werden nicht mehr angezeigt; die Übersicht enthält nur noch Kernfelder inkl. `folder_id` und Ordnerstatus.
 - Session-State-Bereinigung in `app.py`: Fotoagent-Initialisierung (`photo_agent`) und Media-UI-State-Defaults wurden entfernt.

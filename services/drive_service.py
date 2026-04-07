@@ -8,8 +8,7 @@ import streamlit as st
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
-from config import get_app_config
-from onedrive_auth import OneDriveAuthError, get_graph_client, get_onedrive_folder
+from onedrive_auth import OneDriveAuthError, get_graph_client
 from services.google_clients import get_drive_client
 
 DEFAULT_ONEDRIVE_FOLDER_PATH = "Documents/9 Freunde"
@@ -142,24 +141,6 @@ def create_folder(name: str, parent_id: str | None = None) -> str:
         raise translate_http_error(exc) from exc
 
     return created["id"]
-
-
-def get_photos_root_folder_id() -> str:
-    if _is_onedrive_enabled():
-        folder = get_onedrive_folder(_onedrive_folder_path())
-        if not folder.id:
-            raise DriveServiceError(
-                "OneDrive-Ordner-ID konnte nicht aufgelöst werden.",
-                cause="not_found",
-            )
-        return folder.id
-
-    app_config = get_app_config()
-    if app_config.google is None:
-        raise DriveServiceError(
-            "Google-Konfiguration fehlt, zentraler Foto-Ordner ist nicht verfügbar."
-        )
-    return app_config.google.drive_photos_root_folder_id
 
 
 def upload_bytes_to_folder(

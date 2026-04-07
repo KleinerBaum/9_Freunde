@@ -83,6 +83,18 @@ REGISTRATION_PDF_FIELDS_V1: list[str] = [
     "sign__parent2_name",
 ]
 
+REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1: set[str] = {
+    "consent__photo_download_pixelated",
+    "consent__photo_download_unpixelated",
+    "consent__photo_download_denied",
+}
+
+REGISTRATION_MAPPABLE_FIELDS_V1: list[str] = [
+    field_name
+    for field_name in REGISTRATION_PDF_FIELDS_V1
+    if field_name not in REGISTRATION_IMPORT_EXCLUDED_FIELDS_V1
+]
+
 REGISTRATION_REQUIRED_FIELDS_V1: list[str] = [
     "meta__schema_version",
     "child__name",
@@ -98,10 +110,10 @@ REGISTRATION_REQUIRED_FIELDS_V1: list[str] = [
 # Canonical mappings for UI state keys and payload keys.
 REGISTRATION_UI_KEYS_V1: dict[str, str] = {
     field_name: f"registration_{field_name}"
-    for field_name in REGISTRATION_PDF_FIELDS_V1
+    for field_name in REGISTRATION_MAPPABLE_FIELDS_V1
 }
 REGISTRATION_PAYLOAD_KEYS_V1: dict[str, str] = {
-    field_name: field_name for field_name in REGISTRATION_PDF_FIELDS_V1
+    field_name: field_name for field_name in REGISTRATION_MAPPABLE_FIELDS_V1
 }
 
 

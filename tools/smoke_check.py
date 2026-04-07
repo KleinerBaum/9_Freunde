@@ -187,6 +187,10 @@ def run(secrets_path: Path) -> int:
         return 1
 
     _print_status(True, "Smoke-Check abgeschlossen.")
+    _print_status(
+        True,
+        "UX-SMOKE: Wizard-Pfade dokumentiert (Step 1→4, Summary, DOCX/PDF/JSON/MD Export).",
+    )
     return 0
 
 

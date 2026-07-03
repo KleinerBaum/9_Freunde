@@ -10,6 +10,7 @@ from services.photo_share_service import (
     list_child_photos,
     upload_child_photo,
 )
+from ui.state_keys import UIKeys
 
 
 def _child_label(child_record: dict[str, Any]) -> str:
@@ -31,7 +32,7 @@ def _selected_child(
             "Kind auswählen / Select child",
             options=children,
             format_func=_child_label,
-            key="photos.child_select",
+            key=UIKeys.PHOTOS_CHILD_SELECT,
         )
 
     if not children:
@@ -54,12 +55,12 @@ def _render_upload_form(
     user_email: str,
     drive_agent: Any,
 ) -> None:
-    with st.form(key="photos.upload_form", border=True):
+    with st.form(key=UIKeys.PHOTOS_UPLOAD_FORM, border=True):
         uploaded_files = st.file_uploader(
             "Fotos auswählen / Select photos",
             type=["jpg", "jpeg", "png", "webp"],
             accept_multiple_files=True,
-            key="photos.upload_files",
+            key=UIKeys.PHOTOS_UPLOAD_FILES,
         )
         submitted = st.form_submit_button("Fotos speichern / Save photos")
 
@@ -141,7 +142,7 @@ def _render_gallery(*, selected_child: dict[str, Any], drive_agent: Any) -> None
             data=photo_bytes,
             file_name=file_name,
             mime=mime_type,
-            key=f"photos.download.{file_id}",
+            key=UIKeys.photo_download(file_id),
         )
 
 

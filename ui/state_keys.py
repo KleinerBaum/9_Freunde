@@ -15,6 +15,13 @@ class UIKeys:
     MEDIA_UPLOAD_CHILD_SELECT = "media.upload_child_select"
     MEDIA_STATUS_CHILD_SELECT = "media.status_child_select"
     ONEDRIVE_SHOW_EMBED = "media.onedrive_show_embed"
+    PHOTOS_CHILD_SELECT = "photos.child_select"
+    PHOTOS_UPLOAD_FORM = "photos.upload_form"
+    PHOTOS_UPLOAD_FILES = "photos.upload_files"
+
+    @staticmethod
+    def photo_download(file_id: str) -> str:
+        return f"photos.download.{file_id}"
 
 
 def ss_get(key: str, default: Any = None) -> Any:

@@ -1,25 +1,22 @@
 # 9 Freunde – Eltern- und Verwaltungsapp
 
-> ⚠️ **Produktfokus (April 2026):** Die App fokussiert jetzt auf Stammdaten, Dokumente/Verträge, Gmail-Kommunikation und Kalender. Foto-Funktionen sind als Produktfeature entfernt und nicht mehr Bestandteil der aktiven Nutzerflows.
+> **Produktfokus (Juli 2026):** Die App fokussiert auf Stammdaten, Dokumente/Verträge, Gmail-Kommunikation, Kalender und einen kleinen Foto-Upload-MVP. Der Foto-MVP umfasst Upload und Anzeige in geschützten Kind-Ordnern, ohne Gesichtserkennung oder automatisches Tagging.
 
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:
 - **Getrennter Login für Eltern und Leitung:** Sichere Anmeldung mit unterschiedlichen Berechtigungen (Eltern sehen nur eigene Kind-Daten, Leitung hat vollen Verwaltungszugriff).
 - **Sidebar-Sprach-Toggle (DE/EN):** Oberhalb von **„Angemeldet als / Logged in as“** kann die UI-Sprache umgeschaltet werden; zweisprachige Labels im Format `DE / EN` werden app-weit automatisch auf die aktive Sprache reduziert (inkl. Toggle-Beschriftungen, Navigation und Inhaltsbereiche) und blenden den nicht gewählten Teil inklusive Trennzeichen aus.
 - **Stammdatenverwaltung:** Pflege der Kinder- und Eltern-Stammdaten durch die Leitung innerhalb der App.
 - **Kinder-Übersicht (Admin):** In „Stammdaten“ wird eine sortierbare Tabelle mit Name, Eltern-E-Mail, Gruppe, Geburtsdatum und Drive-Ordnerstatus (`✅ Ready`/`⚠️ Missing`) angezeigt.
-- **Foto-UI entfernt (Admin + Eltern):** Es gibt keinen Menüpunkt **„Fotos / Photos“** bzw. **„Fotos & Medien / Photos & media“** mehr. Foto-spezifische Dashboard-Kennzahlen und Tabellenfelder (z. B. `photo_folder_id`, Fotoanzahl) werden in `app.py` nicht mehr geladen oder dargestellt.
-- **Foto-Module stillgelegt:** Die früheren Module `photo.py`, `services/photos_service.py` und `ui/media_gallery.py` sind nicht mehr Teil der aktiven App-Logik.
+- **Foto-Upload-MVP (Admin + Eltern):** Der Bereich **„Fotos & Medien / Photos & media“** erlaubt Upload und Anzeige von Bildern im bestehenden Drive-Ordner des jeweiligen Kindes (`folder_id`).
 - **Admin-Start mit Gesamtübersicht:** Das Dashboard zeigt nach dem Login eine kompakte Tabelle mit Kind, Elternkontakt, `folder_id` und Ordnerstatus zur schnellen Datenkontrolle.
 - **Admin-Dashboard neu strukturiert:** Persönliche Begrüßung (aus Login-E-Mail abgeleitet), KPI-Karten, zweispaltiges Layout (Schnellaktionen + Termine) sowie ausklappbare Bereiche für Kinderübersicht und Kalender reduzieren Scrollen und erhöhen die Informationsdichte.
 - **Kalender-Workflow im Dashboard vereinfacht:** Der separate Admin-Navigationspunkt **„Kalender / Calendar“** entfällt. Das Formular **„Neuer Termin / New event“** ist direkt im Dashboard unter **„Bevorstehende Termine / Upcoming events“** integriert; die Kalenderansicht wird darunter dauerhaft (ohne Dropdown) angezeigt. Optional können Admins hinterlegte User-E-Mails auswählen, die beim Erstellen als Kalender-Teilnehmende eingeladen und per Mail benachrichtigt werden.
 - **Dokumente & Verträge übersichtlicher:** Formulare und Dateilisten sind gruppiert, in Spalten angeordnet und enthalten aufklappbare Detailbereiche für gespeicherte Dateien und Vorschauen.
 - **Kommunikation / Communication (Admin):** Neuer Bereich für E-Mail-Kommunikation mit Zielgruppensteuerung (alle Eltern, Gruppe, einzelnes Kind), Vorlagen (Info/Rückfrage/Erinnerung), Vorschau, Versandprotokoll ohne PII sowie verständlichen DE/EN-Fehlermeldungen mit Retry (exponentielles Backoff) bei transienten Gmail-API-Fehlern.
-- **Kein Foto-Produktpfad mehr:** Es gibt keine aktive Foto-Galerie, keine Foto-Statuspflege und keine Foto-spezifischen Drive-Workflows in der UI.
 - **Kommunikation (Gmail) als Kernfeature:** Admins senden Elternnachrichten zielgruppengenau (alle Eltern/Gruppe/ein Kind) mit Vorlagen, Vorschau und Versandprotokoll ohne PII.
 - **Kalender + Dokumente im Fokus:** Verträge/Abrechnungen und Kalenderprozesse sind zentrale Admin-Workflows; Eltern erhalten nur die für sie freigegebenen Informationen.
 - **DriveAgent mit OneDrive-Backend (optional):** Sobald `[onedrive].enabled = true` aktiv ist, nutzt `services/drive_service.py` für Upload, Download, Listing und Ordneranlage Microsoft Graph statt Google Drive. So können bestehende Drive-Aufrufe ohne UI-Änderung auf OneDrive laufen.
 - **UI-/Domain-Basisstruktur (minimal-invasiv):** Neue Module `ui/layout.py`, `ui/state_keys.py`, `ui/media_gallery.py` und `domain/models.py` kapseln Darstellung, Session-Keys und Datamodelle, ohne bestehende Service-/Storage-Logik unter `services/` zu verändern.
-- **Schema ohne Foto-Felder:** Aktive Stammdaten-/Consent-Mappings enthalten keine produktiv genutzten Foto-Felder mehr.
 - **Eindeutige Auswahl in Admin-Formularen:** Kind- und Abholberechtigten-Auswahl nutzt interne Datensatz-IDs (Anzeige weiter über Namen), damit gleichnamige Einträge sicher bearbeitet werden.
 - **Geführtes Bearbeiten in Stammdaten:** Editierfelder für Kinder und Abholberechtigungen werden erst nach aktiver Auswahl eines Eintrags angezeigt; die Bereiche **„Neues Kind anlegen / Add child“**, **„Abholberechtigte / Pickup authorizations“** und **„Medikationen“** sind standardmäßig eingeklappt.
 - **Medikamentengabe-Log (auditierbar):** Admins können pro Kind Medikamentengaben als minimales Log erfassen (Zeitpunkt, Medikament, Dosis, verabreicht von, Notiz) inkl. optionalem Consent-Dokument-Link; Eltern sehen die Einträge read-only für ihr eigenes Kind.
@@ -32,7 +29,7 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **PDF-Registrierungsparser (Schema v1):** Neues Service-Modul `services/registration_form_service.py` liest ACROForm-Felder aus dem Anmeldeformular robust aus, normalisiert Checkbox-/Textwerte und validiert Pflichtangaben für die Weiterverarbeitung.
 - **PDF-Import in Admin-Stammdaten:** Im Bereich **„Stammdaten“** gibt es jetzt den aufklappbaren Abschnitt **„Anmeldung importieren (PDF) / Import registration (PDF)“** mit Download der Blanko-Vorlage (`assets/forms/9Freunde_Anmeldeformular_v1.pdf`), PDF-Upload, Vorschau (Kind/Eltern/Abholberechtigte/Einwilligungen), Validierungsfehlern mit Save-Blockade und primärem Speicher-CTA inklusive Rückmeldung der `child_id`.
 - **Formulare mit Single-Submit (Admin):** Bearbeiten-/Upload-Aktionen in **Stammdaten (Import)**, **Verträge** und **Fotos** verwenden konsequent `st.form(..., border=True)` mit genau einem Submit-Button; damit folgt die UI dem Streamlit-Form-Prinzip „Widgets sammeln → ein Rerun beim Submit“.
-- **Schema-v1 Mapping idempotent erweitert:** `services/sheets_repo.py` mappt Registrierungs-Payloads jetzt mit stabiler `child_id`-Auflösung (`child__child_id` bevorzugt, sonst `uuid4`), erweitertem Kinderfeld-Mapping (inkl. Gesundheits-/Betreuungsfeldern), Eltern-Upsert-Struktur pro E-Mail, Consent-Feldern als Booleans + `photo_download`-String sowie `pa1..pa4`-Mapping nur bei aktivierter und benannter Abholberechtigung.
+- **Schema-v1 Mapping idempotent erweitert:** `services/sheets_repo.py` mappt Registrierungs-Payloads jetzt mit stabiler `child_id`-Auflösung (`child__child_id` bevorzugt, sonst `uuid4`), erweitertem Kinderfeld-Mapping (inkl. Gesundheits-/Betreuungsfeldern), Eltern-Upsert-Struktur pro E-Mail, Consent-Feldern sowie `pa1..pa4`-Mapping nur bei aktivierter und benannter Abholberechtigung.
 - **Branding mit Logo:** Die App nutzt `images/logo.png` als sichtbares UI-Logo sowie in erzeugten DOCX-Berichten.
 - **Landing-Page-Branding:** Oberhalb der Inhalte wird zusätzlich `images/Herz.png` zentriert dargestellt; `images/Hintergrund.png` wird als globales Hintergrundbild der gesamten App verwendet.
 - **Überarbeitetes Dark-Element-Theme (DE/EN):** Dunkle UI-Elemente (Buttons, Inputs, Sidebar) wurden auf eine kontraststarke, nutzerfreundliche und stylische Farbpalette umgestellt; helle Eingabeflächen mit klaren Fokuszuständen verbessern die Lesbarkeit deutlich. / Dark UI elements (buttons, inputs, sidebar) now use a higher-contrast, user-friendly, stylish palette; lighter input surfaces and clear focus states significantly improve readability.
@@ -42,7 +39,6 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 - **Admin-Aktionen im Dashboard gebündelt:** Die Bereiche **„Neues Kind anlegen / Add child“** und **„Anmeldung importieren (PDF) / Import registration (PDF)“** wurden in die **Admin-Übersicht / Admin overview** verschoben und stehen dort oberhalb der **Kinder-Übersicht / Children overview** bereit.
 - **Dashboard mit Terminvorschau:** **"Bevorstehende Termine / Upcoming events"** wird im Admin-Dashboard unter der **Admin-Übersicht / Admin overview** API-basiert angezeigt; die IFrame-Ansicht ist optional zuschaltbar.
 - **Kalenderintegration:** Verwaltung wichtiger Termine über Google Calendar (inkl. Anzeige für Eltern) mit `services/calendar_service.py` (`add_event`, `list_events`, 60s Cache). Primär wird die API-basierte Terminliste genutzt; die IFrame-Ansicht verwendet eine aus `gcp.calendar_id` erzeugte, URL-encodete Embed-URL und bleibt optional.
-- **Fotoverwaltung (MVP):** Upload in kindspezifische Google-Drive-Ordner (`photos/<child_id>/`), sodass Eltern nur Fotos ihres Kindes sehen. In der App bleiben Vorschauen unverändert; beim Download gilt der pro Kind gespeicherte Consent (`pixelated` Standard, optional `unpixelated`, optional `denied`) mit lokaler Verpixelung erkannter Gesichter bzw. vollständiger Download-Sperre bei `denied`.
 - **Vertragsablage (Admin):** PDF/DOCX-Verträge werden in einen dedizierten Drive-Ordner (`gcp.drive_contracts_folder_id`) hochgeladen und als Liste angezeigt; Eltern sehen diesen Ordner nicht in der UI.
 - **Einheitliche Drive-Schicht:** Google-Drive-Operationen (`upload/list/download/create_folder`) laufen konsistent über `services/drive_service.py` (inkl. Shared-Drive-Flags `supportsAllDrives`/`includeItemsFromAllDrives` und klarer 403/404-Fehlerübersetzung).
 - **Infos-Seiten (Admin/Eltern):** Zentrale Inhalte wie Aushang/FAQ/Mitbringliste werden als Markdown-Seiten in `content_pages` gepflegt (Admin CRUD inkl. Preview, Eltern read-only auf veröffentlichte Inhalte).
@@ -54,7 +50,19 @@ Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege 
 
 Die App ist mobilfähig (Responsive Webdesign über Streamlit) und alle sensiblen Daten bleiben geschützt (keine öffentlichen Links, beschränkter Zugriff per Authentifizierung).
 
+## Foto-Upload / Photo upload
 
+- Admins können Fotos für jedes Kind hochladen und ansehen.
+- Eltern können Fotos nur für ihr eigenes Kind hochladen und ansehen.
+- Die Speicherung erfolgt im bestehenden Drive-Ordner des Kindes (`folder_id`).
+- Im Google-Modus nutzt die App Google Drive über den vorhandenen `DriveAgent`/Drive-Service.
+- Im Local-Modus nutzt die App die lokale `DriveAgent`-Ablage unter `data/drive/`.
+- Es werden keine öffentlichen Google-Drive-Links erzeugt.
+- Es werden keine Drive-Permissions pro Foto erstellt.
+- Erlaubte Formate: JPG/JPEG, PNG, WebP.
+- Maximale Dateigröße: 15 MB pro Datei.
+- Der MVP enthält keine Gesichtserkennung, kein automatisches Tagging und keine automatische Consent-Pixelierung.
+- Secrets gehören in `.streamlit/secrets.toml` und nicht ins Repo.
 
 ### Konfiguration: OpenAI, Gmail, Calendar
 
@@ -104,7 +112,7 @@ Enthalten sind nur die Kernabhängigkeiten:
 Für frühe Prototypen kann die App jetzt **ohne Google/Firebase** betrieben werden.
 Standardmäßig läuft sie im lokalen Modus (`storage.mode = "local"`) und speichert Daten unter `./data/`:
 
-- `data/stammdaten.ods` als zentrale Stammdaten-Datei mit Sheets `children`, `parents`, `consents`, `pickup_authorizations`, `medications`, `photo_meta`
+- `data/stammdaten.ods` als zentrale Stammdaten-Datei mit Sheets `children`, `parents`, `consents`, `pickup_authorizations`, `medications`
 - `data/content_pages.json` für Infos-Seiten (Fallback im Local-Mode)
 - `data/calendar_events.json` für Termine
 - `data/drive/` für Dokumente und Fotos
@@ -179,8 +187,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
    - **Lokal (Entwicklung):** Speichern Sie die JSON-Datei z. B. als `service_account.json` im Projekt (nicht einchecken in Git!). Legen Sie im `.streamlit/secrets.toml` eine Referenz oder die Inhalte ab.
    - **Streamlit Cloud:** Kopieren Sie den Inhalt der JSON in `.streamlit/secrets.toml` unter einem Eintrag `[gcp_service_account]`. Nutzen Sie für `private_key` bevorzugt einen mehrzeiligen TOML-String mit `"""..."""`, damit echte Zeilenumbrüche erhalten bleiben, und vermeiden Sie zusätzliche umschließende Quotes (z. B. `'"..."'`).
 6. **Konfigurationswerte:** Hinterlegen Sie im Secrets-File außerdem:
-   - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners für Fotos (alternativ akzeptiert die App auch eine vollständige Drive-Ordner-URL und extrahiert die ID automatisch).
-  - Hinweis zur Ablage: Fotos werden direkt im konfigurierten zentralen Hauptordner gespeichert; die Zuordnung zu Kindern erfolgt über Metadaten (`photo_meta.child_id`).
+   - `drive_photos_root_folder_id`: die ID des Drive-Hauptordners, unter dem neue Kind-Ordner erstellt werden (alternativ akzeptiert die App auch eine vollständige Drive-Ordner-URL und extrahiert die ID automatisch). Foto-Uploads nutzen danach den `folder_id` des jeweiligen Kindes.
    - `drive_contracts_folder_id`: die ID des Drive-Ordners für Verträge/Dokumente (alternativ auch als vollständige Drive-Ordner-URL möglich).
    - `stammdaten_sheet_id` (optional): überschreibt die Standard-Tabelle `Stammdaten_Eltern_2026` (`1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A`).
    - `calendar_id` (optional): die Kalender-ID für den Google Kalender der Einrichtung.
@@ -190,7 +197,7 @@ Die App nutzt Google Drive und Google Calendar über die Google API. Gehen Sie w
 | API | Status | Nachweis im Code |
 |---|---|---|
 | Google Drive API (`drive.googleapis.com`) | **aktiv genutzt (Fallback)** | `storage.py`, `services/drive_service.py`, `app.py` |
-| Microsoft Graph Drive (`graph.microsoft.com`) | **aktiv genutzt (bei `[onedrive].enabled = true`)** | `services/drive_service.py`, `onedrive_auth.py`, `photo.py` |
+| Microsoft Graph Drive (`graph.microsoft.com`) | **aktiv genutzt (bei `[onedrive].enabled = true`)** | `services/drive_service.py`, `onedrive_auth.py`, `storage.py`, `ui/photos.py` |
 | Google Calendar API (`calendar-json.googleapis.com`) | **aktiv genutzt** | `services/calendar_service.py`, `app.py` |
 | Google Sheets API (`sheets.googleapis.com`) | **aktiv genutzt** | `services/google_clients.py`, `services/sheets_repo.py`, `stammdaten.py` |
 | Google Docs API (`docs.googleapis.com`) | **aktuell ungenutzt** | keine aktive Referenz |
@@ -318,7 +325,7 @@ Pflicht-Tab für Kinder (`children`):
 - Basis: `child_id`, `name`, `parent_email`
 - Erweitert (automatisch ergänzt): `folder_id`, `download_consent`, `birthdate`, `start_date`, `group`, `primary_caregiver`, `allergies`, `notes_parent_visible`, `notes_internal`, `pickup_password`, `status`, `doctor_name`, `doctor_phone`, `health_insurance`, `medication_regular`, `dietary`, `languages_at_home`, `sleep_habits`, `care_notes_optional`
 - Mapping-Regel: Falls `parent1__email` gesetzt ist, wird `children.parent_email` automatisch auf diesen Wert synchronisiert.
-- Consent-Regel: `children.download_consent` wird direkt aus dem Feld `download_consent` übernommen (Default: `pixelated` bei ungültigem/leerem Wert).
+- Consent-Regel: `children.download_consent` wird direkt aus dem Feld `download_consent` übernommen (Default: `pixelated` bei ungültigem/leerem Wert). Der Foto-Upload-MVP wertet dieses Feld nicht für automatische Pixelierung aus.
 - Admin-Formulare „Neues Kind anlegen“ und „Kind bearbeiten“ nutzen für `birthdate` und `start_date` den Streamlit-Datumspicker (`st.date_input`) und speichern ISO-Werte (`YYYY-MM-DD`) oder leer bei optionalen Feldern.
 
 Empfohlener Eltern-Tab (`parents`):
@@ -328,7 +335,7 @@ Empfohlener Eltern-Tab (`parents`):
 - Eltern sehen die Felder read-only in **"Mein Kind - Übersicht"**: Name, Geburtsdatum, Gruppe, Notfallkontakt, bevorzugte Sprache und Benachrichtigungs-Opt-in.
 
 Optional:
-- `consents` (z. B. Consent-Flags für Foto-Downloads; alternativ Feld `download_consent` im `children`-Tab)
+- `consents` (projektspezifische Consent-Flags; alternativ Feld `download_consent` im `children`-Tab)
 
 ## Schema v1 → Tab-Mapping
 
@@ -361,8 +368,8 @@ Serialisierung von Mehrfachstrukturen: `pa1__*` bis `pa4__*` werden als geordnet
 | `parent1__notifications_opt_in` | `parents` | `notifications_opt_in` | Bool-Normalisierung (`true/1/ja` → `true`, sonst `false`). |
 | `parent2__*` | `parents` | wie `parent1__*` | Zweiter Eltern-Datensatz als eigener Upsert; Beziehung zum Kind über `parent_email`-Logik und/oder interne Zuordnung. |
 | `pa1__*`, `pa2__*`, `pa3__*`, `pa4__*` | `pickup_authorizations` | `name`, `phone`, `relationship`, `active`, `valid_from`, `valid_to`, `created_at`, `created_by` | Je Präfix ein Datensatz. Bool-Normalisierung für `active`; `notes` ist **out of scope** (keine Persistenz im Pickup-Schema). |
-| `download_consent` | `children` | `download_consent` | Direkte Übernahme (zulässig: `pixelated`, `unpixelated`, `denied`; sonst Fallback `pixelated`). |
-| weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Out of scope** für das produktive Pflichtschema (nur Download-Consent wird aktiv ausgewertet); optional im `consents`-Tab oder JSON-Fallback in `children.notes_internal`. |
+| `download_consent` | `children` | `download_consent` | Direkte Übernahme (zulässig: `pixelated`, `unpixelated`, `denied`; sonst Fallback `pixelated`). Im Foto-Upload-MVP gibt es keine automatische Pixelierung. |
+| weitere `consent__*` (z. B. Ausflüge, Medien) | optional `consents` | projektspezifische Spalten | **Out of scope** für das produktive Pflichtschema; optional im `consents`-Tab oder JSON-Fallback in `children.notes_internal`. |
 | `sign__parent1_name`, `sign__parent1_date` | optional `consents` | z. B. `sign_parent1_name`, `sign_parent1_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); bevorzugt im `consents`-Tab ablegen. |
 | `sign__parent2_name`, `sign__parent2_date` | optional `consents` | z. B. `sign_parent2_name`, `sign_parent2_date` | **Out of scope** (Signatur-Workflow noch nicht produktiv); alternativ JSON-Fallback in `children.notes_internal`. |
 | `sign__place`, `sign__signature_ref` | optional `consents` | z. B. `sign_place`, `sign_signature_ref` | **Out of scope** bis zur finalen Signatur-Implementierung; in separatem Tab oder JSON-Fallback führen. |
@@ -380,9 +387,9 @@ Aktuell gelten folgende Gruppen als **nicht Teil des Pflichtschemas** und werden
 
 1. **Backup erstellen**: komplette Tabelle als XLSX/CSV exportieren.
 2. **Header migrieren**:
-   - Tab `children`: Spalte `photo_folder_id` aus Header entfernen (Daten bleiben in Backup erhalten).
+   - Tab `children`: Spalte `photo_folder_id` aus Header entfernen (Daten bleiben in Backup erhalten). Der MVP nutzt `children.folder_id`.
    - Tab `consents`: Spalte `photo_download` aus Header entfernen.
-   - Tab `photo_meta`: Tab nicht mehr erforderlich (kann archiviert oder gelöscht werden).
+   - Tab `photo_meta`: Tab ist für den Foto-Upload-MVP nicht erforderlich (kann archiviert oder gelöscht werden).
 3. **Werte übernehmen**:
    - Falls bisher nur alte PDF-Felder genutzt wurden, `children.download_consent` einmalig aus Altdaten befüllen (z. B. mit vorhandenen Werten aus `consents.photo_download`).
 4. **App starten**: Header-Selbstheilung ergänzt fehlende Pflichtspalten automatisch (`children`, `parents`, `pickup_authorizations`, `medications`, `consents`).
@@ -427,7 +434,6 @@ parents_tab = "parents"                         # optional; Default: parents
 consents_tab = "consents"                       # optional; Default: consents
 pickup_authorizations_tab = "pickup_authorizations"  # optional; Default: pickup_authorizations
 medications_tab = "medications" # optional; Default: medications
-photo_meta_tab = "photo_meta" # optional; Default: photo_meta
 content_pages_tab = "content_pages" # optional; Default: content_pages
 
 [gcp_optional_apis]
@@ -458,15 +464,6 @@ enable_web_search = true            # optional
 ```
 
 Hinweis: Fehlende Schlüssel werden direkt in der UI mit konkreten Hinweisen (DE/EN) gemeldet.
-
-## Foto-Freigabe-Workflow (Draft/Published/Archived)
-
-- Beim Upload wird pro Foto ein Metadatensatz im Tab `photo_meta` angelegt (`status=draft`).
-- Admins können den Status je Foto in der UI auf `draft`, `published` oder `archived` setzen.
-- In der Admin-Statusliste wird pro Foto zusätzlich eine DE/EN-Vorschau geladen; Ladefehler einzelner Dateien blockieren die restliche Liste nicht.
-- Eltern sehen ausschließlich Fotos mit Status `published`.
-- Bestehende Fotos ohne Metadaten bleiben kompatibel und werden defensiv als `draft` behandelt.
-- Download-Consent (`pixelated`/`unpixelated`) und Verpixelungslogik beim Download bleiben unverändert.
 
 ## Fehlerbehebung
 
@@ -526,11 +523,11 @@ Ausgabe erfolgt je Schritt als `OK` oder `FAIL`.
   - Lösung: Drive-Ordner/Sheet/Kalender explizit mit `client_email` des Service-Accounts teilen.
 
 - **Admin-Foto-Upload zeigt jetzt gezielte Drive-Hinweise**
-  - Bei 403/404 meldet die UI explizit Freigabe-/ID-Probleme und zeigt technische Details aus `DriveServiceError`.
-  - Fehlt der zentrale Foto-Ordner (`gcp.drive_photos_root_folder_id`) oder fehlt dessen Freigabe, erscheint ein entsprechender Hinweis zur Prüfung der Konfiguration und Service-Account-Berechtigung.
+  - Bei 403/404 meldet die UI Freigabe-/ID-Probleme aus dem Upload in den Kind-Ordner (`folder_id`).
+  - Fehlt der Kind-Ordner (`folder_id`), zeigt die Foto-Seite einen Hinweis. Für neu angelegte Kinder muss im Google-Modus zusätzlich `gcp.drive_photos_root_folder_id` korrekt freigegeben sein, damit der Kind-Ordner erstellt werden kann.
 
-- **System / Healthchecks zeigt Drive-Ordner-ID je Check (Fotos & Verträge)**
-  - Bei Drive-Fehlern zeigt die UI jetzt den konkreten betroffenen Ordner (`gcp.drive_photos_root_folder_id` bzw. `gcp.drive_contracts_folder_id`) und differenziert 403 (fehlende Freigabe) vs. 404 (ungültige ID).
+- **System / Healthchecks zeigt Drive-Ordner-ID je Check**
+  - Bei Drive-Fehlern zeigt die UI den konkreten betroffenen Ordner (aktuell `gcp.drive_contracts_folder_id`) und differenziert 403 (fehlende Freigabe) vs. 404 (ungültige ID).
   - Dadurch kann die Freigabe direkt auf dem richtigen Ordner korrigiert werden, ohne Secrets/PII offenzulegen.
 
 - **System / Healthchecks zeigt Kalender-Kontext bei Fehlern**

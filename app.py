@@ -54,6 +54,7 @@ from ui.layout import (
     section_card,
     table_toolbar,
 )
+from ui.photos import render_photo_share_page
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
 # Streamlit page configuration
@@ -1569,6 +1570,7 @@ else:
         admin_menu_labels: dict[str, str] = {
             "dashboard": "🏠 Dashboard / Dashboard",
             "master_data": "👥 Stammdaten & Infos / Master data & info",
+            "photos": " Fotos & Medien / Photos & media",
             "documents": "🧾 Dokumente & Verträge / Documents & contracts",
             "communication": "💬 Kommunikation / Communication",
             "calendar": "📆 Kalender / Calendar",
@@ -1586,6 +1588,7 @@ else:
     else:
         parent_menu_labels: dict[str, str] = {
             "child": "👶 Mein Kind / My child",
+            "photos": " Fotos & Medien / Photos & media",
             "info": "ℹ️ Infos / Info",
             "documents": "📄 Dokumente / Documents",
             "appointments": "📅 Termine / Appointments",
@@ -1624,6 +1627,8 @@ else:
             admin_view = "Dashboard"
         elif menu == "master_data":
             admin_view = "Stammdaten"
+        elif menu == "photos":
+            admin_view = "Fotos"
         elif menu == "documents":
             admin_view = st.radio(
                 _ui_text("Bereich / Section"),
@@ -2240,6 +2245,28 @@ else:
                             st.caption(
                                 "Noch keine Einträge vorhanden. / No entries yet."
                             )
+
+        # ---- Admin: Fotos ----
+        elif admin_view == "Fotos":
+            children: list[dict[str, str]] = []
+            try:
+                children = stammdaten_manager.get_children()
+            except Exception as exc:
+                st.error(
+                    "Fotos konnten nicht vorbereitet werden. Stammdaten konnten "
+                    "nicht geladen werden. / Photos could not be prepared because "
+                    "master data could not be loaded."
+                )
+                st.caption(
+                    f"Technisches Detail / Technical detail: {type(exc).__name__}"
+                )
+            else:
+                render_photo_share_page(
+                    user_role=user_role,
+                    user_email=user_email,
+                    children=children,
+                    drive_agent=drive_agent,
+                )
 
         # ---- Admin: Dokumente ----
         elif admin_view == "Dokumente":
@@ -3026,6 +3053,14 @@ else:
                     )
                 else:
                     st.write("Keine Kinderdaten gefunden. / No child data found.")
+        elif menu == "photos":
+            children_for_user = [child] if child else []
+            render_photo_share_page(
+                user_role=user_role,
+                user_email=user_email,
+                children=children_for_user,
+                drive_agent=drive_agent,
+            )
         elif menu == "info":
             st.subheader("Infos / Information")
             language = st.radio(

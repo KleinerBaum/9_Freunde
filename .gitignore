@@ -209,3 +209,9 @@ __marimo__/
 secrets.toml
 Lege lokal diese Datei an:
 ./.streamlit/secrets.toml
+
+service_account*.json
+*service-account*.json
+*.pem
+*.key
+.streamlit/secrets*.toml

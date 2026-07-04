@@ -58,6 +58,12 @@ from ui.photos import render_photo_share_page
 from ui.state_keys import UIKeys, ensure_defaults, ss_get, ss_set
 
 # Streamlit page configuration
+HEALTHCHECK_CHILDREN_REQUIRED_COLUMNS = (
+    "child_id",
+    "name",
+    "parent_email",
+    "folder_id",
+)
 LOGO_PATH = Path(__file__).resolve().parent / "images" / "logo.png"
 HEART_PATH = Path(__file__).resolve().parent / "images" / "Herz.png"
 BACKGROUND_PATH = Path(__file__).resolve().parent / "images" / "Hintergrund.png"
@@ -1002,6 +1008,10 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
     if app_config.storage_mode == "google" and app_config.google is not None:
         drive_checks = [
             (
+                "Fotos-Hauptordner / Photos root folder",
+                app_config.google.drive_photos_root_folder_id,
+            ),
+            (
                 "Verträge-Ordner / Contracts folder",
                 app_config.google.drive_contracts_folder_id,
             ),
@@ -1110,22 +1120,44 @@ def _run_google_connection_check() -> list[tuple[str, bool, str]]:
 
     if app_config.google is not None:
         sheet_id = app_config.google.stammdaten_sheet_id
-        sheet_tab = app_config.google.stammdaten_sheet_tab or "children"
-        quoted_tab = _quote_sheet_tab_for_a1(sheet_tab)
-        check_range = f"{quoted_tab}!A1:A1"
+        children_tab = app_config.google.children_tab or "children"
+        quoted_tab = _quote_sheet_tab_for_a1(children_tab)
+        check_range = f"{quoted_tab}!1:1"
         max_attempts = 3
         last_error: Exception | None = None
 
         for attempt in range(1, max_attempts + 1):
             try:
-                read_sheet_values(sheet_id=sheet_id, range_a1=check_range)
+                header_rows = read_sheet_values(sheet_id=sheet_id, range_a1=check_range)
+                header = [
+                    str(column).strip()
+                    for column in (header_rows[0] if header_rows else [])
+                ]
+                missing_columns = sorted(
+                    column
+                    for column in HEALTHCHECK_CHILDREN_REQUIRED_COLUMNS
+                    if column not in header
+                )
+                if missing_columns:
+                    missing_joined = ", ".join(missing_columns)
+                    checks.append(
+                        (
+                            "Google Sheets children-Header / Google Sheets children header",
+                            False,
+                            "Sheets-Header unvollständig. Fehlende Spalten: "
+                            f"{missing_joined}. / Sheets header incomplete. Missing "
+                            f"columns: {missing_joined}. Range: {check_range}.",
+                        )
+                    )
+                    break
+
                 checks.append(
                     (
-                        "Google Sheets Zugriff / Google Sheets access",
+                        "Google Sheets children-Header / Google Sheets children header",
                         True,
-                        f"Sheets-Lesezugriff erfolgreich (Range {check_range}). / "
-                        "Successfully read from Google Sheets "
-                        f"(range {check_range}).",
+                        "children-Header erfolgreich gelesen, inklusive folder_id. / "
+                        "Successfully read children header, including folder_id. "
+                        f"Range: {check_range}.",
                     )
                 )
                 break

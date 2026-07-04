@@ -6,10 +6,6 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
 REQUIRED_SERVICE_ACCOUNT_KEYS: tuple[str, ...] = (
     "type",
     "project_id",
@@ -19,6 +15,9 @@ REQUIRED_SERVICE_ACCOUNT_KEYS: tuple[str, ...] = (
     "client_id",
     "token_uri",
 )
+DEFAULT_STAMMDATEN_SHEET_ID = "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A"
+DEFAULT_CHILDREN_TAB = "children"
+REQUIRED_CHILDREN_COLUMNS = {"child_id", "name", "parent_email", "folder_id"}
 
 
 def _print_status(ok: bool, message: str) -> None:
@@ -60,19 +59,20 @@ def _validate_secrets_schema(
         _require_str(service_account_info_raw, key, "gcp_service_account")
 
     _require_str(gcp_raw, "drive_contracts_folder_id", "gcp")
+    _require_str(gcp_raw, "drive_photos_root_folder_id", "gcp")
 
     sheet_id_value = gcp_raw.get("stammdaten_sheet_id")
     spreadsheet_id = (
         str(sheet_id_value).strip()
         if isinstance(sheet_id_value, str) and str(sheet_id_value).strip()
-        else "1ZuehceuiGnqpwhMxynfCulpSuCg0M2WE-nsQoTEJx-A"
+        else DEFAULT_STAMMDATEN_SHEET_ID
     )
 
-    sheet_tab_value = gcp_raw.get("stammdaten_sheet_tab")
-    sheet_tab = (
-        str(sheet_tab_value).strip()
-        if isinstance(sheet_tab_value, str) and str(sheet_tab_value).strip()
-        else "children"
+    children_tab_value = gcp_raw.get("children_tab")
+    children_tab = (
+        str(children_tab_value).strip()
+        if isinstance(children_tab_value, str) and str(children_tab_value).strip()
+        else DEFAULT_CHILDREN_TAB
     )
 
     calendar_id_value = gcp_raw.get("calendar_id")
@@ -82,19 +82,22 @@ def _validate_secrets_schema(
         else ""
     )
 
-    return service_account_info_raw, gcp_raw, spreadsheet_id, sheet_tab, calendar_id
+    return service_account_info_raw, gcp_raw, spreadsheet_id, children_tab, calendar_id
 
 
 def _drive_check(
-    service_account_info: dict[str, Any], contracts_folder_id: str
+    service_account_info: dict[str, Any], folder_id: str, folder_label: str
 ) -> None:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
     drive_scopes = ["https://www.googleapis.com/auth/drive.readonly"]
     creds = service_account.Credentials.from_service_account_info(
         service_account_info,
         scopes=drive_scopes,
     )
     drive = build("drive", "v3", credentials=creds)
-    query = f"'{contracts_folder_id}' in parents and trashed = false"
+    query = f"'{folder_id}' in parents and trashed = false"
     result = (
         drive.files()
         .list(
@@ -109,7 +112,7 @@ def _drive_check(
     file_count = len(result.get("files", []))
     _print_status(
         True,
-        f"Drive list auf Vertragsordner erfolgreich (Dateien gefunden: {file_count}).",
+        f"Drive list auf {folder_label} erfolgreich (Dateien gefunden: {file_count}).",
     )
 
 
@@ -119,8 +122,11 @@ def _quote_sheet_tab_for_a1(tab_name: str) -> str:
 
 
 def _sheets_header_check(
-    service_account_info: dict[str, Any], spreadsheet_id: str, sheet_tab: str
+    service_account_info: dict[str, Any], spreadsheet_id: str, children_tab: str
 ) -> None:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
     sheets_scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
     creds = service_account.Credentials.from_service_account_info(
         service_account_info,
@@ -133,17 +139,16 @@ def _sheets_header_check(
         .values()
         .get(
             spreadsheetId=spreadsheet_id,
-            range=f"{_quote_sheet_tab_for_a1(sheet_tab)}!1:1",
+            range=f"{_quote_sheet_tab_for_a1(children_tab)}!1:1",
         )
         .execute()
     )
     values = response.get("values", [])
     if not values or not values[0]:
-        raise ValueError("Sheet-Header children!1:1 ist leer.")
+        raise ValueError(f"Sheet-Header {children_tab}!1:1 ist leer.")
 
     header = [str(column).strip() for column in values[0] if str(column).strip()]
-    required_columns = {"child_id", "name", "parent_email"}
-    missing_columns = sorted(required_columns.difference(header))
+    missing_columns = sorted(REQUIRED_CHILDREN_COLUMNS.difference(header))
     if missing_columns:
         raise ValueError(
             "Fehlende Pflichtspalten im children-Header: " + ", ".join(missing_columns)
@@ -155,7 +160,7 @@ def _sheets_header_check(
 def run(secrets_path: Path) -> int:
     try:
         secrets = _load_secrets(secrets_path)
-        service_account_info, gcp, spreadsheet_id, sheet_tab, calendar_id = (
+        service_account_info, gcp, spreadsheet_id, children_tab, calendar_id = (
             _validate_secrets_schema(secrets)
         )
         _print_status(True, f"Secrets geladen aus {secrets_path}.")
@@ -174,14 +179,31 @@ def run(secrets_path: Path) -> int:
         return 1
 
     try:
-        contracts_folder_id = str(gcp["drive_contracts_folder_id"]).strip()
-        _drive_check(service_account_info, contracts_folder_id)
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        _print_status(
+            False,
+            "Google API Python-Pakete fehlen. Bitte requirements.txt installieren.",
+        )
+        return 1
+
+    try:
+        _drive_check(
+            service_account_info,
+            str(gcp["drive_photos_root_folder_id"]).strip(),
+            "Foto-Hauptordner",
+        )
+        _drive_check(
+            service_account_info,
+            str(gcp["drive_contracts_folder_id"]).strip(),
+            "Vertragsordner",
+        )
     except (HttpError, ValueError) as error:
         _print_status(False, f"Drive-Check fehlgeschlagen: {error}")
         return 1
 
     try:
-        _sheets_header_check(service_account_info, spreadsheet_id, sheet_tab)
+        _sheets_header_check(service_account_info, spreadsheet_id, children_tab)
     except (HttpError, ValueError) as error:
         _print_status(False, f"Sheets-Check fehlgeschlagen: {error}")
         return 1

@@ -46,6 +46,10 @@ def _selected_child(
 
 
 def _show_unexpected_error(message: str, exc: Exception) -> None:
+    error_detail = str(exc).strip()
+    if error_detail:
+        st.error(f"{message} {error_detail}")
+        return
     st.error(f"{message} ({type(exc).__name__})")
 
 

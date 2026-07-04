@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
@@ -16,8 +17,13 @@ from services.photo_share_service import (
 
 
 class FakeDriveAgent:
-    def __init__(self, files: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self,
+        files: list[dict[str, Any]] | None = None,
+        upload_error: Exception | None = None,
+    ) -> None:
         self.files = files or []
+        self.upload_error = upload_error
         self.upload_calls: list[dict[str, Any]] = []
         self.list_calls: list[dict[str, str | None]] = []
 
@@ -36,6 +42,8 @@ class FakeDriveAgent:
                 "folder_id": folder_id,
             }
         )
+        if self.upload_error is not None:
+            raise self.upload_error
         return "fake-file-id"
 
     def list_files(
@@ -198,9 +206,9 @@ def test_file_larger_than_max_photo_bytes_raises_photo_share_error() -> None:
         )
 
 
-def test_filename_does_not_contain_uploader_email() -> None:
+def test_filename_does_not_contain_uploader_email_or_original_name() -> None:
     uploaded_file = FakeUploadedFile(
-        name="../playground photo.jpg",
+        name="../max-mueller-ausflug.jpg",
         type="image/jpeg",
         content=_image_bytes("JPEG"),
     )
@@ -212,10 +220,13 @@ def test_filename_does_not_contain_uploader_email() -> None:
 
     uploaded_name = drive_agent.upload_calls[0]["filename"]
     assert uploaded_name == result.file_name
+    assert re.fullmatch(r"\d{8}T\d{6}Z_[0-9a-f]{16}\.jpg", result.file_name)
     assert "parent@example.org" not in result.file_name
     assert "/" not in result.file_name
     assert "\\" not in result.file_name
     assert " " not in result.file_name
+    for pii_fragment in ("parent", "example", "max", "mueller", "ausflug"):
+        assert pii_fragment not in result.file_name.lower()
 
 
 @pytest.mark.parametrize(
@@ -225,7 +236,7 @@ def test_filename_does_not_contain_uploader_email() -> None:
         ({"child_id": "child-fallback", "folder_id": "folder-123"}, "child-fallback"),
     ],
 )
-def test_filename_contains_child_id_or_child_id_fallback(
+def test_filename_does_not_contain_child_id_or_child_id_fallback(
     child_record: dict[str, Any],
     expected_child_id: str,
 ) -> None:
@@ -237,7 +248,32 @@ def test_filename_contains_child_id_or_child_id_fallback(
 
     result, _drive_agent = _upload(uploaded_file, child_record=child_record)
 
-    assert expected_child_id in result.file_name
+    assert expected_child_id not in result.file_name
+
+
+def test_upload_error_preserves_drive_error_detail() -> None:
+    uploaded_file = FakeUploadedFile(
+        name="playground.png",
+        type="image/png",
+        content=_image_bytes("PNG"),
+    )
+    drive_agent = FakeDriveAgent(
+        upload_error=RuntimeError(
+            "Kein Zugriff auf den Drive-Ordner. Bitte den Zielordner teilen."
+        )
+    )
+
+    with pytest.raises(PhotoShareError) as exc_info:
+        upload_child_photo(
+            drive_agent=drive_agent,
+            child_record={"id": "child-123", "folder_id": "folder-123"},
+            uploaded_file=uploaded_file,
+            uploaded_by_email="uploader@example.org",
+        )
+
+    error_message = str(exc_info.value)
+    assert "Photo upload failed." in error_message
+    assert "Kein Zugriff auf den Drive-Ordner" in error_message
 
 
 def test_list_child_photos_returns_empty_list_when_folder_id_missing() -> None:

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import hashlib
-import re
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import PurePosixPath
 from typing import Any, Protocol
 
 try:
@@ -36,7 +34,6 @@ _PIL_FORMAT_TO_MIME_TYPE: dict[str, str] = {
     "PNG": "image/png",
     "WEBP": "image/webp",
 }
-_SAFE_FILENAME_CHARS_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 class PhotoShareError(RuntimeError):
@@ -72,24 +69,6 @@ def child_id_from_record(child_record: dict[str, Any]) -> str:
     return str(child_record.get("child_id") or "").strip()
 
 
-def _safe_component(value: str, *, fallback: str, max_length: int = 80) -> str:
-    normalized = _SAFE_FILENAME_CHARS_RE.sub("_", value.strip())
-    normalized = normalized.strip("._-")
-    if not normalized:
-        normalized = fallback
-    return normalized[:max_length].strip("._-") or fallback
-
-
-def _original_basename(original_file_name: str) -> str:
-    normalized_path = original_file_name.replace("\\", "/")
-    file_name = PurePosixPath(normalized_path).name
-    if not file_name:
-        return "photo"
-    if "." not in file_name:
-        return file_name
-    return ".".join(file_name.split(".")[:-1]) or "photo"
-
-
 def build_photo_filename(
     *,
     original_file_name: str,
@@ -99,6 +78,7 @@ def build_photo_filename(
     timestamp: datetime | None = None,
 ) -> str:
     """Build a sanitized, non-PII photo filename for Drive storage."""
+    _ = (original_file_name, child_id, uploaded_by_email)
     normalized_mime_type = mime_type.strip().lower()
     extension = ALLOWED_IMAGE_MIME_TYPES.get(normalized_mime_type)
     if extension is None:
@@ -110,18 +90,9 @@ def build_photo_filename(
     timestamp_part = timestamp_value.astimezone(timezone.utc).strftime(
         "%Y%m%dT%H%M%SZ"
     )
+    random_token = secrets.token_hex(8)
 
-    child_part = _safe_component(child_id or "", fallback="child", max_length=48)
-    email_hash = hashlib.sha256(
-        uploaded_by_email.strip().lower().encode("utf-8")
-    ).hexdigest()[:10]
-    original_part = _safe_component(
-        _original_basename(original_file_name),
-        fallback="photo",
-        max_length=80,
-    )
-
-    return f"{timestamp_part}_{child_part}_{email_hash}_{original_part}.{extension}"
+    return f"{timestamp_part}_{random_token}.{extension}"
 
 
 def list_child_photos(
@@ -209,7 +180,11 @@ def upload_child_photo(
     try:
         file_id = drive_agent.upload_file(file_name, file_bytes, mime_type, folder_id)
     except Exception as exc:
-        raise PhotoShareError("Photo upload failed.") from exc
+        error_detail = str(exc).strip()
+        message = "Photo upload failed."
+        if error_detail:
+            message = f"{message} {error_detail}"
+        raise PhotoShareError(message) from exc
 
     normalized_file_id = str(file_id or "").strip()
     if not normalized_file_id:

@@ -234,6 +234,7 @@ export const PARENT_CHILD_PATCH_FIELDS = new Set(
 );
 
 export const APP_NAME = "9 Freunde";
+export const MCP_ENDPOINT = "/api/mcp";
 export const MCP_WIDGET_URI = "ui://9-freunde/dashboard-v1.html";
 export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 export const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);

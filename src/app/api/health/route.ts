@@ -1,3 +1,4 @@
+import { MCP_ENDPOINT } from "../../../lib/contracts";
 import { dataMode } from "../../../lib/server/repository";
 import { googleConfigurationStatus } from "../../../lib/server/google-workspace";
 
@@ -13,7 +14,7 @@ export function GET(): Response {
     integrations: mode === "google"
       ? googleConfigurationStatus()
       : { sheets: false, drive: false, calendar: false },
-    mcp: "/mcp"
+    mcp: MCP_ENDPOINT
   }, {
     headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" }
   });

@@ -70,7 +70,7 @@ Production access rules are enforced server-side:
 
 ## ChatGPT App setup
 
-The MCP endpoint is `/mcp`. In ChatGPT developer mode, connect the deployed HTTPS URL ending in `/mcp`. The server exposes:
+The MCP endpoint is `/api/mcp`. ChatGPT Sites reserves the root `/mcp` path, so in ChatGPT developer mode connect the deployed HTTPS URL ending in `/api/mcp`. The server exposes:
 
 - `search` and `fetch` for record discovery.
 - `get_overview` and `render_overview` for the interactive staff dashboard.

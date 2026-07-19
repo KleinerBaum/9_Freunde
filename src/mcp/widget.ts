@@ -1,4 +1,4 @@
-import { MCP_WIDGET_URI } from "@/lib/contracts";
+import { MCP_WIDGET_URI } from "../lib/contracts";
 
 export { MCP_WIDGET_URI as WIDGET_URI };
 

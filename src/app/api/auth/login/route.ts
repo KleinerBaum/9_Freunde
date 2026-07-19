@@ -1,7 +1,7 @@
-import { LoginSchema } from "@/lib/contracts";
-import { authenticateUser } from "@/lib/server/repository";
-import { safeErrorResponse } from "@/lib/server/http";
-import { sessionCookie } from "@/lib/session";
+import { LoginSchema } from "../../../../lib/contracts";
+import { authenticateUser } from "../../../../lib/server/repository";
+import { safeErrorResponse } from "../../../../lib/server/http";
+import { sessionCookie } from "../../../../lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

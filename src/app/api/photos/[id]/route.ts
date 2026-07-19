@@ -1,6 +1,6 @@
-import { HttpError, requireSession, safeErrorResponse } from "@/lib/server/http";
-import { dataMode } from "@/lib/server/repository";
-import { downloadGooglePhoto } from "@/lib/server/google-workspace";
+import { HttpError, requireSession, safeErrorResponse } from "../../../../lib/server/http";
+import { dataMode } from "../../../../lib/server/repository";
+import { downloadGooglePhoto } from "../../../../lib/server/google-workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

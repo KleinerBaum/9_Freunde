@@ -1,7 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-import { dataMode } from "@/lib/server/repository";
-import { createNineFriendsMcpServer } from "@/mcp/server";
+import { dataMode } from "../../lib/server/repository";
+import { createNineFriendsMcpServer } from "../../mcp/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

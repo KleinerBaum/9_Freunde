@@ -1,6 +1,6 @@
-import { AppActionSchema } from "@/lib/contracts";
-import { HttpError, requireSession, safeErrorResponse, noStoreHeaders } from "@/lib/server/http";
-import { performAppAction } from "@/lib/server/repository";
+import { AppActionSchema } from "../../../lib/contracts";
+import { HttpError, requireSession, safeErrorResponse, noStoreHeaders } from "../../../lib/server/http";
+import { performAppAction } from "../../../lib/server/repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -18,8 +18,8 @@ import type {
   DashboardSnapshot,
   ManagedDocument,
   Parent
-} from "@/lib/contracts";
-import { Icon, type IconName } from "@/components/icon";
+} from "../lib/contracts";
+import { Icon, type IconName } from "./icon";
 
 type View = "overview" | "children" | "documents" | "calendar" | "photos" | "profile" | "settings";
 type ModalName = "child" | "event" | "document" | null;

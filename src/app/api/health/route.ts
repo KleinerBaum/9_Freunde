@@ -1,5 +1,5 @@
-import { dataMode } from "@/lib/server/repository";
-import { googleConfigurationStatus } from "@/lib/server/google-workspace";
+import { dataMode } from "../../../lib/server/repository";
+import { googleConfigurationStatus } from "../../../lib/server/google-workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

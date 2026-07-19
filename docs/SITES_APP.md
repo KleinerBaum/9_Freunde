@@ -87,7 +87,7 @@ For current Apps SDK requirements, see the official [MCP server guide](https://d
 npm run sites:archive
 ```
 
-The archive contains the vinext standalone server and the Sites metadata for that commit. Deploy this application privately until real authentication, legal templates, retention rules, and the Google Workspace resources have been reviewed by the childcare provider.
+The archive contains the vinext standalone server and the Sites metadata for that commit. Production publishing uses the exact commit pushed to Sites; the archive is retained as a reproducible local verification artifact. Deploy this application privately until real authentication, legal templates, retention rules, and the Google Workspace resources have been reviewed by the childcare provider.
 
 ## Privacy and operating assumptions
 

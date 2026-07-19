@@ -215,3 +215,12 @@ service_account*.json
 *.pem
 *.key
 .streamlit/secrets*.toml
+
+# TypeScript / Next.js / Sites
+node_modules/
+.next/
+.vinext/
+.open-next/
+*.tsbuildinfo
+.env.local
+.env.*.local

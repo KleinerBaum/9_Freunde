@@ -1,5 +1,7 @@
 # 9 Freunde – Eltern- und Verwaltungsapp
 
+> **New Sites app (recommended):** The repository now includes a low-cost TypeScript portal for staff and parents, a ChatGPT Apps SDK MCP server, deterministic invoice/contract PDFs, Google Sheets/Drive/Calendar adapters, and a private ChatGPT Sites deployment path. Start with [docs/SITES_APP.md](docs/SITES_APP.md). The original Streamlit implementation remains below for reference and migration support.
+
 > **Produktfokus (Juli 2026):** Die App fokussiert auf Stammdaten, Dokumente/Verträge, Gmail-Kommunikation, Kalender und einen kleinen Foto-Upload-MVP. Der Foto-MVP umfasst Upload und Anzeige in geschützten Kind-Ordnern, ohne Gesichtserkennung oder automatisches Tagging.
 
 Die **9 Freunde App** ist eine Streamlit-Webanwendung für die Großtagespflege *"9 Freunde"*. Sie unterstützt die Leitung bei organisatorischen Aufgaben und bietet Eltern einen geschützten Zugang zu Informationen rund um ihre Kinder. Kernfunktionen der App sind:

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "vinext dev",
@@ -32,6 +32,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.45.1",
     "@types/node": "22.16.0",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
@@ -41,7 +42,8 @@
     "eslint-config-next": "16.2.10",
     "typescript": "5.9.3",
     "vite": "8.1.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "wrangler": "4.112.0"
   },
   "overrides": {
     "postcss": "8.5.19"

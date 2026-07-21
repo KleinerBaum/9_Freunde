@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { authenticateDemoUser, demoSession, getDemoSnapshot, resetDemoStateForTests } from "@/lib/demo-data";
+import { MCP_ENDPOINT } from "@/lib/contracts";
 import { buildOverview } from "@/mcp/server";
 
 describe("MCP overview", () => {
+  it("exports the Sites-safe MCP endpoint", () => {
+    expect(MCP_ENDPOINT).toBe("/api/mcp");
+  });
+
   it("returns concise model-visible operational data", () => {
     resetDemoStateForTests();
     const session = demoSession(authenticateDemoUser("leitung@demo.9freunde.de", "willkommen")!);

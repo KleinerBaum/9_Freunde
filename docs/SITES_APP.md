@@ -1,6 +1,6 @@
 # 9 Freunde Sites app
 
-This is the recommended application in this repository. It is a responsive staff and parent portal built with Next.js/React, vinext for ChatGPT Sites, and the ChatGPT Apps SDK over MCP.
+This is the recommended application in this repository. It is a responsive staff and parent portal built with Next.js/React, vinext with its Cloudflare worker adapter for ChatGPT Sites, and the ChatGPT Apps SDK over MCP.
 
 The original Streamlit app remains available during migration. The new app intentionally keeps the operating model small: Google Sheets is the database, Google Drive stores private child photos, Google Calendar sends invitations and updates, and invoices/contracts are deterministic PDFs that always require human review. No paid LLM call is needed for normal portal use.
 
@@ -19,7 +19,7 @@ The original Streamlit app remains available during migration. The new app inten
 
 ## Local demo
 
-Requirements: Node.js 20.9 or newer.
+Requirements: Node.js 22 or newer.
 
 ```bash
 npm install
@@ -70,7 +70,7 @@ Production access rules are enforced server-side:
 
 ## ChatGPT App setup
 
-The MCP endpoint is `/mcp`. In ChatGPT developer mode, connect the deployed HTTPS URL ending in `/mcp`. The server exposes:
+The MCP endpoint is `/api/mcp`. ChatGPT Sites reserves the root `/mcp` path, so in ChatGPT developer mode connect the deployed HTTPS URL ending in `/api/mcp`. The server exposes:
 
 - `search` and `fetch` for record discovery.
 - `get_overview` and `render_overview` for the interactive staff dashboard.
@@ -87,7 +87,7 @@ For current Apps SDK requirements, see the official [MCP server guide](https://d
 npm run sites:archive
 ```
 
-The archive contains the vinext standalone server and the Sites metadata for that commit. Production publishing uses the exact commit pushed to Sites; the archive is retained as a reproducible local verification artifact. Deploy this application privately until real authentication, legal templates, retention rules, and the Google Workspace resources have been reviewed by the childcare provider.
+The archive contains the vinext standalone server and the Sites metadata for that commit. Source deployments use the Cloudflare worker entry declared in `wrangler.jsonc`. Production publishing uses the exact commit pushed to Sites; the archive is retained as a reproducible local verification artifact. Deploy this application privately until real authentication, legal templates, retention rules, and the Google Workspace resources have been reviewed by the childcare provider.
 
 ## Privacy and operating assumptions
 

@@ -2,9 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
 
-import type { DashboardSnapshot, UserSession } from "@/lib/contracts";
-import { getAppSnapshot, performAppAction } from "@/lib/server/repository";
-import { dashboardWidgetHtml, WIDGET_URI } from "@/mcp/widget";
+import type { DashboardSnapshot, UserSession } from "../lib/contracts";
+import { getAppSnapshot, performAppAction } from "../lib/server/repository";
+import { dashboardWidgetHtml, WIDGET_URI } from "./widget";
 
 const overviewSchema = z.object({
   kind: z.literal("overview"),

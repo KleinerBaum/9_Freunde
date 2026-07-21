@@ -1,7 +1,7 @@
-import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "@/lib/contracts";
-import { HttpError, requireSession, safeErrorResponse } from "@/lib/server/http";
-import { dataMode, getAppSnapshot } from "@/lib/server/repository";
-import { uploadGooglePhoto } from "@/lib/server/google-workspace";
+import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "../../../lib/contracts";
+import { HttpError, requireSession, safeErrorResponse } from "../../../lib/server/http";
+import { dataMode, getAppSnapshot } from "../../../lib/server/repository";
+import { uploadGooglePhoto } from "../../../lib/server/google-workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

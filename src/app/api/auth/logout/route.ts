@@ -1,4 +1,4 @@
-import { expiredSessionCookie } from "@/lib/session";
+import { expiredSessionCookie } from "../../../../lib/session";
 
 export const runtime = "nodejs";
 

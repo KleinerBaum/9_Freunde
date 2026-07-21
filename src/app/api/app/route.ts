@@ -1,5 +1,5 @@
-import { requireSession, safeErrorResponse, noStoreHeaders } from "@/lib/server/http";
-import { getAppSnapshot } from "@/lib/server/repository";
+import { requireSession, safeErrorResponse, noStoreHeaders } from "../../../lib/server/http";
+import { getAppSnapshot } from "../../../lib/server/repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -217,6 +217,8 @@ service_account*.json
 .streamlit/secrets*.toml
 
 # TypeScript / Next.js / Sites
+.codex/
+.wrangler/
 node_modules/
 .next/
 .vinext/

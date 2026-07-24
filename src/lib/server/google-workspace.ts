@@ -12,11 +12,11 @@ import {
   PARENT_CHILD_PATCH_FIELDS
 } from "../contracts";
 
-const GOOGLE_SCOPES = [
+const WORKSPACE_GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/drive",
-  "https://www.googleapis.com/auth/calendar"
+  "https://www.googleapis.com/auth/drive"
 ].join(" ");
+const CALENDAR_GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.events";
 
 const TABS = {
   children: process.env.GOOGLE_CHILDREN_TAB || "children",
@@ -27,7 +27,70 @@ const TABS = {
 
 type SheetRow = Record<string, string>;
 type TokenCache = { value: string; expiresAt: number };
-const globalGoogle = globalThis as typeof globalThis & { __nineFriendsGoogleToken?: TokenCache };
+type GoogleAuthContext = "workspace" | "calendar";
+type GoogleTokenCache = Record<string, TokenCache>;
+const globalGoogle = globalThis as typeof globalThis & {
+  __nineFriendsGoogleTokens?: GoogleTokenCache;
+};
+
+export type GoogleIntegrationCheckCode =
+  | "ok"
+  | "not_configured"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "quota"
+  | "schema"
+  | "unavailable"
+  | "unknown";
+
+export type GoogleIntegrationCheck = {
+  ok: boolean;
+  code: GoogleIntegrationCheckCode;
+};
+
+export type GoogleIntegrationHealth = {
+  checkedAt: string;
+  sheets: GoogleIntegrationCheck;
+  drive: GoogleIntegrationCheck;
+  calendar: GoogleIntegrationCheck;
+};
+
+const REQUIRED_SHEET_HEADERS: Record<keyof typeof TABS, readonly string[]> = {
+  children: [
+    "child_id", "name", "birthdate", "start_date", "group", "status",
+    "primary_parent_id", "parent_email", "allergies", "dietary",
+    "languages_at_home", "care_hours_per_week", "care_fee_cents",
+    "meal_fee_cents", "folder_id", "photo_consent", "download_consent",
+    "notes_parent_visible", "notes_internal", "updated_at"
+  ],
+  parents: [
+    "parent_id", "name", "email", "phone", "phone2", "address",
+    "preferred_language", "emergency_contact_name", "emergency_contact_phone",
+    "notifications_opt_in", "child_ids", "updated_at"
+  ],
+  users: [
+    "user_id", "email", "name", "role", "parent_id", "child_ids",
+    "password_salt", "password_hash", "active"
+  ],
+  documents: [
+    "document_id", "child_id", "type", "status", "title", "number", "period",
+    "care_fee_cents", "meal_fee_cents", "total_cents", "due_date",
+    "created_at", "drive_file_id"
+  ]
+};
+
+class GoogleWorkspaceRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly reason: string | undefined,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+class GoogleIntegrationSchemaError extends Error {}
 
 const required = (name: string) => {
   const value = process.env[name]?.trim();
@@ -43,27 +106,96 @@ export function googleConfigurationStatus() {
   return {
     sheets: hasCredentials && Boolean(process.env.GOOGLE_SHEET_ID?.trim()),
     drive: hasCredentials && Boolean(process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID?.trim()),
-    calendar: hasCredentials && Boolean(process.env.GOOGLE_CALENDAR_ID?.trim())
+    calendar: hasCredentials &&
+      Boolean(process.env.GOOGLE_CALENDAR_ID?.trim()) &&
+      Boolean(process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL?.trim())
   };
 }
 
 const base64url = (value: string) => Buffer.from(value).toString("base64url");
 
-async function accessToken(): Promise<string> {
-  const cached = globalGoogle.__nineFriendsGoogleToken;
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.value;
-
+function authConfiguration(context: GoogleAuthContext) {
   const email = required("GOOGLE_SERVICE_ACCOUNT_EMAIL");
-  const privateKey = required("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
-  const now = Math.floor(Date.now() / 1000);
-  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = base64url(JSON.stringify({
+  if (context === "calendar") {
+    return {
+      email,
+      scopes: CALENDAR_GOOGLE_SCOPES,
+      subject: required("GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL")
+    };
+  }
+  return { email, scopes: WORKSPACE_GOOGLE_SCOPES, subject: undefined };
+}
+
+export function buildGoogleJwtClaims(
+  context: GoogleAuthContext,
+  now = Math.floor(Date.now() / 1000)
+) {
+  const { email, scopes, subject } = authConfiguration(context);
+  return {
     iss: email,
-    scope: GOOGLE_SCOPES,
+    scope: scopes,
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
-    exp: now + 3600
-  }));
+    exp: now + 3600,
+    ...(subject ? { sub: subject } : {})
+  };
+}
+
+function tokenCacheKey(context: GoogleAuthContext): string {
+  const { email, scopes, subject } = authConfiguration(context);
+  return [context, email, subject ?? "-", scopes].join("|");
+}
+
+export function resetGoogleTokenCacheForTests() {
+  delete globalGoogle.__nineFriendsGoogleTokens;
+}
+
+function googleErrorReason(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error === "string") return error;
+  if (!error || typeof error !== "object") return undefined;
+  const errors = (error as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return undefined;
+  const reason = (errors[0] as { reason?: unknown } | undefined)?.reason;
+  return typeof reason === "string" ? reason : undefined;
+}
+
+export function classifyGoogleHttpError(
+  status: number,
+  reason?: string
+): GoogleIntegrationCheckCode {
+  if (
+    status === 400 &&
+    /invalid_grant|unauthorized_client|invalid_client/i.test(reason ?? "")
+  ) {
+    return "unauthorized";
+  }
+  if (status === 401) return "unauthorized";
+  if (status === 403) {
+    if (/quota|rateLimit/i.test(reason ?? "")) return "quota";
+    return "forbidden";
+  }
+  if (status === 404) return "not_found";
+  if (status === 429) return "quota";
+  if (status >= 500) return "unavailable";
+  return "unknown";
+}
+
+export function classifyGoogleIntegrationError(error: unknown): GoogleIntegrationCheckCode {
+  if (error instanceof GoogleIntegrationSchemaError) return "schema";
+  if (!(error instanceof GoogleWorkspaceRequestError)) return "unknown";
+  return classifyGoogleHttpError(error.status, error.reason);
+}
+
+export async function getGoogleAccessToken(context: GoogleAuthContext): Promise<string> {
+  const cacheKey = tokenCacheKey(context);
+  const cached = globalGoogle.__nineFriendsGoogleTokens?.[cacheKey];
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.value;
+
+  const privateKey = required("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = base64url(JSON.stringify(buildGoogleJwtClaims(context)));
   const unsigned = `${header}.${claim}`;
   const signer = createSign("RSA-SHA256");
   signer.update(unsigned);
@@ -78,29 +210,128 @@ async function accessToken(): Promise<string> {
       assertion
     })
   });
-  if (!response.ok) throw new Error(`Google authentication failed (${response.status}).`);
-  const payload = await response.json() as { access_token?: string; expires_in?: number };
-  if (!payload.access_token) throw new Error("Google authentication returned no access token.");
-  globalGoogle.__nineFriendsGoogleToken = {
+  const payload = await response.json().catch(() => ({})) as {
+    access_token?: string;
+    expires_in?: number;
+  };
+  if (!response.ok) {
+    throw new GoogleWorkspaceRequestError(
+      response.status,
+      googleErrorReason(payload),
+      `Google authentication failed (${response.status}).`
+    );
+  }
+  if (!payload.access_token) {
+    throw new GoogleWorkspaceRequestError(
+      502,
+      undefined,
+      "Google authentication returned no access token."
+    );
+  }
+  const tokens = globalGoogle.__nineFriendsGoogleTokens ?? {};
+  tokens[cacheKey] = {
     value: payload.access_token,
     expiresAt: Date.now() + (payload.expires_in ?? 3600) * 1000
   };
+  globalGoogle.__nineFriendsGoogleTokens = tokens;
   return payload.access_token;
 }
 
-async function googleFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const token = await accessToken();
+async function googleFetch(
+  url: string,
+  init: RequestInit = {},
+  context: GoogleAuthContext = "workspace"
+): Promise<Response> {
+  const token = await getGoogleAccessToken(context);
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
   const response = await fetch(url, { ...init, headers });
   if (!response.ok) {
-    throw new Error(`Google Workspace request failed (${response.status}).`);
+    const payload = await response.json().catch(() => ({}));
+    throw new GoogleWorkspaceRequestError(
+      response.status,
+      googleErrorReason(payload),
+      `Google Workspace request failed (${response.status}).`
+    );
   }
   return response;
 }
 
 const sheetId = () => required("GOOGLE_SHEET_ID");
 const encodeRange = (tab: string, range = "A:ZZ") => encodeURIComponent(`'${tab.replaceAll("'", "''")}'!${range}`);
+
+async function getSheetHeader(tab: string): Promise<string[]> {
+  const response = await googleFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}/values/${encodeRange(tab, "1:1")}`
+  );
+  const payload = await response.json() as { values?: unknown[][] };
+  return (payload.values?.[0] ?? []).map((value) => String(value).trim()).filter(Boolean);
+}
+
+async function checkSheetsIntegration() {
+  for (const [tabKey, tabName] of Object.entries(TABS) as Array<[keyof typeof TABS, string]>) {
+    const header = await getSheetHeader(tabName);
+    const missing = REQUIRED_SHEET_HEADERS[tabKey].filter((field) => !header.includes(field));
+    if (missing.length > 0) throw new GoogleIntegrationSchemaError("Required Sheet schema is incomplete.");
+  }
+}
+
+async function checkDriveIntegration() {
+  const folderId = encodeURIComponent(required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID"));
+  const url = new URL(`https://www.googleapis.com/drive/v3/files/${folderId}`);
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("fields", "mimeType,trashed,capabilities(canAddChildren)");
+  const response = await googleFetch(url.toString());
+  const payload = await response.json() as {
+    mimeType?: string;
+    trashed?: boolean;
+    capabilities?: { canAddChildren?: boolean };
+  };
+  if (
+    payload.mimeType !== "application/vnd.google-apps.folder" ||
+    payload.trashed ||
+    payload.capabilities?.canAddChildren !== true
+  ) {
+    throw new GoogleWorkspaceRequestError(403, "insufficientFilePermissions", "Drive root is not writable.");
+  }
+}
+
+async function checkCalendarIntegration() {
+  const calendarId = encodeURIComponent(required("GOOGLE_CALENDAR_ID"));
+  const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`);
+  url.searchParams.set("maxResults", "1");
+  url.searchParams.set("singleEvents", "true");
+  url.searchParams.set("timeMin", new Date().toISOString());
+  await googleFetch(url.toString(), {}, "calendar");
+}
+
+async function runIntegrationCheck(
+  configured: boolean,
+  check: () => Promise<void>
+): Promise<GoogleIntegrationCheck> {
+  if (!configured) return { ok: false, code: "not_configured" };
+  try {
+    await check();
+    return { ok: true, code: "ok" };
+  } catch (error) {
+    return { ok: false, code: classifyGoogleIntegrationError(error) };
+  }
+}
+
+export async function checkGoogleIntegrations(): Promise<GoogleIntegrationHealth> {
+  const configuration = googleConfigurationStatus();
+  const [sheets, drive, calendar] = await Promise.all([
+    runIntegrationCheck(configuration.sheets, checkSheetsIntegration),
+    runIntegrationCheck(configuration.drive, checkDriveIntegration),
+    runIntegrationCheck(configuration.calendar, checkCalendarIntegration)
+  ]);
+  return {
+    checkedAt: new Date().toISOString(),
+    sheets,
+    drive,
+    calendar
+  };
+}
 
 const columnName = (index: number) => {
   let result = "";
@@ -274,7 +505,7 @@ async function listCalendarEvents(): Promise<CalendarEvent[]> {
   url.searchParams.set("timeMin", timeMin);
   url.searchParams.set("timeMax", timeMax);
   url.searchParams.set("maxResults", "100");
-  const response = await googleFetch(url.toString());
+  const response = await googleFetch(url.toString(), {}, "calendar");
   const payload = await response.json() as { items?: Array<Record<string, unknown>> };
   return (payload.items ?? []).flatMap((item) => {
     const start = item.start as { dateTime?: string; date?: string } | undefined;
@@ -329,7 +560,7 @@ async function createCalendarEvent(input: Extract<AppAction, { type: "create_eve
         }
       }
     })
-  });
+  }, "calendar");
 }
 
 async function updateCalendarEvent(
@@ -358,7 +589,7 @@ async function updateCalendarEvent(
         }
       }
     })
-  });
+  }, "calendar");
 }
 
 async function createDriveFolder(childId: string): Promise<string> {

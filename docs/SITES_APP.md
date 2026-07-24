@@ -39,10 +39,11 @@ npm run check
 
 1. Create a Google Cloud service account and enable Google Sheets, Drive, and Calendar APIs.
 2. Create one private spreadsheet with tabs named `children`, `parents`, `users`, and `documents`.
-3. Create a private Drive root folder for child photo folders.
-4. Create or choose the facility Calendar.
-5. Share the spreadsheet, Drive root, and Calendar with the service-account email. Grant only the edit permissions the app needs.
+3. Put the spreadsheet and the child-photo root in a Google Workspace Shared Drive. Add the service account as a Content Manager so newly created folders and photos belong to the organization rather than an individual account.
+4. Create a dedicated Workspace organizer account and facility Calendar.
+5. Enable domain-wide delegation for the service account, then authorize only `https://www.googleapis.com/auth/calendar.events` in Google Admin Console. Set `GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL` to the dedicated organizer. Sheets and Drive continue to use the service account directly.
 6. Copy `.env.example` to the deployment environment, set `DATA_MODE=google`, and provide the listed server-side values. Keep the private key, session secret, and MCP bearer token in the Sites secret store only.
+7. Deploy a new Sites version after changing hosted environment values; saved environment revisions do not alter an already-running release.
 
 Recommended first-row headers:
 
@@ -67,6 +68,10 @@ Production access rules are enforced server-side:
 - Photos are streamed through an authenticated application route; Drive files remain private.
 - Calendar writes use `sendUpdates=all` so invitations and edits reach attendees.
 - MCP writes require explicit confirmation and, in Google mode, `MCP_BEARER_TOKEN`.
+- `GET /api/health` reports liveness and whether required configuration is present.
+- `GET /api/admin/integrations/health` requires an authenticated admin session and performs sanitized, read-only checks against the Sheet schema, writable Drive root, and delegated Calendar.
+
+The Calendar organizer must be a managed Google Workspace user. Personal Gmail accounts cannot be used for service-account domain-wide delegation.
 
 ## ChatGPT App setup
 

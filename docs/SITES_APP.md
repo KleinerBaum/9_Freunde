@@ -50,6 +50,11 @@ temporary paths.
 
 ## Production Google Workspace mode
 
+Before enabling real data, complete the
+[private staff pilot release gate](PRIVATE_STAFF_PILOT.md). Keep Sites access
+owner-only until the governance approval, hosted configuration, and production
+health checks have all passed.
+
 1. Create a Google Cloud service account and enable Google Sheets, Drive, and Calendar APIs.
 2. Create one private spreadsheet with tabs named `children`, `parents`, `users`, and `documents`.
 3. Put the spreadsheet and the child-photo root in a Google Workspace Shared Drive. Add the service account as a Content Manager so newly created folders and photos belong to the organization rather than an individual account.

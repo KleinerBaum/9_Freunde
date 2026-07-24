@@ -1,43 +1,116 @@
-# Logikrollen ("Agenten") in der 9-Freunde App
+# AGENTS.md — 9_Freunde
 
-Die Streamlit-App **9 Freunde** ist in mehrere modulare Logikkomponenten ("Agenten") unterteilt. Jeder Agent übernimmt klar definierte Aufgaben, was die Wartbarkeit und Sicherheit des Systems erhöht. Im Folgenden werden die wichtigsten Agenten und ihre Verantwortlichkeiten beschrieben:
+Coding-agent instructions for the 9 Freunde family and administration portal.
 
-## AuthAgent (Authentifizierung & Autorisierung)
-Der **AuthAgent** kümmert sich um die sichere Anmeldung der Benutzer und die Unterscheidung zwischen **Eltern** und **Leitung** (Administrator). Seine Hauptaufgaben sind:
-- **Benutzerauthentifizierung:** Prüft Anmeldedaten (E-Mail und Passwort) gegen die hinterlegten Berechtigungen. In einer produktiven Umgebung erfolgt dies über einen sicheren Authentifizierungsdienst (z. B. Firebase Auth); für das Prototyping können Anmeldedaten auch in der Konfiguration hinterlegt werden.
-- **Sitzungsverwaltung:** Verwaltet angemeldete Sitzungen innerhalb der Streamlit-App (z. B. via `st.session_state`) und stellt sicher, dass nur authentifizierte Benutzer auf interne Bereiche zugreifen.
-- **Rollensteuerung:** Unterscheidet anhand der angemeldeten E-Mail-Adresse oder hinterlegter Rollen, ob es sich um eine Leitungskraft (Admin) oder ein Elternteil handelt, und ermöglicht bzw. beschränkt Funktionen entsprechend. Admin-Benutzer erhalten Zugriff auf Verwaltungsfunktionen (Stammdatenpflege, Dokumentenerstellung, Foto-Upload, Kalenderpflege), während Eltern nur lesenden Zugriff auf für sie relevante Informationen (eigene Kinder, freigegebene Dokumente/Fotos, Termine) erhalten.
+## Active architecture
 
-## DocumentAgent (Dokumentenerstellung)
-Der **DocumentAgent** ist verantwortlich für das Generieren von Dokumenten und Berichten. Wesentliche Aspekte:
-- **Texterstellung mit KI:** Nutzt die OpenAI API, um aus Stichpunkten oder strukturierten Daten automatisch Fließtexte zu generieren (z. B. Tagesberichte, Entwicklungsdokumentationen oder Elternbriefe). Dadurch wird die Leitung bei der Formulierung von Texten unterstützt.
-- **Dokumentengenerierung:** Erstellt formatierte Dokumente (z. B. in Word-Format mittels `python-docx`) und kann diese bei Bedarf auch als PDF aufbereiten (z. B. mit `PyPDF2`). Dabei werden Stammdaten (Name des Kindes, Datum, etc.) automatisch eingefügt.
-- **Integration mit Dateiablage:** Nach Generierung kann der DocumentAgent die fertigen Dokumente entweder zum direkten Download bereitstellen oder an den **DriveAgent** übergeben, um sie in der Google Drive Ablage abzulegen (etwa in einem Dokumente-Ordner pro Kind). So bleiben erstellte Berichte auch langfristig zugänglich.
+- The TypeScript ChatGPT Sites application is the primary product path.
+- The Python/Streamlit application is a legacy and migration path.
+- Do not implement a feature twice or modify the legacy application unless the
+  task explicitly includes it.
+- Read `package.json`, `.env.example`, `.openai/hosting.json`,
+  `docs/SITES_APP.md` and relevant tests before changing the Sites app.
 
-## DriveAgent (Dateiablage auf Google Drive)
-Der **DriveAgent** übernimmt die Anbindung an Google Drive für das Speichern und Abrufen von Dateien, insbesondere Fotos und generierte Dokumente:
-- **Upload & Download:** Lädt Dateien (z. B. PDF/DOCX-Dokumente oder Fotos) in die Google Drive Ablagestruktur hoch und kann sie bei Bedarf wieder herunterladen. Er nutzt dazu die Google Drive API (über einen Service-Account), wodurch die App keine Dateien lokal speichern muss.
-- **Ordnerstruktur verwalten:** Organisiert die Ablage in Drive, z. B. durch Anlage eines Hauptordners für die Großtagespflege und Unterordner pro Kind (für persönliche Dokumente und Fotos). Der DriveAgent kann automatisiert neue Unterordner erstellen, wenn neue Kinder angelegt werden.
-- **Berechtigungen & Zugriff:** Sorgt dafür, dass nur berechtigte Benutzer Zugriff auf die jeweiligen Dateien haben. Z. B. können Foto-Ordner eines Kindes nur von der Leitung beschrieben und vom jeweiligen Elternteil gelesen werden. Die Daten verlassen nicht die Drive-Umgebung, was zur DSGVO-Konformität beiträgt (keine öffentliche Freigabe ohne Berechtigung).
+## Environment
 
-## CalendarAgent (Kalenderverwaltung)
-Der **CalendarAgent** verbindet die Anwendung mit dem Google Kalender der Einrichtung. Aufgaben im Überblick:
-- **Terminerstellung und -pflege:** Ermöglicht der Leitung, wichtige Termine (Eingewöhnungen, Ausflüge, Schließtage, Elternabende etc.) über die App in einem zentralen Google Kalender einzutragen. Dies geschieht über die Google Calendar API.
-- **Anzeige von Terminen:** Stellt für Eltern eine lesbare Liste oder Kalenderansicht der relevanten Termine bereit. Eltern sehen nur allgemeine Termine der Einrichtung oder individuelle Termine, die ihr Kind betreffen.
-- **Synchronisation:** Da ein echter Google Kalender verwendet wird, können Eltern optional diesen Kalender abonnieren oder automatisch Benachrichtigungen erhalten. Der CalendarAgent stellt in der App sicher, dass er stets die aktuellen Events aus dem Kalender abruft (ggf. mit Zwischenspeicherung, um Performance zu verbessern).
+```bash
+export NVM_DIR="$HOME/.nvm"
+. "$NVM_DIR/nvm.sh"
+nvm use
+```
 
-## StammdatenManager (Verwaltung der Stammdaten)
-Die Verwaltung der Grunddaten aller betreuten Kinder erfolgt durch den **StammdatenManager**:
-- **Datenhaltung:** Speichert und lädt Stammdaten der Kinder, Erziehungsberechtigten und ggf. Betreuer. Typische Stammdaten sind Name und Geburtsdatum des Kindes, Kontaktdaten der Eltern, Zugehörigkeit der Elternkonten zu Kindern, Gesundheitsinformationen usw. Diese Daten werden in einer sicheren Datenbank (z. B. Firebase Firestore über `firebase-admin`) oder ersatzweise in einer lokalen Datei/einem Streamlit-Session-State gehalten.
-- **CRUD-Funktionen:** Bietet der Leitung Funktionen, um Kinder und zugehörige Daten anzulegen, zu bearbeiten oder zu archivieren (Create, Read, Update, Delete). Änderungen werden in Echtzeit übernommen, so dass z. B. neu angelegte Kinder sofort in anderen Bereichen (Dokumente, Fotos) zur Verfügung stehen.
-- **Integrität & Zugriff:** Stellt sicher, dass Stammdaten nur von autorisierten Personen (Leitung) geändert werden können. Eltern haben nur Leserechte auf die Stammdaten ihres eigenen Kindes (z. B. könnten sie die hinterlegten Kontaktdaten oder Allergien ihres Kindes einsehen, aber nicht eigenständig ändern).
+- Local Node is selected by `.nvmrc`.
+- Use `npm ci` for a clean installation; do not use global npm packages.
+- Keep `.env.local` ignored and use it only for local configuration.
+- Use `DATA_MODE=demo` and fictional users unless production integration work
+  is explicitly requested.
+- In Codex/WSL, keep `TMPDIR=/tmp` and
+  `WRANGLER_LOG_PATH=/tmp/codex-wrangler`.
 
-## PhotoAgent (Fotoverwaltung & DSGVO-Konformität)
-Der **PhotoAgent** ist zuständig für den Umgang mit Fotos unter Wahrung der Privatsphäre:
-- **Foto-Upload und Galerie pro Kind:** Ermöglicht der Leitung, Fotos für alle Kinder hochzuladen und pro Kind als Galerie anzuzeigen. Eltern sehen ausschließlich die Galerie ihres eigenen Kindes, das über `StammdatenManager.get_child_by_parent(user_email)` ermittelt wird.
-- **Speicherung im Drive-Ordner des Kindes:** Hochgeladene Bilder werden vom PhotoAgent entgegengenommen und mithilfe des DriveAgent im bestehenden Google-Drive-Ordner des Kindes (`child["folder_id"]`) gespeichert. Es werden keine öffentlichen Drive-Links erzeugt.
-- **Validierung und Datenschutz:** Der Upload akzeptiert nur JPG-, PNG- und WebP-Dateien innerhalb des definierten Größenlimits. Dateinamen enthalten keine personenbezogenen Daten.
-- **Zugriffsbeschränkung:** Der Zugriff wird über die Streamlit-App und die Rollenlogik begrenzt: Admin-Benutzer können alle Kinder verwalten, Eltern nur das eigene Kind einsehen.
-- **Nicht-Ziel im MVP:** Gesichtserkennung mit `face_recognition`, Referenzbilder, Face Embeddings, automatisches Kind-Tagging, automatischer Vergleich erkannter Gesichter und automatisches Pixeln fremder Kinder sind nicht Teil des MVP.
+## Primary commands
 
-Alle diese Agenten arbeiten zusammen, um ein ganzheitliches System zu bilden: **AuthAgent** regelt den Zugang, **StammdatenManager** liefert Kontext, **DocumentAgent** und **PhotoAgent** erstellen Inhalte, während **DriveAgent** und **CalendarAgent** die externe Integration zu Google-Diensten handhaben. Durch diese klare Trennung der Logikrollen bleibt der Code übersichtlich, erweiterbar und sicher.
+```bash
+npm run dev
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run check
+```
+
+The complete handoff gate is:
+
+```bash
+TMPDIR=/tmp WRANGLER_LOG_PATH=/tmp/codex-wrangler npm run check
+```
+
+The Cloudflare Vite plugin queries WSL network interfaces during
+`npm run dev`. In a restricted Codex sandbox, request a narrow escalation for
+the development server rather than weakening the default sandbox globally.
+
+## Legacy Streamlit path
+
+Use only when explicitly required:
+
+```bash
+uv venv --python /usr/bin/python3 .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+TMPDIR=/tmp .venv/bin/python -m pytest
+TMPDIR=/tmp .venv/bin/python -m streamlit run app.py
+```
+
+Do not add new Sites behavior to the legacy application by default.
+
+## Data and privacy invariants
+
+- This application handles highly sensitive family and child data.
+- Never use real names, contact details, health data, photos, documents,
+  calendars or identifiers in tests, prompts, logs or screenshots.
+- Parents may access only resources authorized for their own child.
+- Administrative actions require an authenticated authorized role.
+- Photos and documents remain private; never create public Drive links.
+- File names, generated logs and object keys must not expose personal data.
+- Demo mode must remain clearly marked and contain fictional data only.
+
+## Google integration
+
+- Keep Google Sheets, Drive and Calendar integrations server-side.
+- Use least-privilege scopes and document any scope change.
+- Keep service-account credentials and private keys outside the repository.
+- Domain-wide delegation or impersonation requires an explicitly approved
+  managed Google Workspace design; do not emulate it with personal Gmail.
+- External writes require explicit user confirmation and auditable results.
+
+## Contracts and synchronization
+
+When data fields, roles or permissions change, update together:
+
+- canonical Zod schemas and types
+- API and MCP tool contracts
+- authorization and ownership checks
+- server logic and adapters
+- UI state and labels
+- generated documents and exports
+- demo fixtures
+- tests and documentation
+
+Avoid raw duplicated role, status, tab and environment strings when a canonical
+constant or enum exists.
+
+## ChatGPT Apps and Sites
+
+- Preserve the exact project ID in `.openai/hosting.json`.
+- Keep MCP tool schemas narrow and annotate read-only, destructive and
+  open-world behavior correctly.
+- Require confirmation for Calendar, Drive, document and administrative writes.
+- Keep resource domains and CSP minimal.
+- Do not deploy, save a Sites version or change access controls without an
+  explicit request.
+
+## Handoff
+
+- Reproduce defects and report expected versus actual behavior.
+- Keep changes PR-sized and avoid unrelated refactors.
+- Report exact checks and actual outcomes.
+- Finish with `git status --short --branch`.
+- Do not commit, push, create a PR or deploy without explicit authorization.

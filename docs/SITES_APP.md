@@ -19,21 +19,34 @@ The original Streamlit app remains available during migration. The new app inten
 
 ## Local demo
 
-Requirements: Node.js 22 or newer.
+Requirements: Node.js 22 or newer. The recommended local baseline is the
+version pinned in `.nvmrc`.
+
+In WSL or another Bash environment:
 
 ```bash
-npm install
-copy .env.example .env.local
+nvm use
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
+
+To copy the environment template on native Windows, use
+`Copy-Item .env.example .env.local` in PowerShell or
+`copy .env.example .env.local` in Command Prompt.
 
 Open `http://localhost:3000`. The login screen provides fictional staff and parent demo accounts. Never use the demo mode or demo accounts with real child data.
 
 Run all checks:
 
 ```bash
-npm run check
+TMPDIR=/tmp WRANGLER_LOG_PATH=/tmp/codex-wrangler npm run check
 ```
+
+The environment prefix keeps Vitest and Wrangler artifacts in a WSL-native
+temporary directory when the command is launched from Codex. Outside Codex,
+`npm run check` is sufficient when the shell already provides Linux-native
+temporary paths.
 
 ## Production Google Workspace mode
 

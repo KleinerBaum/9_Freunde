@@ -1,6 +1,8 @@
 import { AppActionSchema } from "../../../lib/contracts";
-import { HttpError, requireSession, safeErrorResponse, noStoreHeaders } from "../../../lib/server/http";
+import { canWriteRecords } from "../../../lib/contracts";
+import { HttpError, requireActiveSession, safeErrorResponse, noStoreHeaders } from "../../../lib/server/http";
 import { performAppAction } from "../../../lib/server/repository";
+import { assertSameOrigin } from "../../../lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +17,14 @@ const ADMIN_ONLY_ACTIONS = new Set([
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const session = requireSession(request);
+    assertSameOrigin(request);
+    const session = await requireActiveSession(request);
     const action = AppActionSchema.parse(await request.json());
-    if (session.role === "parent" && ADMIN_ONLY_ACTIONS.has(action.type)) {
+    if (!canWriteRecords(session.role) && ADMIN_ONLY_ACTIONS.has(action.type)) {
       throw new HttpError(403, "This action is available to staff only.");
+    }
+    if (action.type === "record_consent" && session.role !== "admin") {
+      throw new HttpError(403, "Only administrators may record or withdraw consent.");
     }
     if (session.role === "parent" && action.type === "update_child" && !session.childIds.includes(action.childId)) {
       throw new HttpError(403, "You do not have access to this child record.");

@@ -4,20 +4,26 @@ import {
   type AppAction,
   type CalendarEvent,
   type Child,
+  type ConsentRecord,
   type DashboardSnapshot,
   type ManagedDocument,
   type Parent,
   type Photo,
+  type Role,
   type UserSession,
+  canAdminister,
+  canWriteRecords,
+  isStaffRole,
   PARENT_CHILD_PATCH_FIELDS
 } from "./contracts";
+import { sessionMetadata } from "./session";
 
 type DemoUser = {
   id: string;
   email: string;
   password: string;
   name: string;
-  role: "admin" | "parent";
+  role: Role;
   parentId?: string;
   childIds: string[];
 };
@@ -28,6 +34,7 @@ type DemoState = {
   events: CalendarEvent[];
   documents: ManagedDocument[];
   photos: Photo[];
+  consents: ConsentRecord[];
 };
 
 const isoDay = (offset: number, hour = 9, minute = 0) => {
@@ -61,6 +68,68 @@ export const DEMO_USERS: DemoUser[] = [
 ];
 
 const seedState: DemoState = {
+  consents: [
+    {
+      id: "consent-lina-photo",
+      childId: "child-lina",
+      purpose: "photo_processing",
+      status: "granted",
+      scope: "parent_portal",
+      documentVersion: "demo-1",
+      source: "signed_form",
+      evidenceRef: "fictional-demo-record",
+      recordedAt: updatedAt,
+      recordedBy: "user-admin"
+    },
+    {
+      id: "consent-lina-download",
+      childId: "child-lina",
+      purpose: "photo_download",
+      status: "restricted",
+      scope: "staff_only",
+      documentVersion: "demo-1",
+      source: "signed_form",
+      evidenceRef: "fictional-demo-record",
+      recordedAt: updatedAt,
+      recordedBy: "user-admin"
+    },
+    {
+      id: "consent-noah-photo",
+      childId: "child-noah",
+      purpose: "photo_processing",
+      status: "granted",
+      scope: "parent_portal",
+      documentVersion: "demo-1",
+      source: "signed_form",
+      evidenceRef: "fictional-demo-record",
+      recordedAt: updatedAt,
+      recordedBy: "user-admin"
+    },
+    {
+      id: "consent-noah-download",
+      childId: "child-noah",
+      purpose: "photo_download",
+      status: "granted",
+      scope: "download",
+      documentVersion: "demo-1",
+      source: "signed_form",
+      evidenceRef: "fictional-demo-record",
+      recordedAt: updatedAt,
+      recordedBy: "user-admin"
+    },
+    {
+      id: "consent-milo-photo",
+      childId: "child-milo",
+      purpose: "photo_processing",
+      status: "restricted",
+      scope: "staff_only",
+      documentVersion: "demo-1",
+      source: "signed_form",
+      evidenceRef: "fictional-demo-record",
+      recordedAt: updatedAt,
+      recordedBy: "user-admin"
+    }
+  ],
   parents: [
     {
       id: "parent-sommer",
@@ -341,26 +410,37 @@ export function authenticateDemoUser(email: string, password: string): DemoUser 
 
 export function demoSession(user: DemoUser): UserSession {
   return {
+    ...sessionMetadata("demo"),
     userId: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
     ...(user.parentId ? { parentId: user.parentId } : {}),
-    childIds: user.childIds,
-    expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 12
+    childIds: user.childIds
   };
 }
 
 export function getDemoSnapshot(session: UserSession): DashboardSnapshot {
   const current = state();
   const childIds = new Set(session.childIds);
-  const children = session.role === "admin"
+  const children = isStaffRole(session.role)
     ? current.children
     : current.children.filter((child) => childIds.has(child.id));
   const visibleChildIds = new Set(children.map((child) => child.id));
-  const parents = session.role === "admin"
+  const parents = isStaffRole(session.role)
     ? current.parents
     : current.parents.filter((parent) => parent.id === session.parentId);
+  const consentFor = (childId: string, purpose: ConsentRecord["purpose"]) =>
+    current.consents
+      .filter((record) => record.childId === childId && record.purpose === purpose)
+      .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt))[0];
+  const photoPermitted = (childId: string) =>
+    consentFor(childId, "photo_processing")?.status === "granted" &&
+    (isStaffRole(session.role) || (
+      consentFor(childId, "photo_processing")?.scope === "parent_portal" &&
+      consentFor(childId, "photo_download")?.status === "granted" &&
+      consentFor(childId, "photo_download")?.scope === "download"
+    ));
 
   return {
     session,
@@ -370,22 +450,27 @@ export function getDemoSnapshot(session: UserSession): DashboardSnapshot {
       current.events.filter((event) => event.audience === "all" || (event.childId && visibleChildIds.has(event.childId)))
     ),
     documents: structuredClone(
-      current.documents.filter((document) => session.role === "admin" || visibleChildIds.has(document.childId))
+      current.documents.filter((document) => isStaffRole(session.role) || visibleChildIds.has(document.childId))
     ),
     photos: structuredClone(
-      current.photos.filter((photo) => session.role === "admin" || visibleChildIds.has(photo.childId))
+      current.photos.filter((photo) =>
+        visibleChildIds.has(photo.childId) && photoPermitted(photo.childId)
+      )
     ),
+    consents: session.role === "admin"
+      ? structuredClone(current.consents.filter((record) => visibleChildIds.has(record.childId)))
+      : [],
     integrations: { mode: "demo", sheets: false, drive: false, calendar: false, mcp: true },
     generatedAt: new Date().toISOString()
   };
 }
 
 const assertAdmin = (session: UserSession) => {
-  if (session.role !== "admin") throw new Error("This action is available to staff only.");
+  if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
 };
 
 const assertChildAccess = (session: UserSession, childId: string) => {
-  if (session.role !== "admin" && !session.childIds.includes(childId)) {
+  if (!isStaffRole(session.role) && !session.childIds.includes(childId)) {
     throw new Error("You do not have access to this child record.");
   }
 };
@@ -445,6 +530,7 @@ export function performDemoAction(session: UserSession, action: AppAction): Dash
   }
 
   if (action.type === "update_child") {
+    if (session.role === "staff_read") throw new Error("This action requires write access.");
     assertChildAccess(session, action.childId);
     const child = current.children.find((item) => item.id === action.childId);
     if (!child) throw new Error("Child record not found.");
@@ -458,7 +544,8 @@ export function performDemoAction(session: UserSession, action: AppAction): Dash
   }
 
   if (action.type === "update_parent_profile") {
-    if (session.role !== "admin" && session.parentId !== action.parentId) {
+    if (session.role === "staff_read") throw new Error("This action requires write access.");
+    if (!isStaffRole(session.role) && session.parentId !== action.parentId) {
       throw new Error("You can only update your own profile.");
     }
     const parent = current.parents.find((item) => item.id === action.parentId);
@@ -522,6 +609,32 @@ export function performDemoAction(session: UserSession, action: AppAction): Dash
     const document = current.documents.find((item) => item.id === action.documentId);
     if (!document) throw new Error("Document not found.");
     document.status = action.status;
+  }
+
+  if (action.type === "record_consent") {
+    if (!canAdminister(session.role)) {
+      throw new Error("Only administrators may record or withdraw consent.");
+    }
+    const child = current.children.find((item) => item.id === action.payload.childId);
+    if (!child) throw new Error("Child record not found.");
+    const recordedAt = now;
+    const record: ConsentRecord = {
+      id: `consent-${randomUUID()}`,
+      childId: action.payload.childId,
+      purpose: action.payload.purpose,
+      status: action.payload.status,
+      scope: action.payload.scope,
+      documentVersion: action.payload.documentVersion,
+      source: action.payload.source,
+      ...(action.payload.evidenceRef ? { evidenceRef: action.payload.evidenceRef } : {}),
+      recordedAt,
+      recordedBy: session.userId,
+      ...(action.payload.status === "withdrawn" ? { withdrawnAt: recordedAt } : {})
+    };
+    current.consents.push(record);
+    if (record.purpose === "photo_processing") child.photoConsent = record.status;
+    if (record.purpose === "photo_download") child.downloadConsent = record.status;
+    child.updatedAt = now;
   }
 
   return getDemoSnapshot(session);

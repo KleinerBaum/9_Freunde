@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { GET } from "../src/app/api/admin/integrations/health/route";
-import { sessionCookie } from "../src/lib/session";
+import { sessionCookie, sessionMetadata } from "../src/lib/session";
 
 const originalEnvironment = { ...process.env };
 
 function requestFor(role: "admin" | "parent") {
   const cookie = sessionCookie({
+    ...sessionMetadata("demo"),
     userId: `${role}-user`,
     email: `${role}@example.com`,
     name: role,

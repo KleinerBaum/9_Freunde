@@ -11,13 +11,15 @@ import {
   useState
 } from "react";
 
-import type {
-  AppAction,
-  CalendarEvent,
-  Child,
-  DashboardSnapshot,
-  ManagedDocument,
-  Parent
+import {
+  canWriteRecords,
+  isStaffRole,
+  type AppAction,
+  type CalendarEvent,
+  type Child,
+  type DashboardSnapshot,
+  type ManagedDocument,
+  type Parent
 } from "../lib/contracts";
 import { Icon, type IconName } from "./icon";
 
@@ -69,6 +71,7 @@ const STATUS_LABELS: Record<string, string> = {
   overdue: "Überfällig",
   granted: "Erteilt",
   restricted: "Eingeschränkt",
+  withdrawn: "Widerrufen",
   missing: "Fehlt"
 };
 
@@ -116,7 +119,13 @@ function Modal({ title, eyebrow, children, onClose }: { title: string; eyebrow: 
   );
 }
 
-function Login({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+function Login({
+  onLogin,
+  managedAccessError
+}: {
+  onLogin: (email: string, password: string) => Promise<void>;
+  managedAccessError?: string;
+}) {
   const [email, setEmail] = useState("leitung@demo.9freunde.de");
   const [password, setPassword] = useState("willkommen");
   const [pending, setPending] = useState(false);
@@ -154,17 +163,18 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
       <section className="login-panel">
         <div className="login-card">
           <div className="login-card__intro"><span className="eyebrow">Familienportal</span><h2>Willkommen zurück</h2><p>Melde dich mit deinem persönlichen Zugang an.</p></div>
-          <div className="demo-switch" aria-label="Demo-Zugang wählen">
+          {!managedAccessError ? <div className="demo-switch" aria-label="Demo-Zugang wählen">
             <button type="button" onClick={() => chooseDemo("admin")} className={email.startsWith("leitung") ? "active" : ""}><Icon name="spark" /> Leitung</button>
             <button type="button" onClick={() => chooseDemo("parent")} className={email.startsWith("eltern") ? "active" : ""}><Icon name="heart" /> Eltern</button>
-          </div>
-          <form onSubmit={submit} className="form-stack">
+          </div> : null}
+          {managedAccessError ? <p className="form-error"><Icon name="warning" />{managedAccessError}</p> : <form onSubmit={submit} className="form-stack">
             <label><span>E-Mail-Adresse</span><span className="input-wrap"><Icon name="mail" /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></span></label>
             <label><span>Passwort</span><span className="input-wrap"><Icon name="shield" /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required minLength={6} /></span></label>
             {error ? <p className="form-error"><Icon name="warning" />{error}</p> : null}
             <button className="primary-button primary-button--wide" type="submit" disabled={pending}>{pending ? "Anmeldung läuft…" : "Sicher anmelden"}<Icon name="arrow" /></button>
-          </form>
-          <p className="demo-note"><Icon name="spark" /> Diese Vorschau nutzt ausschließlich erfundene Demodaten.</p>
+          </form>}
+          {!managedAccessError ? <p className="demo-note"><Icon name="spark" /> Diese Vorschau nutzt ausschließlich erfundene Demodaten.</p> : null}
+          <p className="legal-links"><a href="/datenschutz">Datenschutz</a><span>·</span><a href="/impressum">Impressum</a></p>
         </div>
       </section>
     </main>
@@ -172,7 +182,7 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
 }
 
 function Sidebar({ snapshot, view, onView, onLogout, open, onClose }: { snapshot: DashboardSnapshot; view: View; onView: (view: View) => void; onLogout: () => void; open: boolean; onClose: () => void }) {
-  const nav = snapshot.session.role === "admin" ? ADMIN_NAV : PARENT_NAV;
+  const nav = isStaffRole(snapshot.session.role) ? ADMIN_NAV : PARENT_NAV;
   return (
     <aside className={`sidebar ${open ? "sidebar--open" : ""}`}>
       <div className="sidebar__head"><Brand compact /><button className="icon-button sidebar__close" type="button" onClick={onClose} aria-label="Navigation schließen"><Icon name="close" /></button></div>
@@ -182,7 +192,7 @@ function Sidebar({ snapshot, view, onView, onLogout, open, onClose }: { snapshot
       </nav>
       <div className="sidebar__bottom">
         <div className="privacy-chip"><Icon name="shield" /><span><strong>Privater Bereich</strong><small>{snapshot.integrations.mode === "demo" ? "Fiktionale Daten" : "Google Workspace"}</small></span></div>
-        <div className="user-chip"><Avatar name={snapshot.session.name} tone={4} /><span><strong>{snapshot.session.name}</strong><small>{snapshot.session.role === "admin" ? "Leitung" : "Elternzugang"}</small></span><button type="button" onClick={onLogout} aria-label="Abmelden"><Icon name="logout" /></button></div>
+        <div className="user-chip"><Avatar name={snapshot.session.name} tone={4} /><span><strong>{snapshot.session.name}</strong><small>{isStaffRole(snapshot.session.role) ? "Kita-Team" : "Elternzugang"}</small></span><button type="button" onClick={onLogout} aria-label="Abmelden"><Icon name="logout" /></button></div>
       </div>
     </aside>
   );
@@ -240,9 +250,9 @@ function AdminOverview({ snapshot, onModal, onNavigate }: { snapshot: DashboardS
       <KpiCard icon="calendar" label="Nächste Termine" value={upcoming.length} note="In den nächsten 6 Monaten" tone="blue" />
     </section>
     <section className="dashboard-grid">
-      <article className="panel panel--wide welcome-panel"><div className="welcome-panel__copy"><span className="eyebrow">Mit einem Klick starten</span><h2>Weniger klicken.<br /><em>Mehr begleiten.</em></h2><p>Die häufigsten Aufgaben sind hier direkt erreichbar.</p><div className="quick-actions"><button type="button" onClick={() => onModal("child")}><Icon name="plus" /> Kind aufnehmen</button><button type="button" onClick={() => onModal("document")}><Icon name="document" /> Dokument erstellen</button><button type="button" onClick={() => onModal("event")}><Icon name="calendar" /> Termin planen</button></div></div><div className="welcome-art" aria-hidden="true"><span className="sun-shape" /><span className="rainbow-shape" /><span className="heart-shape">♥</span><span className="flower-shape">✿</span></div></article>
+      <article className="panel panel--wide welcome-panel"><div className="welcome-panel__copy"><span className="eyebrow">Mit einem Klick starten</span><h2>Weniger klicken.<br /><em>Mehr begleiten.</em></h2><p>Die häufigsten Aufgaben sind hier direkt erreichbar.</p>{canWriteRecords(snapshot.session.role) ? <div className="quick-actions"><button type="button" onClick={() => onModal("child")}><Icon name="plus" /> Kind aufnehmen</button><button type="button" onClick={() => onModal("document")}><Icon name="document" /> Dokument erstellen</button><button type="button" onClick={() => onModal("event")}><Icon name="calendar" /> Termin planen</button></div> : <p>Dieser Zugang ist schreibgeschützt.</p>}</div><div className="welcome-art" aria-hidden="true"><span className="sun-shape" /><span className="rainbow-shape" /><span className="heart-shape">♥</span><span className="flower-shape">✿</span></div></article>
       <article className="panel attention-panel"><header className="panel__head"><div><span className="eyebrow">Aufmerksamkeit</span><h2>Das ist als Nächstes dran</h2></div><button className="text-button" type="button" onClick={() => onNavigate("documents")}>Alle ansehen <Icon name="arrow" /></button></header>{attention.length ? <div className="attention-list">{attention.map((item) => <button type="button" onClick={() => onNavigate(item.view, item.focus)} key={`${item.title}-${item.focus}`}><span className={`attention-icon attention-icon--${item.tone}`}><Icon name={item.icon} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><Icon name="chevron" /></button>)}</div> : <Empty icon="check" title="Alles im grünen Bereich" copy="Aktuell sind keine dringenden Aufgaben offen." />}</article>
-      <article className="panel appointments-panel"><header className="panel__head"><div><span className="eyebrow">Kommende Termine</span><h2>Was diese Woche passiert</h2></div><button className="round-add" type="button" onClick={() => onModal("event")} aria-label="Termin hinzufügen"><Icon name="plus" /></button></header><div className="timeline">{upcoming.slice(0, 4).map((event, index) => <button type="button" onClick={() => onNavigate("calendar", event.id)} className="timeline-item" key={event.id}><span className={`timeline-date timeline-date--${index % 4}`}><strong>{day(event.start).split(" ")[0]}</strong><small>{day(event.start).split(" ")[1]}</small></span><span className="timeline-copy"><strong>{event.title}</strong><small><Icon name="clock" />{new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.start))}{event.location ? ` · ${event.location}` : ""}</small></span><Icon name="chevron" /></button>)}</div>{!upcoming.length ? <Empty icon="calendar" title="Noch keine Termine" copy="Plane den nächsten Elternabend oder Ausflug." /> : null}</article>
+      <article className="panel appointments-panel"><header className="panel__head"><div><span className="eyebrow">Kommende Termine</span><h2>Was diese Woche passiert</h2></div>{canWriteRecords(snapshot.session.role) ? <button className="round-add" type="button" onClick={() => onModal("event")} aria-label="Termin hinzufügen"><Icon name="plus" /></button> : null}</header><div className="timeline">{upcoming.slice(0, 4).map((event, index) => <button type="button" onClick={() => onNavigate("calendar", event.id)} className="timeline-item" key={event.id}><span className={`timeline-date timeline-date--${index % 4}`}><strong>{day(event.start).split(" ")[0]}</strong><small>{day(event.start).split(" ")[1]}</small></span><span className="timeline-copy"><strong>{event.title}</strong><small><Icon name="clock" />{new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.start))}{event.location ? ` · ${event.location}` : ""}</small></span><Icon name="chevron" /></button>)}</div>{!upcoming.length ? <Empty icon="calendar" title="Noch keine Termine" copy="Plane den nächsten Elternabend oder Ausflug." /> : null}</article>
       <article className="panel occupancy-panel"><div><span className="eyebrow">Auslastung</span><h2>Gruppen im Blick</h2></div><div className="occupancy-chart"><div className="donut" style={{ "--value": `${Math.min(100, active / 9 * 100)}%` } as CSSProperties}><span><strong>{active}</strong><small>von 9</small></span></div><div className="legend">{Array.from(new Set(snapshot.children.map((child) => child.group))).map((group, index) => <span key={group}><i className={`legend-dot legend-dot--${index}`} />{group}<strong>{snapshot.children.filter((child) => child.group === group && child.status === "active").length}</strong></span>)}</div></div><button className="secondary-button secondary-button--wide" type="button" onClick={() => onNavigate("children")}>Kinderübersicht öffnen <Icon name="arrow" /></button></article>
     </section>
   </>;
@@ -269,40 +279,96 @@ function ChildrenView({ snapshot, focusId, onAction, onAdd }: { snapshot: Dashbo
   const children = snapshot.children.filter((child) => filter === "all" || child.status === filter);
   const selected = snapshot.children.find((child) => child.id === selectedId) ?? children[0];
   const parent = snapshot.parents.find((item) => item.id === selected?.primaryParentId);
-  const isAdmin = snapshot.session.role === "admin";
+  const isStaff = isStaffRole(snapshot.session.role);
+  const canEdit = canWriteRecords(snapshot.session.role);
+  const canManageConsent = snapshot.session.role === "admin";
   return <>
-    <PageIntro view="children" snapshot={snapshot} action={isAdmin ? <button className="primary-button" type="button" onClick={onAdd}><Icon name="plus" /> Kind aufnehmen</button> : undefined} />
-    <div className={`children-layout ${!isAdmin ? "children-layout--parent" : ""}`}>
-      {isAdmin ? <section className="panel children-list"><header><div className="segmented"><button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Alle</button><button type="button" className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Aktiv</button><button type="button" className={filter === "onboarding" ? "active" : ""} onClick={() => setFilter("onboarding")}>Startet bald</button></div><span>{children.length} Einträge</span></header><div className="child-rows">{children.map((child, index) => <button type="button" className={selected?.id === child.id ? "active" : ""} onClick={() => setSelectedId(child.id)} key={child.id}><Avatar name={child.name} tone={index} /><span><strong>{child.name}</strong><small>{child.group}</small></span><Pill value={child.status} /><Icon name="chevron" /></button>)}</div></section> : null}
-      {selected ? <ChildDetail key={`${selected.id}-${selected.updatedAt}`} child={selected} parent={parent} isAdmin={isAdmin} onAction={onAction} /> : <Empty icon="children" title="Kein Kind ausgewählt" copy="Wähle links einen Datensatz aus." />}
+    <PageIntro view="children" snapshot={snapshot} action={canEdit ? <button className="primary-button" type="button" onClick={onAdd}><Icon name="plus" /> Kind aufnehmen</button> : undefined} />
+    <div className={`children-layout ${!isStaff ? "children-layout--parent" : ""}`}>
+      {isStaff ? <section className="panel children-list"><header><div className="segmented"><button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Alle</button><button type="button" className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Aktiv</button><button type="button" className={filter === "onboarding" ? "active" : ""} onClick={() => setFilter("onboarding")}>Startet bald</button></div><span>{children.length} Einträge</span></header><div className="child-rows">{children.map((child, index) => <button type="button" className={selected?.id === child.id ? "active" : ""} onClick={() => setSelectedId(child.id)} key={child.id}><Avatar name={child.name} tone={index} /><span><strong>{child.name}</strong><small>{child.group}</small></span><Pill value={child.status} /><Icon name="chevron" /></button>)}</div></section> : null}
+      {selected ? <ChildDetail key={`${selected.id}-${selected.updatedAt}`} child={selected} parent={parent} isStaff={isStaff} canEdit={canEdit} canManageConsent={canManageConsent} onAction={onAction} /> : <Empty icon="children" title="Kein Kind ausgewählt" copy="Wähle links einen Datensatz aus." />}
     </div>
   </>;
 }
 
-function ChildDetail({ child, parent, isAdmin, onAction }: { child: Child; parent?: Parent; isAdmin: boolean; onAction: (action: AppAction, message: string) => Promise<void> }) {
+function ChildDetail({
+  child,
+  parent,
+  isStaff,
+  canEdit,
+  canManageConsent,
+  onAction
+}: {
+  child: Child;
+  parent?: Parent;
+  isStaff: boolean;
+  canEdit: boolean;
+  canManageConsent: boolean;
+  onAction: (action: AppAction, message: string) => Promise<void>;
+}) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setPending(true);
     const data = new FormData(event.currentTarget);
     const payload = {
-      ...(isAdmin ? {
+      ...(isStaff ? {
         name: String(data.get("name") ?? ""), group: String(data.get("group") ?? ""), status: String(data.get("status") ?? "active") as Child["status"],
         careHoursPerWeek: Number(data.get("hours") ?? 0), mealFeeCents: Math.round(Number(data.get("mealFee") ?? 0) * 100),
-        photoConsent: String(data.get("photoConsent") ?? "missing") as Child["photoConsent"], downloadConsent: String(data.get("downloadConsent") ?? "missing") as Child["downloadConsent"],
         notesInternal: String(data.get("notesInternal") ?? "")
       } : {}),
       allergies: String(data.get("allergies") ?? ""), dietary: String(data.get("dietary") ?? ""), languagesAtHome: String(data.get("languages") ?? ""), notesParentVisible: String(data.get("notesParent") ?? "")
     };
-    try { await onAction({ type: "update_child", childId: child.id, payload }, "Angaben wurden sicher gespeichert."); setEditing(false); }
+    try {
+      await onAction({ type: "update_child", childId: child.id, payload }, "Angaben wurden sicher gespeichert.");
+      if (canManageConsent) {
+        const documentVersion = String(data.get("consentVersion") ?? "").trim();
+        const source = String(data.get("consentSource") ?? "signed_form") as "signed_form" | "digital_form";
+        const evidenceRef = String(data.get("consentEvidenceRef") ?? "").trim();
+        const photoConsent = String(data.get("photoConsent") ?? "missing") as Child["photoConsent"];
+        const downloadConsent = String(data.get("downloadConsent") ?? "missing") as Child["downloadConsent"];
+        const changed = photoConsent !== child.photoConsent || downloadConsent !== child.downloadConsent;
+        if (changed && !documentVersion) throw new Error("Für Einwilligungsänderungen ist die Dokumentversion erforderlich.");
+        if (photoConsent !== "missing" && photoConsent !== child.photoConsent) {
+          await onAction({
+            type: "record_consent",
+            payload: {
+              childId: child.id,
+              purpose: "photo_processing",
+              status: photoConsent,
+              scope: photoConsent === "granted" ? "parent_portal" : "staff_only",
+              documentVersion,
+              source,
+              ...(evidenceRef ? { evidenceRef } : {})
+            }
+          }, "Foto-Einwilligung wurde revisionssicher erfasst.");
+        }
+        if (downloadConsent !== "missing" && downloadConsent !== child.downloadConsent) {
+          await onAction({
+            type: "record_consent",
+            payload: {
+              childId: child.id,
+              purpose: "photo_download",
+              status: downloadConsent,
+              scope: "download",
+              documentVersion,
+              source,
+              ...(evidenceRef ? { evidenceRef } : {})
+            }
+          }, "Download-Einwilligung wurde revisionssicher erfasst.");
+        }
+      }
+      setEditing(false);
+    }
     finally { setPending(false); }
   };
-  return <section className="panel child-detail"><header className="child-detail__hero"><div className="child-person"><Avatar name={child.name} tone={2} large /><div><div className="name-line"><h2>{child.name}</h2><Pill value={child.status} /></div><p>{child.group} · seit {fullDate(child.careStart)}</p></div></div><button className="secondary-button" type="button" onClick={() => setEditing((value) => !value)}><Icon name={editing ? "close" : "edit"} />{editing ? "Abbrechen" : "Bearbeiten"}</button></header>
+  return <section className="panel child-detail"><header className="child-detail__hero"><div className="child-person"><Avatar name={child.name} tone={2} large /><div><div className="name-line"><h2>{child.name}</h2><Pill value={child.status} /></div><p>{child.group} · seit {fullDate(child.careStart)}</p></div></div>{canEdit ? <button className="secondary-button" type="button" onClick={() => setEditing((value) => !value)}><Icon name={editing ? "close" : "edit"} />{editing ? "Abbrechen" : "Bearbeiten"}</button> : null}</header>
     {editing ? <form className="detail-form" onSubmit={submit}>
-      {isAdmin ? <div className="form-grid"><label><span>Name</span><input name="name" defaultValue={child.name} required /></label><label><span>Gruppe</span><input name="group" defaultValue={child.group} required /></label><label><span>Status</span><select name="status" defaultValue={child.status}><option value="active">Aktiv</option><option value="onboarding">Eingewöhnung</option><option value="paused">Pausiert</option><option value="archived">Archiviert</option></select></label><label><span>Stunden / Woche</span><input name="hours" type="number" min="0" max="80" defaultValue={child.careHoursPerWeek} /></label><label><span>Verpflegung / Monat (€)</span><input name="mealFee" type="number" min="0" step="0.01" defaultValue={child.mealFeeCents / 100} /></label><label><span>Foto-Einwilligung</span><select name="photoConsent" defaultValue={child.photoConsent}><option value="granted">Erteilt</option><option value="restricted">Eingeschränkt</option><option value="missing">Fehlt</option></select></label><label><span>Download-Einwilligung</span><select name="downloadConsent" defaultValue={child.downloadConsent}><option value="granted">Erteilt</option><option value="restricted">Eingeschränkt</option><option value="missing">Fehlt</option></select></label></div> : null}
+      {isStaff ? <div className="form-grid"><label><span>Name</span><input name="name" defaultValue={child.name} required /></label><label><span>Gruppe</span><input name="group" defaultValue={child.group} required /></label><label><span>Status</span><select name="status" defaultValue={child.status}><option value="active">Aktiv</option><option value="onboarding">Eingewöhnung</option><option value="paused">Pausiert</option><option value="archived">Archiviert</option></select></label><label><span>Stunden / Woche</span><input name="hours" type="number" min="0" max="80" defaultValue={child.careHoursPerWeek} /></label><label><span>Verpflegung / Monat (€)</span><input name="mealFee" type="number" min="0" step="0.01" defaultValue={child.mealFeeCents / 100} /></label></div> : null}
+      {canManageConsent ? <><div className="form-grid"><label><span>Foto-Einwilligung</span><select name="photoConsent" defaultValue={child.photoConsent}><option value="missing">Fehlt</option><option value="granted">Erteilt</option><option value="restricted">Eingeschränkt</option><option value="withdrawn">Widerrufen</option></select></label><label><span>Download-Einwilligung</span><select name="downloadConsent" defaultValue={child.downloadConsent}><option value="missing">Fehlt</option><option value="granted">Erteilt</option><option value="restricted">Eingeschränkt</option><option value="withdrawn">Widerrufen</option></select></label><label><span>Dokumentversion</span><input name="consentVersion" placeholder="z. B. FOTO-2026-01" /></label><label><span>Nachweisart</span><select name="consentSource" defaultValue="signed_form"><option value="signed_form">Unterzeichnetes Formular</option><option value="digital_form">Digitales Formular</option></select></label></div><label><span>Nachweisreferenz · keine Namen</span><input name="consentEvidenceRef" placeholder="z. B. DOC-2026-0042" /></label></> : null}
       <div className="form-grid"><label><span>Allergien</span><input name="allergies" defaultValue={child.allergies} /></label><label><span>Ernährung</span><input name="dietary" defaultValue={child.dietary} /></label><label><span>Sprachen zuhause</span><input name="languages" defaultValue={child.languagesAtHome} /></label></div>
       <label><span>Hinweis für Eltern</span><textarea name="notesParent" rows={3} defaultValue={child.notesParentVisible} /></label>
-      {isAdmin ? <label><span>Interne Notiz · nicht für Eltern sichtbar</span><textarea name="notesInternal" rows={3} defaultValue={child.notesInternal} /></label> : null}
+      {isStaff ? <label><span>Interne Notiz · nicht für Eltern sichtbar</span><textarea name="notesInternal" rows={3} defaultValue={child.notesInternal} /></label> : null}
       <div className="form-actions"><button className="primary-button" type="submit" disabled={pending}><Icon name="check" />{pending ? "Speichert…" : "Änderungen speichern"}</button></div>
     </form> : <div className="detail-content">
       <div className="detail-section"><span className="section-icon section-icon--sun"><Icon name="profile" /></span><div><span className="eyebrow">Stammdaten</span><div className="fact-grid"><span><small>Geburtsdatum</small><strong>{fullDate(child.birthDate)}</strong></span><span><small>Betreuungsumfang</small><strong>{child.careHoursPerWeek} Std. / Woche</strong></span><span><small>Ernährung</small><strong>{child.dietary || "Keine Angabe"}</strong></span><span><small>Sprachen zuhause</small><strong>{child.languagesAtHome || "Keine Angabe"}</strong></span></div></div></div>
@@ -318,9 +384,9 @@ function DocumentsView({ snapshot, focusId, onGenerate, onAction }: { snapshot: 
   const documents = snapshot.documents.filter((document) => type === "all" || document.type === type).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const childName = (id: string) => snapshot.children.find((child) => child.id === id)?.name ?? "Unbekannt";
   return <>
-    <PageIntro view="documents" snapshot={snapshot} action={snapshot.session.role === "admin" ? <button className="primary-button" type="button" onClick={onGenerate}><Icon name="plus" /> Neues Dokument</button> : undefined} />
+    <PageIntro view="documents" snapshot={snapshot} action={canWriteRecords(snapshot.session.role) ? <button className="primary-button" type="button" onClick={onGenerate}><Icon name="plus" /> Neues Dokument</button> : undefined} />
     <section className="panel documents-panel"><header className="list-toolbar"><div className="segmented"><button type="button" className={type === "all" ? "active" : ""} onClick={() => setType("all")}>Alle</button><button type="button" className={type === "invoice" ? "active" : ""} onClick={() => setType("invoice")}>Abrechnungen</button><button type="button" className={type === "contract" ? "active" : ""} onClick={() => setType("contract")}>Verträge</button></div><span>{documents.length} Dokumente</span></header>
-      <div className="document-table"><div className="document-table__head"><span>Dokument</span><span>Kind</span><span>Datum</span><span>Betrag</span><span>Status</span><span /></div>{documents.map((document) => <div className={`document-row ${focusId === document.id ? "document-row--focus" : ""}`} key={document.id}><span className={`doc-icon doc-icon--${document.type}`}><Icon name="document" /></span><span className="doc-title"><strong>{document.title}</strong><small>{document.number}</small></span><span>{childName(document.childId)}</span><span>{fullDate(document.createdAt)}</span><span>{document.type === "invoice" ? money(document.totalCents) : "—"}</span><span><Pill value={document.status} /></span><span className="row-actions"><a href={`/api/documents/${encodeURIComponent(document.id)}`} title="PDF herunterladen"><Icon name="download" /></a>{snapshot.session.role === "admin" ? <select aria-label="Dokumentstatus" value={document.status} onChange={(event) => void onAction({ type: "update_document_status", documentId: document.id, status: event.target.value as ManagedDocument["status"] }, "Dokumentstatus aktualisiert.")}><option value="draft">Entwurf</option><option value="sent">Versendet</option><option value="signed">Unterzeichnet</option><option value="paid">Bezahlt</option><option value="overdue">Überfällig</option></select> : null}</span></div>)}</div>
+      <div className="document-table"><div className="document-table__head"><span>Dokument</span><span>Kind</span><span>Datum</span><span>Betrag</span><span>Status</span><span /></div>{documents.map((document) => <div className={`document-row ${focusId === document.id ? "document-row--focus" : ""}`} key={document.id}><span className={`doc-icon doc-icon--${document.type}`}><Icon name="document" /></span><span className="doc-title"><strong>{document.title}</strong><small>{document.number}</small></span><span>{childName(document.childId)}</span><span>{fullDate(document.createdAt)}</span><span>{document.type === "invoice" ? money(document.totalCents) : "—"}</span><span><Pill value={document.status} /></span><span className="row-actions"><a href={`/api/documents/${encodeURIComponent(document.id)}`} title="PDF herunterladen"><Icon name="download" /></a>{canWriteRecords(snapshot.session.role) ? <select aria-label="Dokumentstatus" value={document.status} onChange={(event) => void onAction({ type: "update_document_status", documentId: document.id, status: event.target.value as ManagedDocument["status"] }, "Dokumentstatus aktualisiert.")}><option value="draft">Entwurf</option><option value="sent">Versendet</option><option value="signed">Unterzeichnet</option><option value="paid">Bezahlt</option><option value="overdue">Überfällig</option></select> : null}</span></div>)}</div>
       {!documents.length ? <Empty icon="document" title="Noch keine Dokumente" copy="Erstelle eine Abrechnung oder einen Vertragsentwurf." /> : null}
     </section>
     <aside className="legal-note"><Icon name="shield" /><span><strong>Prüfung bleibt Pflicht</strong><small>Automatisch erstellte Verträge sind Entwürfe und müssen vor Versand fachlich und rechtlich geprüft werden.</small></span></aside>
@@ -331,8 +397,8 @@ function CalendarView({ snapshot, focusId, onAdd, onEdit }: { snapshot: Dashboar
   const events = [...snapshot.events].sort((a, b) => a.start.localeCompare(b.start));
   const grouped = events.reduce<Record<string, CalendarEvent[]>>((acc, event) => { const key = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(new Date(event.start)); (acc[key] ??= []).push(event); return acc; }, {});
   return <>
-    <PageIntro view="calendar" snapshot={snapshot} action={snapshot.session.role === "admin" ? <button className="primary-button" type="button" onClick={onAdd}><Icon name="plus" /> Termin planen</button> : undefined} />
-    <section className="calendar-layout"><article className="panel calendar-list">{Object.entries(grouped).map(([month, monthEvents]) => <div className="month-group" key={month}><h2>{month}</h2>{monthEvents.map((event) => <div className={`calendar-event ${focusId === event.id ? "calendar-event--focus" : ""}`} key={event.id}><div className="calendar-event__date"><strong>{new Intl.DateTimeFormat("de-DE", { day: "2-digit" }).format(new Date(event.start))}</strong><small>{new Intl.DateTimeFormat("de-DE", { weekday: "short" }).format(new Date(event.start))}</small></div><div className="calendar-event__bar" /><div className="calendar-event__copy"><div><strong>{event.title}</strong><Pill value={event.audience === "all" ? "granted" : "restricted"} /></div><p>{event.description}</p><span><Icon name="clock" />{dateTime(event.start)} – {new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.end))}</span>{event.location ? <span><Icon name="location" />{event.location}</span> : null}{snapshot.session.role === "admin" ? <button className="calendar-event__edit" type="button" onClick={() => onEdit(event)} aria-label={`Termin ${event.title} bearbeiten`}><Icon name="edit" /> Bearbeiten</button> : null}</div></div>)}</div>)}</article>
+    <PageIntro view="calendar" snapshot={snapshot} action={canWriteRecords(snapshot.session.role) ? <button className="primary-button" type="button" onClick={onAdd}><Icon name="plus" /> Termin planen</button> : undefined} />
+    <section className="calendar-layout"><article className="panel calendar-list">{Object.entries(grouped).map(([month, monthEvents]) => <div className="month-group" key={month}><h2>{month}</h2>{monthEvents.map((event) => <div className={`calendar-event ${focusId === event.id ? "calendar-event--focus" : ""}`} key={event.id}><div className="calendar-event__date"><strong>{new Intl.DateTimeFormat("de-DE", { day: "2-digit" }).format(new Date(event.start))}</strong><small>{new Intl.DateTimeFormat("de-DE", { weekday: "short" }).format(new Date(event.start))}</small></div><div className="calendar-event__bar" /><div className="calendar-event__copy"><div><strong>{event.title}</strong><Pill value={event.audience === "all" ? "granted" : "restricted"} /></div><p>{event.description}</p><span><Icon name="clock" />{dateTime(event.start)} – {new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.end))}</span>{event.location ? <span><Icon name="location" />{event.location}</span> : null}{canWriteRecords(snapshot.session.role) ? <button className="calendar-event__edit" type="button" onClick={() => onEdit(event)} aria-label={`Termin ${event.title} bearbeiten`}><Icon name="edit" /> Bearbeiten</button> : null}</div></div>)}</div>)}</article>
       <aside className="panel reminder-card"><span className="reminder-art"><Icon name="calendar" /></span><span className="eyebrow">Automatische Erinnerungen</span><h2>Niemand muss Termine im Kopf behalten.</h2><p>Google Calendar sendet Einladungen und Aktualisierungen an die ausgewählten Familien.</p><div className="integration-mini"><i className={snapshot.integrations.calendar ? "connected" : ""} /><span><strong>Google Calendar</strong><small>{snapshot.integrations.calendar ? "Verbunden" : "Im Demo-Modus simuliert"}</small></span></div></aside>
     </section>
   </>;
@@ -351,7 +417,7 @@ function PhotosView({ snapshot, onSnapshot, showToast }: { snapshot: DashboardSn
     finally { setUploading(false); event.target.value = ""; }
   };
   return <>
-    <PageIntro view="photos" snapshot={snapshot} action={snapshot.session.role === "admin" ? <label className={`primary-button upload-button ${uploading ? "disabled" : ""}`}><Icon name="upload" />{uploading ? "Lädt hoch…" : "Foto hochladen"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void upload(event)} disabled={uploading} /></label> : undefined} />
+    <PageIntro view="photos" snapshot={snapshot} action={canWriteRecords(snapshot.session.role) ? <label className={`primary-button upload-button ${uploading ? "disabled" : ""}`}><Icon name="upload" />{uploading ? "Lädt hoch…" : "Foto hochladen"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void upload(event)} disabled={uploading} /></label> : undefined} />
     <section className="photo-toolbar panel"><div><span className="eyebrow">Galerie für</span><select value={childId} onChange={(event) => setChildId(event.target.value)}>{snapshot.children.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="consent-summary"><Icon name="shield" /><span><strong>{child ? STATUS_LABELS[child.photoConsent] : "—"}</strong><small>Foto-Einwilligung</small></span></div><div className="consent-summary"><Icon name="download" /><span><strong>{child ? STATUS_LABELS[child.downloadConsent] : "—"}</strong><small>Download-Freigabe</small></span></div></section>
     {snapshot.integrations.mode === "demo" ? <div className="demo-banner"><Icon name="spark" /><span><strong>Behutsame Demo-Illustrationen</strong><small>Es werden keine echten Kinderfotos ausgeliefert. Im Google-Modus kommen Bilder ausschließlich aus privaten Kind-Ordnern.</small></span></div> : null}
     <section className="photo-grid">{photos.map((photo, index) => <article className={`photo-card photo-card--${index % 5}`} key={photo.id}><div style={{ backgroundImage: `url(${photo.previewUrl})` }} role="img" aria-label={photo.name} /><footer><span><strong>{photo.name}</strong><small>{fullDate(photo.createdAt)}</small></span><button type="button" aria-label="Mehr Optionen"><Icon name="more" /></button></footer></article>)}</section>
@@ -403,12 +469,26 @@ export function Portal() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent>();
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; error: boolean } | null>(null);
+  const [managedAccessError, setManagedAccessError] = useState<string>();
 
   const showToast = useCallback((message: string, error = false) => setToast({ message, error }), []);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(null), 4200); return () => window.clearTimeout(timer); }, [toast]);
 
   const load = useCallback(async () => {
-    try { setSnapshot(await readJson<DashboardSnapshot>(await fetch("/api/app", { cache: "no-store" }))); }
+    try {
+      let response = await fetch("/api/app", { cache: "no-store" });
+      if (response.status === 401) {
+        const platform = await fetch("/api/auth/platform", { method: "POST" });
+        if (platform.ok) {
+          response = await fetch("/api/app", { cache: "no-store" });
+        } else if ([401, 403].includes(platform.status)) {
+          const payload = await platform.json().catch(() => ({})) as { error?: string };
+          setManagedAccessError(payload.error || "Dieses verwaltete Konto ist nicht freigegeben.");
+        }
+      }
+      setSnapshot(await readJson<DashboardSnapshot>(response));
+      setManagedAccessError(undefined);
+    }
     catch { setSnapshot(null); }
     finally { setLoading(false); }
   }, []);
@@ -421,13 +501,13 @@ export function Portal() {
   const navigate = (next: View, focus?: string) => { setView(next); setFocusId(focus); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   if (loading) return <div className="app-loader"><Brand /><span className="loader-dots"><i /><i /><i /></span><p>Der Familienbereich wird vorbereitet…</p></div>;
-  if (!snapshot) return <Login onLogin={login} />;
+  if (!snapshot) return <Login onLogin={login} managedAccessError={managedAccessError} />;
 
   return <div className="portal-shell">
     <Sidebar snapshot={snapshot} view={view} onView={(next) => navigate(next)} onLogout={() => void logout()} open={menuOpen} onClose={() => setMenuOpen(false)} />
     {menuOpen ? <button className="sidebar-scrim" type="button" aria-label="Navigation schließen" onClick={() => setMenuOpen(false)} /> : null}
     <div className="portal-main"><Topbar snapshot={snapshot} onMenu={() => setMenuOpen(true)} onNavigate={navigate} /><main className="page-content">
-      {view === "overview" ? snapshot.session.role === "admin" ? <AdminOverview snapshot={snapshot} onModal={(name) => setModal(name)} onNavigate={navigate} /> : <ParentOverview snapshot={snapshot} onNavigate={navigate} /> : null}
+      {view === "overview" ? isStaffRole(snapshot.session.role) ? <AdminOverview snapshot={snapshot} onModal={(name) => setModal(name)} onNavigate={navigate} /> : <ParentOverview snapshot={snapshot} onNavigate={navigate} /> : null}
       {view === "children" ? <ChildrenView key={focusId || "children"} snapshot={snapshot} focusId={focusId} onAction={action} onAdd={() => setModal("child")} /> : null}
       {view === "documents" ? <DocumentsView snapshot={snapshot} focusId={focusId} onGenerate={() => setModal("document")} onAction={action} /> : null}
       {view === "calendar" ? <CalendarView snapshot={snapshot} focusId={focusId} onAdd={() => setModal("event")} onEdit={setEditingEvent} /> : null}

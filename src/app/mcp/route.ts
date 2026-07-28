@@ -14,14 +14,23 @@ const corsHeaders = {
   "Cache-Control": "no-store"
 };
 
-function authorized(request: Request) {
-  if (dataMode() === "demo") return true;
+function authorizationStatus(request: Request): "allowed" | "disabled" | "denied" {
+  if (dataMode() === "demo") return "allowed";
+  if (process.env.MCP_ENABLED?.trim().toLowerCase() !== "true") return "disabled";
   const expected = process.env.MCP_BEARER_TOKEN?.trim();
-  return Boolean(expected && request.headers.get("authorization") === `Bearer ${expected}`);
+  return expected && request.headers.get("authorization") === `Bearer ${expected}`
+    ? "allowed"
+    : "denied";
 }
 
 async function handleMcp(request: Request): Promise<Response> {
-  if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+  const authorization = authorizationStatus(request);
+  if (authorization === "disabled") {
+    return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
+  }
+  if (authorization === "denied") {
+    return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+  }
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   const server = createNineFriendsMcpServer();
   await server.connect(transport);

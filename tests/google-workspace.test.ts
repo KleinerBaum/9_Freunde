@@ -23,6 +23,7 @@ function configureGoogleEnvironment() {
   process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID = "folder-id";
   process.env.GOOGLE_CALENDAR_ID = "facility@example.com";
   process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL = "organizer@example.com";
+  process.env.GOOGLE_WORKSPACE_DOMAIN = "example.com";
 }
 
 function decodeAssertion(body: BodyInit | null | undefined) {

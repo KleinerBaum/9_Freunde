@@ -9,13 +9,16 @@ contracts, consent records, or incident details here.
 
 - [x] The Sites project uses custom access with only the owner allowed and no
   user or group allowlists.
-- [x] The deployed release remains in fictional `demo` mode.
+- [ ] The deployed release has been verified to remain in fictional `demo`
+  mode until the newly hardened version is published.
 - [x] The browser portal is the only pilot surface; the MCP endpoint is not
   connected to ChatGPT.
 - [ ] `GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL` is configured in Sites with the
   dedicated managed Workspace organizer account.
 - [ ] The final staff allowlist contains only active workspace accounts approved
   for the pilot.
+- [ ] The hardened source version and hosted environment have been deployed and
+  independently checked; repository changes alone do not change the live app.
 
 ## Governance approval
 
@@ -50,12 +53,18 @@ Before saving the production version, verify the Sites runtime configuration
 without copying values into source control:
 
 - `DATA_MODE=google`
+- `REAL_DATA_APPROVED=true` (only after signed approval)
+- `AUTH_MODE=sites`
+- `MANAGED_STAFF_EMAIL_DOMAIN` is the reviewed managed domain
+- `PARENT_ACCESS_ENABLED=false`
+- `MCP_ENABLED=false`
 - `APP_BASE_URL` is the production `https://...chatgpt.site` URL
-- `ADMIN_EMAILS` contains only approved staff administrators
 - `SESSION_SECRET` is at least 32 random characters and stored as a secret
-- `MCP_BEARER_TOKEN` is long, random, stored as a secret, and not distributed
-  during the browser-only pilot
+- `AUDIT_HASH_SECRET` is independent, random, and stored as a secret
+- all privacy and legal-notice variables in `.env.example` are complete and
+  legally reviewed
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` is stored as a secret
+- `GOOGLE_WORKSPACE_DOMAIN` matches the managed organizer domain
 - the service-account email, Sheet, private Drive root, Calendar, and delegated
   organizer values reference the reviewed managed Workspace resources
 - the service account has only the documented Sheets and Drive access, and
@@ -69,11 +78,20 @@ version before it becomes active.
 Deploy to owner-only access first. The acceptance evidence must show:
 
 - `/api/health` reports `mode: "google"` with Sheets, Drive, and Calendar
-  configured
+  configured and all release gates ready
 - an authenticated administrator receives successful sanitized results from
   `/api/admin/integrations/health`
 - an unauthorized account cannot open the site
+- a managed account absent from the `users` tab cannot create an application
+  session
+- `staff_read` cannot write; `staff_write` cannot perform admin-only consent or
+  privacy actions
+- changing `active=false` or incrementing `session_version` blocks an existing
+  session on its next protected request
+- missing, restricted, or withdrawn photo consent blocks the relevant upload,
+  listing, preview, and download operation
 - a request to `/api/mcp` without the bearer token receives `401`
+- a request to `/api/mcp` while `MCP_ENABLED=false` receives `404`
 - application and worker logs contain no personal data or secret values
 
 External write tests require a separate explicit confirmation. Use one

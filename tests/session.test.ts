@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeSession, encodeSession } from "@/lib/session";
+import { decodeSession, encodeSession, sessionMetadata } from "@/lib/session";
 
 describe("signed sessions", () => {
   it("round-trips a valid session", () => {
     const session = {
+      ...sessionMetadata("password"),
       userId: "user-test",
       email: "test@example.test",
       name: "Test User",
@@ -18,6 +19,7 @@ describe("signed sessions", () => {
 
   it("rejects a modified signature", () => {
     const token = encodeSession({
+      ...sessionMetadata("password"),
       userId: "user-test",
       email: "test@example.test",
       name: "Test User",
@@ -30,6 +32,7 @@ describe("signed sessions", () => {
 
   it("rejects an expired session", () => {
     const token = encodeSession({
+      ...sessionMetadata("password"),
       userId: "user-test",
       email: "test@example.test",
       name: "Test User",

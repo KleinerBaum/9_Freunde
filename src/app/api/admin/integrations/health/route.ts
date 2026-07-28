@@ -3,7 +3,7 @@ import { checkGoogleIntegrations } from "../../../../../lib/server/google-worksp
 import {
   HttpError,
   noStoreHeaders,
-  requireSession,
+  requireActiveSession,
   safeErrorResponse
 } from "../../../../../lib/server/http";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const session = requireSession(request);
+    const session = await requireActiveSession(request);
     if (session.role !== "admin") {
       throw new HttpError(403, "This check is available to staff only.");
     }

@@ -3,7 +3,9 @@ import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@model
 import { z } from "zod";
 
 import type { DashboardSnapshot, UserSession } from "../lib/contracts";
-import { getAppSnapshot, performAppAction } from "../lib/server/repository";
+import { sessionMetadata } from "../lib/session";
+import { appendGoogleAuditEvent } from "../lib/server/google-workspace";
+import { dataMode, getAppSnapshot, performAppAction } from "../lib/server/repository";
 import { dashboardWidgetHtml, WIDGET_URI } from "./widget";
 
 const overviewSchema = z.object({
@@ -23,12 +25,12 @@ const overviewSchema = z.object({
 type Overview = z.infer<typeof overviewSchema>;
 
 const staffSession = (): UserSession => ({
+  ...sessionMetadata("sites"),
   userId: "mcp-staff",
   email: (process.env.ADMIN_EMAILS?.split(",")[0] || "mcp-admin@demo.9freunde.de").trim(),
   name: "9 Freunde Leitung",
   role: "admin",
-  childIds: [],
-  expiresAt: Math.floor(Date.now() / 1000) + 3600
+  childIds: []
 });
 
 export function buildOverview(snapshot: DashboardSnapshot): Overview {
@@ -89,7 +91,17 @@ const canonicalUrl = (id: string) => {
 };
 
 async function snapshot() {
-  return getAppSnapshot(staffSession());
+  const session = staffSession();
+  const data = await getAppSnapshot(session);
+  if (dataMode() === "google") {
+    await appendGoogleAuditEvent({
+      session,
+      action: "mcp.data.read",
+      resourceType: "portal",
+      outcome: "success"
+    });
+  }
+  return data;
 }
 
 export function createNineFriendsMcpServer(): McpServer {

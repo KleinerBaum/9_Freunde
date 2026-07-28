@@ -1,4 +1,4 @@
-import { HttpError, requireSession, safeErrorResponse } from "../../../../lib/server/http";
+import { HttpError, requireActiveSession, safeErrorResponse } from "../../../../lib/server/http";
 import { dataMode } from "../../../../lib/server/repository";
 import { downloadGooglePhoto } from "../../../../lib/server/google-workspace";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   try {
     if (dataMode() !== "google") throw new HttpError(404, "Photo not found.");
-    const session = requireSession(request);
+    const session = await requireActiveSession(request);
     const { id } = await context.params;
     const photo = await downloadGooglePhoto(session, id);
     return new Response(photo.bytes, {

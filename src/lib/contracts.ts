@@ -1,10 +1,18 @@
 import { z } from "zod";
 
-export const RoleSchema = z.enum(["admin", "parent"]);
+export const RoleSchema = z.enum(["admin", "staff_write", "staff_read", "parent"]);
 export type Role = z.infer<typeof RoleSchema>;
+export const STAFF_ROLES = new Set<Role>(["admin", "staff_write", "staff_read"]);
+export const WRITING_STAFF_ROLES = new Set<Role>(["admin", "staff_write"]);
+export const isStaffRole = (role: Role) => STAFF_ROLES.has(role);
+export const canWriteRecords = (role: Role) => WRITING_STAFF_ROLES.has(role);
+export const canAdminister = (role: Role) => role === "admin";
 
 export const ChildStatusSchema = z.enum(["active", "onboarding", "paused", "archived"]);
-export const ConsentSchema = z.enum(["granted", "restricted", "missing"]);
+export const ConsentSchema = z.enum(["granted", "restricted", "withdrawn", "missing"]);
+export const ConsentPurposeSchema = z.enum(["photo_processing", "photo_download"]);
+export const ConsentScopeSchema = z.enum(["staff_only", "parent_portal", "download"]);
+export const ConsentSourceSchema = z.enum(["signed_form", "digital_form", "legacy_import"]);
 export const DocumentTypeSchema = z.enum(["invoice", "contract"]);
 export const DocumentStatusSchema = z.enum([
   "draft",
@@ -16,15 +24,34 @@ export const DocumentStatusSchema = z.enum([
 export const EventAudienceSchema = z.enum(["all", "child"]);
 
 export const UserSessionSchema = z.object({
+  sessionId: z.string().min(1).default("legacy-session"),
   userId: z.string().min(1),
   email: z.string().email(),
   name: z.string().min(1),
   role: RoleSchema,
   parentId: z.string().optional(),
   childIds: z.array(z.string()).default([]),
+  sessionVersion: z.number().int().nonnegative().default(0),
+  issuedAt: z.number().int().nonnegative().default(0),
+  authSource: z.enum(["demo", "sites", "password"]).default("password"),
   expiresAt: z.number().int().positive()
 });
 export type UserSession = z.infer<typeof UserSessionSchema>;
+
+export const ConsentRecordSchema = z.object({
+  id: z.string().min(1),
+  childId: z.string().min(1),
+  purpose: ConsentPurposeSchema,
+  status: z.enum(["granted", "restricted", "withdrawn"]),
+  scope: ConsentScopeSchema,
+  documentVersion: z.string().min(1).max(100),
+  source: ConsentSourceSchema,
+  evidenceRef: z.string().max(200).optional(),
+  recordedAt: z.string().datetime(),
+  recordedBy: z.string().min(1),
+  withdrawnAt: z.string().datetime().optional()
+});
+export type ConsentRecord = z.infer<typeof ConsentRecordSchema>;
 
 export const ParentSchema = z.object({
   id: z.string().min(1),
@@ -125,6 +152,7 @@ export const DashboardSnapshotSchema = z.object({
   events: z.array(CalendarEventSchema),
   documents: z.array(ManagedDocumentSchema),
   photos: z.array(PhotoSchema),
+  consents: z.array(ConsentRecordSchema).default([]),
   integrations: IntegrationStatusSchema,
   generatedAt: z.string().datetime()
 });
@@ -146,8 +174,6 @@ const AdminEditableChildPatchSchema = ParentEditableChildPatchSchema.extend({
   careHoursPerWeek: z.number().min(0).max(80).optional(),
   careFeeCents: z.number().int().min(0).max(500_000).optional(),
   mealFeeCents: z.number().int().min(0).max(100_000).optional(),
-  photoConsent: ConsentSchema.optional(),
-  downloadConsent: ConsentSchema.optional(),
   notesInternal: z.string().max(4000).optional()
 });
 
@@ -186,6 +212,16 @@ export const CreateEventSchema = z.object({
   remindersMinutes: z.array(z.number().int().min(5).max(40_320)).max(5).default([1440])
 });
 
+export const RecordConsentSchema = z.object({
+  childId: z.string().min(1),
+  purpose: ConsentPurposeSchema,
+  status: z.enum(["granted", "restricted", "withdrawn"]),
+  scope: ConsentScopeSchema,
+  documentVersion: z.string().min(1).max(100),
+  source: ConsentSourceSchema,
+  evidenceRef: z.string().max(200).optional()
+});
+
 export const AppActionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("create_child"),
@@ -220,9 +256,55 @@ export const AppActionSchema = z.discriminatedUnion("type", [
     type: z.literal("update_document_status"),
     documentId: z.string().min(1),
     status: DocumentStatusSchema
+  }),
+  z.object({
+    type: z.literal("record_consent"),
+    payload: RecordConsentSchema
   })
 ]);
 export type AppAction = z.infer<typeof AppActionSchema>;
+
+export const PrivacyRequestTypeSchema = z.enum([
+  "access",
+  "export",
+  "correction",
+  "deletion",
+  "access_revocation"
+]);
+export const PrivacyRequestStatusSchema = z.enum([
+  "pending",
+  "approved",
+  "rejected",
+  "completed"
+]);
+export const PrivacyRequestSchema = z.object({
+  id: z.string().min(1),
+  type: PrivacyRequestTypeSchema,
+  subjectType: z.enum(["child", "parent", "user"]),
+  subjectId: z.string().min(1),
+  status: PrivacyRequestStatusSchema,
+  requestedAt: z.string().datetime(),
+  requestedBy: z.string().min(1),
+  reviewedAt: z.string().datetime().optional(),
+  reviewedBy: z.string().optional(),
+  dueAt: z.string().datetime(),
+  confirmation: z.boolean().default(false)
+});
+export type PrivacyRequest = z.infer<typeof PrivacyRequestSchema>;
+
+export const CreatePrivacyRequestSchema = z.object({
+  type: PrivacyRequestTypeSchema,
+  subjectType: z.enum(["child", "parent", "user"]),
+  subjectId: z.string().min(1),
+  confirmation: z.literal(true)
+});
+
+export const UpdateUserAccessSchema = z.object({
+  userId: z.string().min(1),
+  role: RoleSchema,
+  active: z.boolean(),
+  confirmation: z.literal(true)
+});
 
 export const LoginSchema = z.object({
   email: z.string().email(),

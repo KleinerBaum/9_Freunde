@@ -1,8 +1,9 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { UserSessionSchema, type UserSession } from "./contracts";
 
 export const SESSION_COOKIE = "nine_friends_session";
+export const SESSION_TTL_SECONDS = 30 * 60;
 
 function sessionSecret() {
   const configured = process.env.SESSION_SECRET?.trim();
@@ -52,10 +53,28 @@ export function sessionFromRequest(request: Request): UserSession | null {
 
 export function sessionCookie(session: UserSession): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${SESSION_COOKIE}=${encodeSession(session)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`;
+  const maxAge = Math.max(0, Math.min(
+    SESSION_TTL_SECONDS,
+    session.expiresAt - Math.floor(Date.now() / 1000)
+  ));
+  return `${SESSION_COOKIE}=${encodeSession(session)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
 }
 
 export function expiredSessionCookie(): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
+}
+
+export function sessionMetadata(
+  authSource: UserSession["authSource"],
+  sessionVersion = 0
+): Pick<UserSession, "sessionId" | "sessionVersion" | "issuedAt" | "authSource" | "expiresAt"> {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    sessionId: randomUUID(),
+    sessionVersion,
+    issuedAt: now,
+    authSource,
+    expiresAt: now + SESSION_TTL_SECONDS
+  };
 }

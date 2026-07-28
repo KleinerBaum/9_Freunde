@@ -4,13 +4,26 @@ import {
   type AppAction,
   type CalendarEvent,
   type Child,
+  type ConsentRecord,
   type DashboardSnapshot,
   type ManagedDocument,
   type Parent,
   type Photo,
+  type PrivacyRequest,
+  type Role,
   type UserSession,
-  PARENT_CHILD_PATCH_FIELDS
+  canAdminister,
+  canWriteRecords,
+  isStaffRole,
+  PARENT_CHILD_PATCH_FIELDS,
+  PrivacyRequestSchema
 } from "../contracts";
+import { sessionMetadata } from "../session";
+import {
+  assertManagedStaffIdentity,
+  parentAccessEnabled,
+  pseudonymousId
+} from "./security";
 
 const WORKSPACE_GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
@@ -22,7 +35,10 @@ const TABS = {
   children: process.env.GOOGLE_CHILDREN_TAB || "children",
   parents: process.env.GOOGLE_PARENTS_TAB || "parents",
   users: process.env.GOOGLE_USERS_TAB || "users",
-  documents: process.env.GOOGLE_DOCUMENTS_TAB || "documents"
+  documents: process.env.GOOGLE_DOCUMENTS_TAB || "documents",
+  consents: process.env.GOOGLE_CONSENTS_TAB || "consents",
+  audit: process.env.GOOGLE_AUDIT_TAB || "audit",
+  privacyRequests: process.env.GOOGLE_PRIVACY_REQUESTS_TAB || "privacy_requests"
 } as const;
 
 type SheetRow = Record<string, string>;
@@ -71,12 +87,26 @@ const REQUIRED_SHEET_HEADERS: Record<keyof typeof TABS, readonly string[]> = {
   ],
   users: [
     "user_id", "email", "name", "role", "parent_id", "child_ids",
-    "password_salt", "password_hash", "active"
+    "password_salt", "password_hash", "active", "session_version"
   ],
   documents: [
     "document_id", "child_id", "type", "status", "title", "number", "period",
     "care_fee_cents", "meal_fee_cents", "total_cents", "due_date",
     "created_at", "drive_file_id"
+  ],
+  consents: [
+    "consent_id", "child_id", "purpose", "status", "scope",
+    "document_version", "source", "evidence_ref", "recorded_at",
+    "recorded_by", "withdrawn_at"
+  ],
+  audit: [
+    "event_id", "occurred_at", "actor_ref", "actor_role", "action",
+    "resource_type", "resource_ref", "outcome", "request_ref"
+  ],
+  privacyRequests: [
+    "request_id", "type", "subject_type", "subject_ref", "status",
+    "requested_at", "requested_by", "reviewed_at", "reviewed_by",
+    "due_at", "confirmation"
   ]
 };
 
@@ -103,12 +133,20 @@ export function googleConfigurationStatus() {
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() &&
     process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.trim()
   );
+  const workspaceDomain = process.env.GOOGLE_WORKSPACE_DOMAIN?.trim().toLowerCase();
+  const organizer = process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL?.trim().toLowerCase();
+  const hasManagedOrganizer = Boolean(
+    workspaceDomain &&
+    organizer &&
+    !organizer.endsWith("@gmail.com") &&
+    organizer.endsWith(`@${workspaceDomain}`)
+  );
   return {
     sheets: hasCredentials && Boolean(process.env.GOOGLE_SHEET_ID?.trim()),
     drive: hasCredentials && Boolean(process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID?.trim()),
     calendar: hasCredentials &&
       Boolean(process.env.GOOGLE_CALENDAR_ID?.trim()) &&
-      Boolean(process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL?.trim())
+      hasManagedOrganizer
   };
 }
 
@@ -417,16 +455,149 @@ async function updateRow(tab: string, idField: string, id: string, patch: SheetR
   );
 }
 
+export async function appendGoogleAuditEvent(input: {
+  session?: UserSession;
+  actorEmail?: string;
+  actorRole?: Role | "unknown";
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  outcome: "success" | "denied" | "failure";
+  requestId?: string;
+}): Promise<void> {
+  const actor = input.session?.email || input.actorEmail || "anonymous";
+  await appendRow(TABS.audit, {
+    event_id: `audit-${randomUUID()}`,
+    occurred_at: new Date().toISOString(),
+    actor_ref: pseudonymousId(actor),
+    actor_role: input.session?.role || input.actorRole || "unknown",
+    action: input.action,
+    resource_type: input.resourceType,
+    resource_ref: input.resourceId ? pseudonymousId(input.resourceId) : "",
+    outcome: input.outcome,
+    request_ref: input.requestId ? pseudonymousId(input.requestId) : ""
+  });
+}
+
+export async function createGooglePrivacyRequest(
+  session: UserSession,
+  input: {
+    type: PrivacyRequest["type"];
+    subjectType: PrivacyRequest["subjectType"];
+    subjectId: string;
+    confirmation: true;
+  }
+): Promise<PrivacyRequest> {
+  const now = new Date();
+  const request: PrivacyRequest = {
+    id: `privacy-${randomUUID()}`,
+    type: input.type,
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    status: "pending",
+    requestedAt: now.toISOString(),
+    requestedBy: pseudonymousId(session.email),
+    dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+    confirmation: input.confirmation
+  };
+  await appendRow(TABS.privacyRequests, {
+    request_id: request.id,
+    type: request.type,
+    subject_type: request.subjectType,
+    subject_ref: pseudonymousId(request.subjectId),
+    status: request.status,
+    requested_at: request.requestedAt,
+    requested_by: request.requestedBy,
+    reviewed_at: "",
+    reviewed_by: "",
+    due_at: request.dueAt,
+    confirmation: "true"
+  });
+  await appendGoogleAuditEvent({
+    session,
+    action: `privacy_request.${request.type}`,
+    resourceType: request.subjectType,
+    resourceId: request.subjectId,
+    outcome: "success"
+  });
+  return request;
+}
+
+export async function listGooglePrivacyRequests(): Promise<Array<Omit<PrivacyRequest, "subjectId"> & { subjectRef: string }>> {
+  const rows = await getRows(TABS.privacyRequests);
+  return rows.flatMap((row) => {
+    if (!row.request_id || !row.type || !row.subject_type || !row.subject_ref) return [];
+    const parsed = PrivacyRequestSchema.safeParse({
+      id: row.request_id,
+      type: row.type,
+      subjectType: row.subject_type,
+      subjectId: row.subject_ref,
+      status: row.status || "pending",
+      requestedAt: row.requested_at,
+      requestedBy: row.requested_by,
+      ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
+      ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
+      dueAt: row.due_at,
+      confirmation: bool(row.confirmation ?? "")
+    });
+    if (!parsed.success) return [];
+    const { subjectId: subjectRef, ...request } = parsed.data;
+    return [{ ...request, subjectRef }];
+  });
+}
+
+export async function updateGoogleUserAccess(
+  session: UserSession,
+  input: {
+    userId: string;
+    role: Role;
+    active: boolean;
+    confirmation: true;
+  }
+) {
+  if (!canAdminister(session.role)) {
+    throw new Error("Only administrators may change user access.");
+  }
+  const users = await getRows(TABS.users);
+  const target = users.find((row) => row.user_id === input.userId);
+  if (!target?.email) throw new Error("User record not found.");
+  assertManagedStaffIdentity(target.email, input.role);
+  const sessionVersion = int(target.session_version ?? "") + 1;
+  await updateRow(TABS.users, "user_id", input.userId, {
+    role: input.role,
+    active: String(input.active),
+    session_version: String(sessionVersion)
+  });
+  await appendGoogleAuditEvent({
+    session,
+    action: input.active ? "user.access_changed" : "user.access_revoked",
+    resourceType: "user",
+    resourceId: input.userId,
+    outcome: "success"
+  });
+  return {
+    userRef: pseudonymousId(input.userId),
+    role: input.role,
+    active: input.active,
+    sessionVersion
+  };
+}
+
 const bool = (value: string, fallback = false) => {
   if (!value) return fallback;
   return ["true", "1", "yes", "ja", "on"].includes(value.trim().toLowerCase());
 };
 const int = (value: string) => Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0;
-const consent = (value: string): "granted" | "restricted" | "missing" => {
+const consent = (value: string): Child["photoConsent"] => {
   if (["granted", "unpixelated", "true", "yes", "ja"].includes(value.toLowerCase())) return "granted";
   if (["restricted", "pixelated"].includes(value.toLowerCase())) return "restricted";
+  if (["withdrawn", "revoked", "widerrufen"].includes(value.toLowerCase())) return "withdrawn";
   return "missing";
 };
+const roleFromRow = (value: string): Role | null =>
+  ["admin", "staff_write", "staff_read", "parent"].includes(value)
+    ? value as Role
+    : null;
 const status = (value: string): Child["status"] =>
   ["active", "onboarding", "paused", "archived"].includes(value) ? value as Child["status"] : "active";
 const initials = (name: string) => name.split(/\s+/u).filter(Boolean).map((part) => part[0]).join("").slice(0, 3).toUpperCase() || "?";
@@ -493,6 +664,69 @@ const documentFromRow = (row: SheetRow): ManagedDocument => ({
   createdAt: row.created_at || new Date().toISOString().slice(0, 10),
   ...(row.drive_file_id ? { driveFileId: row.drive_file_id } : {})
 });
+
+const consentFromRow = (row: SheetRow): ConsentRecord | null => {
+  const purpose = row.purpose === "photo_processing" || row.purpose === "photo_download"
+    ? row.purpose
+    : null;
+  const consentStatus = ["granted", "restricted", "withdrawn"].includes(row.status ?? "")
+    ? row.status as ConsentRecord["status"]
+    : null;
+  const scope = ["staff_only", "parent_portal", "download"].includes(row.scope ?? "")
+    ? row.scope as ConsentRecord["scope"]
+    : null;
+  const source = ["signed_form", "digital_form", "legacy_import"].includes(row.source ?? "")
+    ? row.source as ConsentRecord["source"]
+    : null;
+  if (!row.consent_id || !row.child_id || !purpose || !consentStatus || !scope || !source) {
+    return null;
+  }
+  return {
+    id: row.consent_id,
+    childId: row.child_id,
+    purpose,
+    status: consentStatus,
+    scope,
+    documentVersion: row.document_version || "unknown",
+    source,
+    ...(row.evidence_ref ? { evidenceRef: row.evidence_ref } : {}),
+    recordedAt: row.recorded_at || new Date(0).toISOString(),
+    recordedBy: row.recorded_by || "unknown",
+    ...(row.withdrawn_at ? { withdrawnAt: row.withdrawn_at } : {})
+  };
+};
+
+function latestConsent(
+  records: ConsentRecord[],
+  childId: string,
+  purpose: ConsentRecord["purpose"]
+): ConsentRecord | undefined {
+  return records
+    .filter((record) => record.childId === childId && record.purpose === purpose)
+    .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt))[0];
+}
+
+function applyConsentState(children: Child[], records: ConsentRecord[]): Child[] {
+  return children.map((child) => ({
+    ...child,
+    photoConsent: latestConsent(records, child.id, "photo_processing")?.status ?? "missing",
+    downloadConsent: latestConsent(records, child.id, "photo_download")?.status ?? "missing"
+  }));
+}
+
+function photoAccessPermitted(
+  records: ConsentRecord[],
+  childId: string,
+  role: Role
+): boolean {
+  const processing = latestConsent(records, childId, "photo_processing");
+  if (processing?.status !== "granted") return false;
+  if (isStaffRole(role)) return true;
+  const download = latestConsent(records, childId, "photo_download");
+  return processing.scope === "parent_portal" &&
+    download?.status === "granted" &&
+    download.scope === "download";
+}
 
 async function listCalendarEvents(): Promise<CalendarEvent[]> {
   if (!googleConfigurationStatus().calendar) return [];
@@ -644,41 +878,110 @@ export async function authenticateGoogleUser(email: string, password: string): P
   const actual = pbkdf2Sync(password, row.password_salt, 210_000, 32, "sha256");
   const expected = Buffer.from(row.password_hash, "base64url");
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
-  const role = row.role === "admin" ? "admin" as const : "parent" as const;
+  const role = roleFromRow(row.role ?? "");
+  if (!role || (role === "parent" && !parentAccessEnabled())) return null;
+  assertManagedStaffIdentity(normalized, role);
   return {
+    ...sessionMetadata("password", int(row.session_version || "")),
     userId: row.user_id || normalized,
     email: normalized,
     name: row.name || normalized.split("@")[0] || "Nutzer",
     role,
     ...(row.parent_id ? { parentId: row.parent_id } : {}),
-    childIds: (row.child_ids || "").split(",").map((item) => item.trim()).filter(Boolean),
-    expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 12
+    childIds: (row.child_ids || "").split(",").map((item) => item.trim()).filter(Boolean)
   };
 }
 
+export async function authenticateGoogleSitesUser(
+  email: string,
+  forwardedName?: string
+): Promise<UserSession | null> {
+  const normalized = email.trim().toLowerCase();
+  const users = await getRows(TABS.users);
+  const row = users.find((item) =>
+    item.email?.trim().toLowerCase() === normalized && item.active !== "false"
+  );
+  if (!row) return null;
+  const role = roleFromRow(row.role ?? "");
+  if (!role || (role === "parent" && !parentAccessEnabled())) return null;
+  assertManagedStaffIdentity(normalized, role);
+  return {
+    ...sessionMetadata("sites", int(row.session_version || "")),
+    userId: row.user_id || normalized,
+    email: normalized,
+    name: forwardedName || row.name || normalized.split("@")[0] || "Nutzer",
+    role,
+    ...(row.parent_id ? { parentId: row.parent_id } : {}),
+    childIds: (row.child_ids || "").split(",").map((item) => item.trim()).filter(Boolean)
+  };
+}
+
+export async function validateGoogleSession(session: UserSession): Promise<boolean> {
+  const users = await getRows(TABS.users);
+  const row = users.find((item) =>
+    (item.user_id === session.userId ||
+      item.email?.trim().toLowerCase() === session.email.toLowerCase()) &&
+    item.active !== "false"
+  );
+  if (!row) return false;
+  const role = roleFromRow(row.role ?? "");
+  if (!role || role !== session.role) return false;
+  if (role === "parent" && !parentAccessEnabled()) return false;
+  if (int(row.session_version || "") !== session.sessionVersion) return false;
+  try {
+    assertManagedStaffIdentity(session.email, role);
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 export async function getGoogleSnapshot(session: UserSession): Promise<DashboardSnapshot> {
-  const [parentRows, childRows, documentRows, events] = await Promise.all([
+  const [parentRows, childRows, documentRows, consentRows, events] = await Promise.all([
     getRows(TABS.parents),
     getRows(TABS.children),
     getRows(TABS.documents),
+    getRows(TABS.consents),
     listCalendarEvents()
   ]);
   const allParents = parentRows.map(parentFromRow);
-  const allChildren = childRows.map((row) => childFromRow(row, allParents));
+  const allConsents = consentRows.flatMap((row) => {
+    const record = consentFromRow(row);
+    return record ? [record] : [];
+  });
+  const allChildren = applyConsentState(
+    childRows.map((row) => childFromRow(row, allParents)),
+    allConsents
+  );
   const allowedIds = new Set(session.childIds);
-  const children = session.role === "admin" ? allChildren : allChildren.filter((child) => allowedIds.has(child.id));
+  const children = isStaffRole(session.role)
+    ? allChildren
+    : allChildren.filter((child) => allowedIds.has(child.id));
   const visibleIds = new Set(children.map((child) => child.id));
-  const parents = session.role === "admin" ? allParents : allParents.filter((parent) => parent.id === session.parentId);
-  const photos = await listPhotosForChildren(children);
+  const parents = isStaffRole(session.role)
+    ? allParents
+    : allParents.filter((parent) => parent.id === session.parentId);
+  const photoChildren = children.filter((child) =>
+    photoAccessPermitted(allConsents, child.id, session.role)
+  );
+  const photos = await listPhotosForChildren(photoChildren);
   const configuration = googleConfigurationStatus();
   return {
     session,
     children,
     parents,
     events: events.filter((event) => event.audience === "all" || (event.childId && visibleIds.has(event.childId))),
-    documents: documentRows.map(documentFromRow).filter((document) => session.role === "admin" || visibleIds.has(document.childId)),
+    documents: documentRows.map(documentFromRow).filter((document) => isStaffRole(session.role) || visibleIds.has(document.childId)),
     photos,
-    integrations: { mode: "google", ...configuration, mcp: Boolean(process.env.MCP_BEARER_TOKEN?.trim()) },
+    consents: session.role === "admin"
+      ? allConsents.filter((record) => visibleIds.has(record.childId))
+      : [],
+    integrations: {
+      mode: "google",
+      ...configuration,
+      mcp: process.env.MCP_ENABLED?.trim().toLowerCase() === "true" &&
+        Boolean(process.env.MCP_BEARER_TOKEN?.trim())
+    },
     generatedAt: new Date().toISOString()
   };
 }
@@ -696,8 +999,6 @@ const childPatchToRow = (patch: Record<string, unknown>): SheetRow => {
     careHoursPerWeek: "care_hours_per_week",
     careFeeCents: "care_fee_cents",
     mealFeeCents: "meal_fee_cents",
-    photoConsent: "photo_consent",
-    downloadConsent: "download_consent",
     notesParentVisible: "notes_parent_visible",
     notesInternal: "notes_internal"
   };
@@ -707,10 +1008,44 @@ const childPatchToRow = (patch: Record<string, unknown>): SheetRow => {
   }));
 };
 
+async function recordGoogleConsent(
+  session: UserSession,
+  input: Extract<AppAction, { type: "record_consent" }>["payload"]
+): Promise<void> {
+  if (!canAdminister(session.role)) {
+    throw new Error("Only administrators may record or withdraw consent.");
+  }
+  const childRows = await getRows(TABS.children);
+  if (!childRows.some((row) => row.child_id === input.childId)) {
+    throw new Error("Child record not found.");
+  }
+  const now = new Date().toISOString();
+  await appendRow(TABS.consents, {
+    consent_id: `consent-${randomUUID()}`,
+    child_id: input.childId,
+    purpose: input.purpose,
+    status: input.status,
+    scope: input.scope,
+    document_version: input.documentVersion,
+    source: input.source,
+    evidence_ref: input.evidenceRef || "",
+    recorded_at: now,
+    recorded_by: pseudonymousId(session.email),
+    withdrawn_at: input.status === "withdrawn" ? now : ""
+  });
+  await appendGoogleAuditEvent({
+    session,
+    action: `consent.${input.status}`,
+    resourceType: input.purpose,
+    resourceId: input.childId,
+    outcome: "success"
+  });
+}
+
 export async function performGoogleAction(session: UserSession, action: AppAction): Promise<DashboardSnapshot> {
   const now = new Date().toISOString();
   if (action.type === "create_child") {
-    if (session.role !== "admin") throw new Error("This action is available to staff only.");
+    if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
     const childId = `child-${randomUUID()}`;
     const parentId = `parent-${randomUUID()}`;
     const folderId = googleConfigurationStatus().drive ? await createDriveFolder(childId) : "";
@@ -742,7 +1077,8 @@ export async function performGoogleAction(session: UserSession, action: AppActio
     });
   }
   if (action.type === "update_child") {
-    if (session.role !== "admin" && !session.childIds.includes(action.childId)) {
+    if (session.role === "staff_read") throw new Error("This action requires write access.");
+    if (!isStaffRole(session.role) && !session.childIds.includes(action.childId)) {
       throw new Error("You do not have access to this child record.");
     }
     const patch = { ...action.payload } as Record<string, unknown>;
@@ -755,7 +1091,8 @@ export async function performGoogleAction(session: UserSession, action: AppActio
     });
   }
   if (action.type === "update_parent_profile") {
-    if (session.role !== "admin" && session.parentId !== action.parentId) {
+    if (session.role === "staff_read") throw new Error("This action requires write access.");
+    if (!isStaffRole(session.role) && session.parentId !== action.parentId) {
       throw new Error("You can only update your own profile.");
     }
     const mapping: Record<string, string> = {
@@ -771,15 +1108,15 @@ export async function performGoogleAction(session: UserSession, action: AppActio
     await updateRow(TABS.parents, "parent_id", action.parentId, { ...patch, updated_at: now });
   }
   if (action.type === "create_event") {
-    if (session.role !== "admin") throw new Error("This action is available to staff only.");
+    if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
     await createCalendarEvent(action.payload);
   }
   if (action.type === "update_event") {
-    if (session.role !== "admin") throw new Error("This action is available to staff only.");
+    if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
     await updateCalendarEvent(action.eventId, action.payload);
   }
   if (action.type === "generate_document") {
-    if (session.role !== "admin") throw new Error("This action is available to staff only.");
+    if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
     const snapshot = await getGoogleSnapshot(session);
     const child = snapshot.children.find((item) => item.id === action.childId);
     if (!child) throw new Error("Child record not found.");
@@ -801,8 +1138,26 @@ export async function performGoogleAction(session: UserSession, action: AppActio
     });
   }
   if (action.type === "update_document_status") {
-    if (session.role !== "admin") throw new Error("This action is available to staff only.");
+    if (!canWriteRecords(session.role)) throw new Error("This action requires write access.");
     await updateRow(TABS.documents, "document_id", action.documentId, { status: action.status });
+  }
+  if (action.type === "record_consent") {
+    await recordGoogleConsent(session, action.payload);
+  }
+  if (action.type !== "record_consent") {
+    const resourceId =
+      "childId" in action ? action.childId
+        : "parentId" in action ? action.parentId
+          : "eventId" in action ? action.eventId
+            : "documentId" in action ? action.documentId
+              : undefined;
+    await appendGoogleAuditEvent({
+      session,
+      action: action.type,
+      resourceType: action.type.split("_").at(-1) || "record",
+      ...(resourceId ? { resourceId } : {}),
+      outcome: "success"
+    });
   }
   return getGoogleSnapshot(session);
 }
@@ -815,10 +1170,13 @@ function photoSignatureMatches(bytes: Uint8Array, mimeType: string) {
 }
 
 export async function uploadGooglePhoto(session: UserSession, childId: string, file: File) {
-  if (session.role !== "admin") throw new Error("Only staff can upload photos.");
+  if (!canWriteRecords(session.role)) throw new Error("Photo upload requires write access.");
   const snapshot = await getGoogleSnapshot(session);
   const child = snapshot.children.find((item) => item.id === childId);
   if (!child?.photoFolderId) throw new Error("The child has no private Drive folder.");
+  if (child.photoConsent !== "granted") {
+    throw new Error("A current granted photo consent is required before upload.");
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!photoSignatureMatches(bytes, file.type)) throw new Error("The image contents do not match the selected file type.");
   const boundary = `nine-friends-${randomUUID()}`;
@@ -834,6 +1192,13 @@ export async function uploadGooglePhoto(session: UserSession, childId: string, f
     headers: { "content-type": `multipart/related; boundary=${boundary}` },
     body
   });
+  await appendGoogleAuditEvent({
+    session,
+    action: "photo.upload",
+    resourceType: "child",
+    resourceId: childId,
+    outcome: "success"
+  });
 }
 
 export async function downloadGooglePhoto(session: UserSession, fileId: string): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
@@ -841,5 +1206,12 @@ export async function downloadGooglePhoto(session: UserSession, fileId: string):
   const photo = snapshot.photos.find((item) => item.id === fileId);
   if (!photo) throw new Error("Photo not found or access denied.");
   const response = await googleFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);
+  await appendGoogleAuditEvent({
+    session,
+    action: "photo.read",
+    resourceType: "photo",
+    resourceId: fileId,
+    outcome: "success"
+  });
   return { bytes: await response.arrayBuffer(), mimeType: photo.mimeType };
 }

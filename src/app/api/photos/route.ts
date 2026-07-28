@@ -1,14 +1,27 @@
 import { ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from "../../../lib/contracts";
-import { HttpError, requireSession, safeErrorResponse } from "../../../lib/server/http";
+import { HttpError, requireActiveSession, safeErrorResponse } from "../../../lib/server/http";
 import { dataMode, getAppSnapshot } from "../../../lib/server/repository";
-import { uploadGooglePhoto } from "../../../lib/server/google-workspace";
+import {
+  appendGoogleAuditEvent,
+  uploadGooglePhoto
+} from "../../../lib/server/google-workspace";
+import { assertSameOrigin } from "../../../lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const snapshot = await getAppSnapshot(requireSession(request));
+    const session = await requireActiveSession(request);
+    const snapshot = await getAppSnapshot(session);
+    if (dataMode() === "google") {
+      await appendGoogleAuditEvent({
+        session,
+        action: "photo.list",
+        resourceType: "photo",
+        outcome: "success"
+      });
+    }
     return Response.json({ photos: snapshot.photos }, { headers: { "cache-control": "no-store, private" } });
   } catch (error) {
     return safeErrorResponse(error);
@@ -17,7 +30,8 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const session = requireSession(request);
+    assertSameOrigin(request);
+    const session = await requireActiveSession(request);
     if (dataMode() !== "google") throw new HttpError(409, "Demo mode uses illustration placeholders; connect Google Drive to upload photos.");
     const form = await request.formData();
     const childId = String(form.get("childId") ?? "");

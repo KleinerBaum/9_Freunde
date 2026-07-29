@@ -31,6 +31,9 @@ describe("production security gates", () => {
     process.env.GOOGLE_CALENDAR_ID = "calendar-id";
     process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL =
       "calendar@kita.example";
+    process.env.GMAIL_ENABLED = "true";
+    process.env.GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL =
+      "mail@kita.example";
     process.env.PRIVACY_CONTROLLER_NAME = "Fictional Provider";
     process.env.PRIVACY_CONTROLLER_ADDRESS = "Example address";
     process.env.PRIVACY_CONTACT_EMAIL = "privacy@kita.example";
@@ -52,6 +55,8 @@ describe("production security gates", () => {
     expect(dataMode()).toBe("demo");
     process.env.REAL_DATA_APPROVED = "true";
     expect(dataMode()).toBe("google");
+    process.env.GMAIL_ENABLED = "false";
+    expect(dataMode()).toBe("demo");
   });
 
   it("accepts only staff accounts from the managed domain", () => {

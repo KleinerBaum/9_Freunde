@@ -58,6 +58,7 @@ without copying values into source control:
 - `MANAGED_STAFF_EMAIL_DOMAIN` is the reviewed managed domain
 - `PARENT_ACCESS_ENABLED=false`
 - `MCP_ENABLED=false`
+- `GMAIL_ENABLED=true`
 - `APP_BASE_URL` is the production `https://...chatgpt.site` URL
 - `SESSION_SECRET` is at least 32 random characters and stored as a secret
 - `AUDIT_HASH_SECRET` is independent, random, and stored as a secret
@@ -65,10 +66,11 @@ without copying values into source control:
   legally reviewed
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` is stored as a secret
 - `GOOGLE_WORKSPACE_DOMAIN` matches the managed organizer domain
-- the service-account email, Sheet, private Drive root, Calendar, and delegated
-  organizer values reference the reviewed managed Workspace resources
+- the service-account email, Sheet, private Drive root, Calendar, delegated
+  organizer, and separate delegated Gmail sender reference the reviewed
+  managed Workspace resources
 - the service account has only the documented Sheets and Drive access, and
-  domain-wide delegation authorizes only `calendar.events`
+  domain-wide delegation authorizes only `calendar.events` and `gmail.send`
 
 Any hosted environment change requires a newly saved and deployed Sites
 version before it becomes active.
@@ -77,7 +79,7 @@ version before it becomes active.
 
 Deploy to owner-only access first. The acceptance evidence must show:
 
-- `/api/health` reports `mode: "google"` with Sheets, Drive, and Calendar
+- `/api/health` reports `mode: "google"` with Sheets, Drive, Calendar, and Gmail
   configured and all release gates ready
 - an authenticated administrator receives successful sanitized results from
   `/api/admin/integrations/health`
@@ -96,8 +98,9 @@ Deploy to owner-only access first. The acceptance evidence must show:
 
 External write tests require a separate explicit confirmation. Use one
 fictional record and controlled staff recipients only. Record the results for
-Sheets, private Drive upload/download, Calendar create/update, and PDF drafting.
-Removing the test artifacts also requires explicit confirmation.
+Sheets, private Drive upload/download, Calendar create/update, PDF drafting,
+and one confirmed Gmail delivery to a controlled staff address. Removing the
+test artifacts also requires explicit confirmation.
 
 ## Staff rollout and rollback
 

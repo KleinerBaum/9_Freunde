@@ -22,7 +22,8 @@ export async function GET(request: Request): Promise<Response> {
         checkedAt: new Date().toISOString(),
         sheets: { ok: false, code: "not_configured" },
         drive: { ok: false, code: "not_configured" },
-        calendar: { ok: false, code: "not_configured" }
+        calendar: { ok: false, code: "not_configured" },
+        gmail: { ok: false, code: "not_configured" }
       }, { headers: noStoreHeaders });
     }
     return Response.json(

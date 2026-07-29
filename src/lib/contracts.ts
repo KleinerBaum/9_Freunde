@@ -21,6 +21,12 @@ export const DocumentStatusSchema = z.enum([
   "paid",
   "overdue"
 ]);
+const ManualDocumentStatusSchema = z.enum([
+  "draft",
+  "signed",
+  "paid",
+  "overdue"
+]);
 export const EventAudienceSchema = z.enum(["all", "child"]);
 
 export const UserSessionSchema = z.object({
@@ -142,6 +148,7 @@ export const IntegrationStatusSchema = z.object({
   sheets: z.boolean(),
   drive: z.boolean(),
   calendar: z.boolean(),
+  gmail: z.boolean(),
   mcp: z.boolean()
 });
 
@@ -255,7 +262,7 @@ export const AppActionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("update_document_status"),
     documentId: z.string().min(1),
-    status: DocumentStatusSchema
+    status: ManualDocumentStatusSchema
   }),
   z.object({
     type: z.literal("record_consent"),
@@ -263,6 +270,70 @@ export const AppActionSchema = z.discriminatedUnion("type", [
   })
 ]);
 export type AppAction = z.infer<typeof AppActionSchema>;
+
+export const CommunicationAudienceSchema = z.enum([
+  "all_parents",
+  "group",
+  "single_child"
+]);
+
+const CommunicationSubjectSchema = z.string()
+  .trim()
+  .min(1)
+  .max(160)
+  .refine((value) => !/[\r\n]/u.test(value), {
+    message: "Subject must not contain line breaks."
+  });
+
+const CommunicationBodySchema = z.string().trim().min(1).max(10_000);
+
+const SendAnnouncementSchema = z.object({
+  kind: z.literal("announcement"),
+  audience: CommunicationAudienceSchema,
+  group: z.string().trim().min(1).max(100).optional(),
+  childId: z.string().trim().min(1).optional(),
+  subject: CommunicationSubjectSchema,
+  body: CommunicationBodySchema,
+  confirmed: z.literal(true)
+}).strict().superRefine((value, context) => {
+  if (value.audience === "group" && !value.group) {
+    context.addIssue({
+      code: "custom",
+      path: ["group"],
+      message: "A group is required for this audience."
+    });
+  }
+  if (value.audience === "single_child" && !value.childId) {
+    context.addIssue({
+      code: "custom",
+      path: ["childId"],
+      message: "A child is required for this audience."
+    });
+  }
+});
+
+const SendDocumentSchema = z.object({
+  kind: z.literal("document"),
+  documentId: z.string().trim().min(1),
+  body: CommunicationBodySchema,
+  reviewConfirmed: z.literal(true),
+  confirmed: z.literal(true)
+}).strict();
+
+export const CommunicationSendSchema = z.union([
+  SendAnnouncementSchema,
+  SendDocumentSchema
+]);
+export type CommunicationSend = z.infer<typeof CommunicationSendSchema>;
+
+export const CommunicationSendResultSchema = z.object({
+  kind: z.enum(["announcement", "document"]),
+  successCount: z.number().int().nonnegative(),
+  failureCount: z.number().int().nonnegative(),
+  documentId: z.string().optional(),
+  documentStatusUpdated: z.boolean().optional()
+});
+export type CommunicationSendResult = z.infer<typeof CommunicationSendResultSchema>;
 
 export const PrivacyRequestTypeSchema = z.enum([
   "access",

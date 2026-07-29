@@ -4,6 +4,8 @@ import {
   type AppAction,
   type CalendarEvent,
   type Child,
+  type CommunicationSend,
+  type CommunicationSendResult,
   type ConsentRecord,
   type DashboardSnapshot,
   type ManagedDocument,
@@ -18,6 +20,7 @@ import {
   PARENT_CHILD_PATCH_FIELDS,
   PrivacyRequestSchema
 } from "../contracts";
+import { buildManagedDocumentPdf } from "../pdf";
 import { sessionMetadata } from "../session";
 import {
   assertManagedStaffIdentity,
@@ -30,6 +33,7 @@ const WORKSPACE_GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/drive"
 ].join(" ");
 const CALENDAR_GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.events";
+const GMAIL_GOOGLE_SCOPES = "https://www.googleapis.com/auth/gmail.send";
 
 const TABS = {
   children: process.env.GOOGLE_CHILDREN_TAB || "children",
@@ -43,10 +47,11 @@ const TABS = {
 
 type SheetRow = Record<string, string>;
 type TokenCache = { value: string; expiresAt: number };
-type GoogleAuthContext = "workspace" | "calendar";
+type GoogleAuthContext = "workspace" | "calendar" | "gmail";
 type GoogleTokenCache = Record<string, TokenCache>;
 const globalGoogle = globalThis as typeof globalThis & {
   __nineFriendsGoogleTokens?: GoogleTokenCache;
+  __nineFriendsGoogleTokenRequests?: Record<string, Promise<string>>;
 };
 
 export type GoogleIntegrationCheckCode =
@@ -70,6 +75,7 @@ export type GoogleIntegrationHealth = {
   sheets: GoogleIntegrationCheck;
   drive: GoogleIntegrationCheck;
   calendar: GoogleIntegrationCheck;
+  gmail: GoogleIntegrationCheck;
 };
 
 const REQUIRED_SHEET_HEADERS: Record<keyof typeof TABS, readonly string[]> = {
@@ -128,6 +134,19 @@ const required = (name: string) => {
   return value;
 };
 
+export function gmailIntegrationEnabled(): boolean {
+  return process.env.GMAIL_ENABLED?.trim().toLowerCase() === "true";
+}
+
+function isManagedWorkspaceUser(email: string | undefined, domain: string | undefined) {
+  return Boolean(
+    domain &&
+    email &&
+    !email.endsWith("@gmail.com") &&
+    email.endsWith(`@${domain}`)
+  );
+}
+
 export function googleConfigurationStatus() {
   const hasCredentials = Boolean(
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() &&
@@ -135,18 +154,20 @@ export function googleConfigurationStatus() {
   );
   const workspaceDomain = process.env.GOOGLE_WORKSPACE_DOMAIN?.trim().toLowerCase();
   const organizer = process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL?.trim().toLowerCase();
-  const hasManagedOrganizer = Boolean(
-    workspaceDomain &&
-    organizer &&
-    !organizer.endsWith("@gmail.com") &&
-    organizer.endsWith(`@${workspaceDomain}`)
-  );
+  const gmailSender = process.env.GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL?.trim().toLowerCase();
+  const hasManagedOrganizer = isManagedWorkspaceUser(organizer, workspaceDomain);
+  const hasDedicatedManagedGmailSender =
+    isManagedWorkspaceUser(gmailSender, workspaceDomain) &&
+    gmailSender !== organizer;
   return {
     sheets: hasCredentials && Boolean(process.env.GOOGLE_SHEET_ID?.trim()),
     drive: hasCredentials && Boolean(process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID?.trim()),
     calendar: hasCredentials &&
       Boolean(process.env.GOOGLE_CALENDAR_ID?.trim()) &&
-      hasManagedOrganizer
+      hasManagedOrganizer,
+    gmail: gmailIntegrationEnabled() &&
+      hasCredentials &&
+      hasDedicatedManagedGmailSender
   };
 }
 
@@ -159,6 +180,13 @@ function authConfiguration(context: GoogleAuthContext) {
       email,
       scopes: CALENDAR_GOOGLE_SCOPES,
       subject: required("GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL")
+    };
+  }
+  if (context === "gmail") {
+    return {
+      email,
+      scopes: GMAIL_GOOGLE_SCOPES,
+      subject: required("GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL")
     };
   }
   return { email, scopes: WORKSPACE_GOOGLE_SCOPES, subject: undefined };
@@ -186,6 +214,7 @@ function tokenCacheKey(context: GoogleAuthContext): string {
 
 export function resetGoogleTokenCacheForTests() {
   delete globalGoogle.__nineFriendsGoogleTokens;
+  delete globalGoogle.__nineFriendsGoogleTokenRequests;
 }
 
 function googleErrorReason(payload: unknown): string | undefined {
@@ -226,11 +255,10 @@ export function classifyGoogleIntegrationError(error: unknown): GoogleIntegratio
   return classifyGoogleHttpError(error.status, error.reason);
 }
 
-export async function getGoogleAccessToken(context: GoogleAuthContext): Promise<string> {
-  const cacheKey = tokenCacheKey(context);
-  const cached = globalGoogle.__nineFriendsGoogleTokens?.[cacheKey];
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.value;
-
+async function requestGoogleAccessToken(
+  context: GoogleAuthContext,
+  cacheKey: string
+): Promise<string> {
   const privateKey = required("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = base64url(JSON.stringify(buildGoogleJwtClaims(context)));
@@ -273,6 +301,27 @@ export async function getGoogleAccessToken(context: GoogleAuthContext): Promise<
   };
   globalGoogle.__nineFriendsGoogleTokens = tokens;
   return payload.access_token;
+}
+
+export async function getGoogleAccessToken(context: GoogleAuthContext): Promise<string> {
+  const cacheKey = tokenCacheKey(context);
+  const cached = globalGoogle.__nineFriendsGoogleTokens?.[cacheKey];
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.value;
+
+  const active = globalGoogle.__nineFriendsGoogleTokenRequests?.[cacheKey];
+  if (active) return active;
+
+  const request = requestGoogleAccessToken(context, cacheKey);
+  const requests = globalGoogle.__nineFriendsGoogleTokenRequests ?? {};
+  requests[cacheKey] = request;
+  globalGoogle.__nineFriendsGoogleTokenRequests = requests;
+  try {
+    return await request;
+  } finally {
+    if (globalGoogle.__nineFriendsGoogleTokenRequests?.[cacheKey] === request) {
+      delete globalGoogle.__nineFriendsGoogleTokenRequests[cacheKey];
+    }
+  }
 }
 
 async function googleFetch(
@@ -343,6 +392,10 @@ async function checkCalendarIntegration() {
   await googleFetch(url.toString(), {}, "calendar");
 }
 
+async function checkGmailIntegration() {
+  await getGoogleAccessToken("gmail");
+}
+
 async function runIntegrationCheck(
   configured: boolean,
   check: () => Promise<void>
@@ -358,16 +411,18 @@ async function runIntegrationCheck(
 
 export async function checkGoogleIntegrations(): Promise<GoogleIntegrationHealth> {
   const configuration = googleConfigurationStatus();
-  const [sheets, drive, calendar] = await Promise.all([
+  const [sheets, drive, calendar, gmail] = await Promise.all([
     runIntegrationCheck(configuration.sheets, checkSheetsIntegration),
     runIntegrationCheck(configuration.drive, checkDriveIntegration),
-    runIntegrationCheck(configuration.calendar, checkCalendarIntegration)
+    runIntegrationCheck(configuration.calendar, checkCalendarIntegration),
+    runIntegrationCheck(configuration.gmail, checkGmailIntegration)
   ]);
   return {
     checkedAt: new Date().toISOString(),
     sheets,
     drive,
-    calendar
+    calendar,
+    gmail
   };
 }
 
@@ -664,6 +719,321 @@ const documentFromRow = (row: SheetRow): ManagedDocument => ({
   createdAt: row.created_at || new Date().toISOString().slice(0, 10),
   ...(row.drive_file_id ? { driveFileId: row.drive_file_id } : {})
 });
+
+type GmailAttachment = {
+  filename: string;
+  mimeType: "application/pdf";
+  bytes: Uint8Array;
+};
+
+type GmailMessage = {
+  sender: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  attachment?: GmailAttachment;
+};
+
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
+
+function assertSafeHeader(value: string, label: string) {
+  if (/[\r\n]/u.test(value)) {
+    throw new Error(`${label} must not contain line breaks.`);
+  }
+}
+
+function wrapBase64(value: Buffer): string {
+  return value.toString("base64").match(/.{1,76}/gu)?.join("\r\n") ?? "";
+}
+
+export function buildGmailRawMessage(message: GmailMessage): string {
+  assertSafeHeader(message.sender, "Sender");
+  assertSafeHeader(message.recipient, "Recipient");
+  assertSafeHeader(message.subject, "Subject");
+  if (!EMAIL_PATTERN.test(message.sender) || !EMAIL_PATTERN.test(message.recipient)) {
+    throw new Error("Gmail sender and recipient must be valid email addresses.");
+  }
+
+  const headers = [
+    `From: ${message.sender}`,
+    `To: ${message.recipient}`,
+    `Subject: =?UTF-8?B?${Buffer.from(message.subject, "utf8").toString("base64")}?=`,
+    "MIME-Version: 1.0"
+  ];
+
+  let mime: string;
+  if (message.attachment) {
+    const boundary = `nine-friends-${randomUUID()}`;
+    const filename = message.attachment.filename
+      .replace(/[^a-zA-Z0-9._-]/gu, "_")
+      .slice(0, 100) || "document.pdf";
+    mime = [
+      ...headers,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrapBase64(Buffer.from(message.body, "utf8")),
+      `--${boundary}`,
+      `Content-Type: ${message.attachment.mimeType}; name="${filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${filename}"`,
+      "",
+      wrapBase64(Buffer.from(message.attachment.bytes)),
+      `--${boundary}--`,
+      ""
+    ].join("\r\n");
+  } else {
+    mime = [
+      ...headers,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrapBase64(Buffer.from(message.body, "utf8")),
+      ""
+    ].join("\r\n");
+  }
+  return Buffer.from(mime, "utf8").toString("base64url");
+}
+
+function normalizedUniqueEmails(values: string[]): string[] {
+  return [...new Set(values
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => EMAIL_PATTERN.test(value)))];
+}
+
+export function resolveAnnouncementRecipients(
+  input: Extract<CommunicationSend, { kind: "announcement" }>,
+  parents: Parent[],
+  children: Child[]
+): string[] {
+  const optedInParents = parents.filter((parent) => parent.notificationsOptIn);
+  const parentForChild = (child: Child) =>
+    optedInParents.find((parent) => parent.id === child.primaryParentId) ??
+    optedInParents.find((parent) =>
+      parent.email.toLowerCase() === child.primaryParentEmail.toLowerCase()
+    );
+
+  let matchingParents: Parent[];
+  if (input.audience === "all_parents") {
+    matchingParents = optedInParents;
+  } else {
+    const matchingChildren = input.audience === "group"
+      ? children.filter((child) =>
+        child.group.trim().toLowerCase() === input.group?.trim().toLowerCase()
+      )
+      : children.filter((child) => child.id === input.childId);
+    matchingParents = matchingChildren.flatMap((child) => {
+      const parent = parentForChild(child);
+      return parent ? [parent] : [];
+    });
+  }
+
+  const recipients = normalizedUniqueEmails(
+    matchingParents.map((parent) => parent.email)
+  );
+  if (recipients.length > 100) {
+    const error = new Error("The recipient limit of 100 was exceeded.");
+    Object.assign(error, { status: 400 });
+    throw error;
+  }
+  return recipients;
+}
+
+export async function sendGmailBatch(
+  recipients: string[],
+  send: (recipient: string) => Promise<void>
+): Promise<{ successCount: number; failureCount: number }> {
+  const uniqueRecipients = normalizedUniqueEmails(recipients);
+  if (uniqueRecipients.length > 100) {
+    const error = new Error("The recipient limit of 100 was exceeded.");
+    Object.assign(error, { status: 400 });
+    throw error;
+  }
+  let successCount = 0;
+  let failureCount = 0;
+  for (const recipient of uniqueRecipients) {
+    try {
+      await send(recipient);
+      successCount += 1;
+    } catch {
+      failureCount += 1;
+    }
+  }
+  return { successCount, failureCount };
+}
+
+function configuredGmailSender(): string {
+  const sender = required("GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL")
+    .trim()
+    .toLowerCase();
+  if (!googleConfigurationStatus().gmail) {
+    const error = new Error("The dedicated managed Gmail sender is not configured.");
+    Object.assign(error, { status: 503 });
+    throw error;
+  }
+  return sender;
+}
+
+async function sendGmailMessage(
+  recipient: string,
+  subject: string,
+  body: string,
+  attachment?: GmailAttachment
+) {
+  const raw = buildGmailRawMessage({
+    sender: configuredGmailSender(),
+    recipient,
+    subject,
+    body,
+    ...(attachment ? { attachment } : {})
+  });
+  await googleFetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ raw })
+    },
+    "gmail"
+  );
+}
+
+function communicationOutcome(result: {
+  successCount: number;
+  failureCount: number;
+}): "success" | "failure" {
+  return result.successCount > 0 && result.failureCount === 0
+    ? "success"
+    : "failure";
+}
+
+export async function sendGoogleCommunication(
+  session: UserSession,
+  input: CommunicationSend
+): Promise<CommunicationSendResult> {
+  if (!canAdminister(session.role)) {
+    const error = new Error("Only administrators may send communications.");
+    Object.assign(error, { status: 403 });
+    throw error;
+  }
+  configuredGmailSender();
+
+  const [parentRows, childRows, documentRows] = await Promise.all([
+    getRows(TABS.parents),
+    getRows(TABS.children),
+    getRows(TABS.documents)
+  ]);
+  const parents = parentRows.map(parentFromRow);
+  const children = childRows.map((row) => childFromRow(row, parents));
+
+  if (input.kind === "announcement") {
+    const recipients = resolveAnnouncementRecipients(input, parents, children);
+    if (recipients.length === 0) {
+      const error = new Error("No eligible opted-in recipients were found.");
+      Object.assign(error, { status: 409 });
+      throw error;
+    }
+    const result = await sendGmailBatch(
+      recipients,
+      (recipient) => sendGmailMessage(recipient, input.subject, input.body)
+    );
+    await appendGoogleAuditEvent({
+      session,
+      action: result.failureCount > 0
+        ? "communication.announcement_partial"
+        : "communication.announcement",
+      resourceType: input.audience,
+      resourceId: input.childId ?? input.group,
+      outcome: communicationOutcome(result)
+    });
+    return { kind: "announcement", ...result };
+  }
+
+  const document = documentRows
+    .map(documentFromRow)
+    .find((item) => item.id === input.documentId);
+  if (!document) {
+    const error = new Error("Document not found.");
+    Object.assign(error, { status: 404 });
+    throw error;
+  }
+  if (document.status !== "draft") {
+    const error = new Error("Only reviewed document drafts may be sent.");
+    Object.assign(error, { status: 409 });
+    throw error;
+  }
+  const child = children.find((item) => item.id === document.childId);
+  if (!child) {
+    const error = new Error("The document has no authorized child record.");
+    Object.assign(error, { status: 409 });
+    throw error;
+  }
+  const parent = parents.find((item) => item.id === child.primaryParentId) ??
+    parents.find((item) =>
+      item.email.toLowerCase() === child.primaryParentEmail.toLowerCase()
+    );
+  if (!parent) {
+    const error = new Error("The document has no assigned primary contact.");
+    Object.assign(error, { status: 409 });
+    throw error;
+  }
+
+  const pdf = await buildManagedDocumentPdf(document, child, parent);
+  const result = await sendGmailBatch([parent.email], (recipient) =>
+    sendGmailMessage(
+      recipient,
+      `${document.title} · ${document.number}`,
+      input.body,
+      {
+        filename: `${document.number}.pdf`,
+        mimeType: "application/pdf",
+        bytes: pdf
+      }
+    )
+  );
+  if (result.successCount === 0) {
+    await appendGoogleAuditEvent({
+      session,
+      action: "communication.document",
+      resourceType: "document",
+      resourceId: document.id,
+      outcome: "failure"
+    });
+    return {
+      kind: "document",
+      ...result,
+      documentId: document.id,
+      documentStatusUpdated: false
+    };
+  }
+
+  let documentStatusUpdated = false;
+  try {
+    await updateRow(TABS.documents, "document_id", document.id, {
+      status: "sent"
+    });
+    documentStatusUpdated = true;
+  } finally {
+    await appendGoogleAuditEvent({
+      session,
+      action: documentStatusUpdated
+        ? "communication.document"
+        : "communication.document_status_failed",
+      resourceType: "document",
+      resourceId: document.id,
+      outcome: documentStatusUpdated ? "success" : "failure"
+    });
+  }
+  return {
+    kind: "document",
+    ...result,
+    documentId: document.id,
+    documentStatusUpdated
+  };
+}
 
 const consentFromRow = (row: SheetRow): ConsentRecord | null => {
   const purpose = row.purpose === "photo_processing" || row.purpose === "photo_download"

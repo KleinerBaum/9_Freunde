@@ -17,19 +17,22 @@ import {
   type AppAction,
   type CalendarEvent,
   type Child,
+  type CommunicationSend,
+  type CommunicationSendResult,
   type DashboardSnapshot,
   type ManagedDocument,
   type Parent
 } from "../lib/contracts";
 import { Icon, type IconName } from "./icon";
 
-type View = "overview" | "children" | "documents" | "calendar" | "photos" | "profile" | "settings";
+type View = "overview" | "children" | "documents" | "communications" | "calendar" | "photos" | "profile" | "settings";
 type ModalName = "child" | "event" | "document" | null;
 
 const ADMIN_NAV: Array<{ id: View; label: string; icon: IconName }> = [
   { id: "overview", label: "Tagesblick", icon: "home" },
   { id: "children", label: "Kinder & Familien", icon: "children" },
   { id: "documents", label: "Dokumente", icon: "document" },
+  { id: "communications", label: "Nachrichten", icon: "mail" },
   { id: "calendar", label: "Kalender", icon: "calendar" },
   { id: "photos", label: "Fotomomente", icon: "photo" },
   { id: "settings", label: "Einstellungen", icon: "settings" }
@@ -48,6 +51,7 @@ const VIEW_COPY: Record<View, { title: string; eyebrow: string }> = {
   overview: { title: "Schön, dass du da bist.", eyebrow: "Heute bei 9 Freunde" },
   children: { title: "Kinder & Familien", eyebrow: "Alles Wichtige an einem Ort" },
   documents: { title: "Verträge & Abrechnungen", eyebrow: "Vorbereiten, prüfen, fertig" },
+  communications: { title: "Sicher kommunizieren", eyebrow: "Hinweise & geprüfte Dokumente" },
   calendar: { title: "Gemeinsam gut geplant", eyebrow: "Termine & Erinnerungen" },
   photos: { title: "Kleine Momente, sicher geteilt", eyebrow: "Geschützte Fotogalerie" },
   profile: { title: "Meine Angaben", eyebrow: "Kontaktdaten aktuell halten" },
@@ -182,7 +186,11 @@ function Login({
 }
 
 function Sidebar({ snapshot, view, onView, onLogout, open, onClose }: { snapshot: DashboardSnapshot; view: View; onView: (view: View) => void; onLogout: () => void; open: boolean; onClose: () => void }) {
-  const nav = isStaffRole(snapshot.session.role) ? ADMIN_NAV : PARENT_NAV;
+  const nav = isStaffRole(snapshot.session.role)
+    ? ADMIN_NAV.filter((item) =>
+      item.id !== "communications" || snapshot.session.role === "admin"
+    )
+    : PARENT_NAV;
   return (
     <aside className={`sidebar ${open ? "sidebar--open" : ""}`}>
       <div className="sidebar__head"><Brand compact /><button className="icon-button sidebar__close" type="button" onClick={onClose} aria-label="Navigation schließen"><Icon name="close" /></button></div>
@@ -386,7 +394,7 @@ function DocumentsView({ snapshot, focusId, onGenerate, onAction }: { snapshot: 
   return <>
     <PageIntro view="documents" snapshot={snapshot} action={canWriteRecords(snapshot.session.role) ? <button className="primary-button" type="button" onClick={onGenerate}><Icon name="plus" /> Neues Dokument</button> : undefined} />
     <section className="panel documents-panel"><header className="list-toolbar"><div className="segmented"><button type="button" className={type === "all" ? "active" : ""} onClick={() => setType("all")}>Alle</button><button type="button" className={type === "invoice" ? "active" : ""} onClick={() => setType("invoice")}>Abrechnungen</button><button type="button" className={type === "contract" ? "active" : ""} onClick={() => setType("contract")}>Verträge</button></div><span>{documents.length} Dokumente</span></header>
-      <div className="document-table"><div className="document-table__head"><span>Dokument</span><span>Kind</span><span>Datum</span><span>Betrag</span><span>Status</span><span /></div>{documents.map((document) => <div className={`document-row ${focusId === document.id ? "document-row--focus" : ""}`} key={document.id}><span className={`doc-icon doc-icon--${document.type}`}><Icon name="document" /></span><span className="doc-title"><strong>{document.title}</strong><small>{document.number}</small></span><span>{childName(document.childId)}</span><span>{fullDate(document.createdAt)}</span><span>{document.type === "invoice" ? money(document.totalCents) : "—"}</span><span><Pill value={document.status} /></span><span className="row-actions"><a href={`/api/documents/${encodeURIComponent(document.id)}`} title="PDF herunterladen"><Icon name="download" /></a>{canWriteRecords(snapshot.session.role) ? <select aria-label="Dokumentstatus" value={document.status} onChange={(event) => void onAction({ type: "update_document_status", documentId: document.id, status: event.target.value as ManagedDocument["status"] }, "Dokumentstatus aktualisiert.")}><option value="draft">Entwurf</option><option value="sent">Versendet</option><option value="signed">Unterzeichnet</option><option value="paid">Bezahlt</option><option value="overdue">Überfällig</option></select> : null}</span></div>)}</div>
+      <div className="document-table"><div className="document-table__head"><span>Dokument</span><span>Kind</span><span>Datum</span><span>Betrag</span><span>Status</span><span /></div>{documents.map((document) => <div className={`document-row ${focusId === document.id ? "document-row--focus" : ""}`} key={document.id}><span className={`doc-icon doc-icon--${document.type}`}><Icon name="document" /></span><span className="doc-title"><strong>{document.title}</strong><small>{document.number}</small></span><span>{childName(document.childId)}</span><span>{fullDate(document.createdAt)}</span><span>{document.type === "invoice" ? money(document.totalCents) : "—"}</span><span><Pill value={document.status} /></span><span className="row-actions"><a href={`/api/documents/${encodeURIComponent(document.id)}`} title="PDF herunterladen"><Icon name="download" /></a>{canWriteRecords(snapshot.session.role) ? <select aria-label="Dokumentstatus" value={document.status} onChange={(event) => void onAction({ type: "update_document_status", documentId: document.id, status: event.target.value as Exclude<ManagedDocument["status"], "sent"> }, "Dokumentstatus aktualisiert.")}><option value="draft">Entwurf</option><option value="sent" disabled={document.status !== "sent"}>Versendet · nur nach Gmail-Zustellung</option><option value="signed">Unterzeichnet</option><option value="paid">Bezahlt</option><option value="overdue">Überfällig</option></select> : null}</span></div>)}</div>
       {!documents.length ? <Empty icon="document" title="Noch keine Dokumente" copy="Erstelle eine Abrechnung oder einen Vertragsentwurf." /> : null}
     </section>
     <aside className="legal-note"><Icon name="shield" /><span><strong>Prüfung bleibt Pflicht</strong><small>Automatisch erstellte Verträge sind Entwürfe und müssen vor Versand fachlich und rechtlich geprüft werden.</small></span></aside>
@@ -433,8 +441,100 @@ function ProfileView({ snapshot, onAction }: { snapshot: DashboardSnapshot; onAc
   return <><PageIntro view="profile" snapshot={snapshot} /><section className="profile-layout"><form className="panel profile-form" onSubmit={submit}><header><Avatar name={parent.name} tone={4} large /><div><h2>{parent.name}</h2><p>{parent.email}</p></div></header><div className="form-grid"><label><span>Telefon</span><input name="phone" defaultValue={parent.phone} /></label><label><span>Telefon 2</span><input name="phone2" defaultValue={parent.phoneSecondary} /></label><label className="span-2"><span>Adresse</span><input name="address" defaultValue={parent.address} /></label><label><span>Bevorzugte Sprache</span><select name="language" defaultValue={parent.preferredLanguage}><option value="de">Deutsch</option><option value="en">English</option></select></label><label><span>Notfallkontakt</span><input name="emergencyName" defaultValue={parent.emergencyContactName} /></label><label><span>Telefon Notfallkontakt</span><input name="emergencyPhone" defaultValue={parent.emergencyContactPhone} /></label></div><label className="toggle-row"><input type="checkbox" name="notifications" defaultChecked={parent.notificationsOptIn} /><span><strong>Benachrichtigungen erhalten</strong><small>Terminupdates und wichtige Hinweise per E-Mail.</small></span></label><div className="form-actions"><button className="primary-button" type="submit" disabled={pending}><Icon name="check" />{pending ? "Speichert…" : "Profil speichern"}</button></div></form><aside className="panel profile-note"><span><Icon name="shield" /></span><h2>Du entscheidest über deine Daten.</h2><p>Änderungen sind nur für dich und die Leitung sichtbar. Interne Betreuungsnotizen werden Eltern niemals über diese Ansicht offengelegt.</p></aside></section></>;
 }
 
+function CommunicationsView({
+  snapshot,
+  onSend
+}: {
+  snapshot: DashboardSnapshot;
+  onSend: (input: CommunicationSend) => Promise<CommunicationSendResult>;
+}) {
+  const [audience, setAudience] = useState<"all_parents" | "group" | "single_child">("all_parents");
+  const [announcementPending, setAnnouncementPending] = useState(false);
+  const [documentPending, setDocumentPending] = useState(false);
+  const [announcementResult, setAnnouncementResult] = useState<CommunicationSendResult>();
+  const [documentResult, setDocumentResult] = useState<CommunicationSendResult>();
+  const groups = [...new Set(snapshot.children.map((child) => child.group).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "de"));
+  const draftDocuments = snapshot.documents
+    .filter((document) => document.status === "draft")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const sendAvailable =
+    snapshot.integrations.mode === "google" && snapshot.integrations.gmail;
+
+  const submitAnnouncement = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAnnouncementPending(true);
+    setAnnouncementResult(undefined);
+    const data = new FormData(event.currentTarget);
+    const input: CommunicationSend = {
+      kind: "announcement",
+      audience,
+      ...(audience === "group" ? { group: String(data.get("group") ?? "") } : {}),
+      ...(audience === "single_child" ? { childId: String(data.get("childId") ?? "") } : {}),
+      subject: String(data.get("subject") ?? ""),
+      body: String(data.get("body") ?? ""),
+      confirmed: true
+    };
+    try {
+      setAnnouncementResult(await onSend(input));
+    } finally {
+      setAnnouncementPending(false);
+    }
+  };
+
+  const submitDocument = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDocumentPending(true);
+    setDocumentResult(undefined);
+    const data = new FormData(event.currentTarget);
+    try {
+      setDocumentResult(await onSend({
+        kind: "document",
+        documentId: String(data.get("documentId") ?? ""),
+        body: String(data.get("body") ?? ""),
+        reviewConfirmed: true,
+        confirmed: true
+      }));
+    } finally {
+      setDocumentPending(false);
+    }
+  };
+
+  return <>
+    <PageIntro view="communications" snapshot={snapshot} />
+    {!sendAvailable ? <div className="demo-banner"><Icon name="shield" /><span><strong>Versand ist gesperrt</strong><small>Diese Ansicht sendet erst im freigegebenen Google-Produktionsmodus mit konfiguriertem Portal-Gmail-Postfach.</small></span></div> : null}
+    <section className="communications-grid">
+      <form className="panel communication-form" onSubmit={submitAnnouncement}>
+        <header><span className="communication-icon communication-icon--sun"><Icon name="mail" /></span><div><span className="eyebrow">Elternhinweis</span><h2>Eine Nachricht, einzeln zugestellt</h2><p>Empfänger werden serverseitig ermittelt. Abgemeldete Kontakte werden ausgelassen.</p></div></header>
+        <label><span>Zielgruppe</span><select value={audience} onChange={(event) => setAudience(event.target.value as typeof audience)}><option value="all_parents">Alle angemeldeten Elternkontakte</option><option value="group">Eine Gruppe</option><option value="single_child">Primärkontakt eines Kindes</option></select></label>
+        {audience === "group" ? <label><span>Gruppe</span><select name="group" required><option value="">Bitte wählen</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label> : null}
+        {audience === "single_child" ? <label><span>Kind</span><select name="childId" required><option value="">Bitte wählen</option>{snapshot.children.map((child) => <option key={child.id} value={child.id}>{child.name}</option>)}</select></label> : null}
+        <label><span>Betreff</span><input name="subject" maxLength={160} required /></label>
+        <label><span>Nachricht</span><textarea name="body" rows={7} maxLength={10_000} required /></label>
+        <label className="confirmation-row"><input type="checkbox" required /><span><strong>Versand ausdrücklich bestätigen</strong><small>Jede Nachricht wird separat ohne sichtbare Empfängerliste verschickt.</small></span></label>
+        <button className="primary-button primary-button--wide" type="submit" disabled={!sendAvailable || announcementPending}><Icon name="mail" />{announcementPending ? "Wird einzeln versendet…" : "Hinweis verbindlich senden"}</button>
+        {announcementResult ? <p className={`send-result ${announcementResult.failureCount ? "send-result--warning" : ""}`} role="status"><Icon name={announcementResult.failureCount ? "warning" : "check"} /><span><strong>{announcementResult.successCount} erfolgreich zugestellt</strong><small>{announcementResult.failureCount ? `${announcementResult.failureCount} Zustellung(en) fehlgeschlagen. Es wurden keine Adress- oder Providerdetails gespeichert.` : "Der pseudonymisierte Audit-Eintrag wurde erstellt."}</small></span></p> : null}
+      </form>
+
+      <form className="panel communication-form" onSubmit={submitDocument}>
+        <header><span className="communication-icon communication-icon--mint"><Icon name="document" /></span><div><span className="eyebrow">Geprüfter PDF-Versand</span><h2>Entwurf sicher zustellen</h2><p>Das PDF wird serverseitig neu erzeugt und ausschließlich an den zugeordneten Primärkontakt gesendet.</p></div></header>
+        <label><span>Geprüfter Dokumententwurf</span><select name="documentId" required disabled={!draftDocuments.length}><option value="">Bitte wählen</option>{draftDocuments.map((document) => {
+          const child = snapshot.children.find((item) => item.id === document.childId);
+          return <option key={document.id} value={document.id}>{document.number} · {child?.name ?? "Unbekannt"}</option>;
+        })}</select></label>
+        <label><span>Begleittext</span><textarea name="body" rows={7} maxLength={10_000} required /></label>
+        <label className="confirmation-row"><input type="checkbox" required /><span><strong>Inhalt und PDF fachlich geprüft</strong><small>Der Dokumentstatus wird erst nach erfolgreicher Gmail-Zustellung auf „Versendet“ gesetzt.</small></span></label>
+        <label className="confirmation-row"><input type="checkbox" required /><span><strong>Versand ausdrücklich bestätigen</strong><small>Es wird genau ein autorisierter Primärkontakt angeschrieben.</small></span></label>
+        <button className="primary-button primary-button--wide" type="submit" disabled={!sendAvailable || !draftDocuments.length || documentPending}><Icon name="document" />{documentPending ? "PDF wird versendet…" : "Geprüftes PDF senden"}</button>
+        {!draftDocuments.length ? <p className="form-hint"><Icon name="shield" /> Es gibt aktuell keinen Dokumententwurf, der zum Erstversand bereitsteht.</p> : null}
+        {documentResult ? <p className={`send-result ${documentResult.failureCount || !documentResult.documentStatusUpdated ? "send-result--warning" : ""}`} role="status"><Icon name={documentResult.failureCount || !documentResult.documentStatusUpdated ? "warning" : "check"} /><span><strong>{documentResult.successCount ? "PDF wurde zugestellt." : "PDF konnte nicht zugestellt werden."}</strong><small>{documentResult.documentStatusUpdated ? "Der Dokumentstatus wurde auf „Versendet“ gesetzt." : "Der Dokumentstatus blieb unverändert."}</small></span></p> : null}
+      </form>
+    </section>
+  </>;
+}
+
 function SettingsView({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const integrations = [{ name: "Google Sheets", copy: "Zentrale Stammdaten", active: snapshot.integrations.sheets, icon: "document" as IconName }, { name: "Google Drive", copy: "Private Foto-Ordner", active: snapshot.integrations.drive, icon: "drive" as IconName }, { name: "Google Calendar", copy: "Einladungen & Erinnerungen", active: snapshot.integrations.calendar, icon: "calendar" as IconName }, { name: "ChatGPT App", copy: "MCP Management-Tools", active: snapshot.integrations.mcp, icon: "spark" as IconName }];
+  const integrations = [{ name: "Google Sheets", copy: "Zentrale Stammdaten", active: snapshot.integrations.sheets, icon: "document" as IconName }, { name: "Google Drive", copy: "Private Foto-Ordner", active: snapshot.integrations.drive, icon: "drive" as IconName }, { name: "Google Calendar", copy: "Einladungen & Erinnerungen", active: snapshot.integrations.calendar, icon: "calendar" as IconName }, { name: "Portal-Gmail", copy: "Einzelversand ohne sichtbare Empfängerlisten", active: snapshot.integrations.gmail, icon: "mail" as IconName }, { name: "ChatGPT App", copy: "MCP Management-Tools", active: snapshot.integrations.mcp, icon: "spark" as IconName }];
   return <><PageIntro view="settings" snapshot={snapshot} /><section className="settings-grid"><article className="panel integrations-card"><header><span className="eyebrow">Verbindungen</span><h2>Google Workspace & ChatGPT</h2></header><div>{integrations.map((item) => <div className="integration-row" key={item.name}><span><Icon name={item.icon} /></span><div><strong>{item.name}</strong><small>{item.copy}</small></div><Pill value={item.active ? "granted" : "missing"} /></div>)}</div></article><article className="panel privacy-card"><span className="privacy-illustration"><Icon name="shield" /></span><span className="eyebrow">Privacy by default</span><h2>Fotos bleiben privat. Rollen bleiben klar.</h2><ul><li><Icon name="check" /> Eltern sehen nur ihre zugeordneten Kinder.</li><li><Icon name="check" /> Fotos werden nie öffentlich freigegeben.</li><li><Icon name="check" /> Interne Notizen bleiben intern.</li><li><Icon name="check" /> Tool-Aktionen sind nach Wirkung markiert.</li></ul></article><article className="panel mode-card"><div><span className={`mode-light ${snapshot.integrations.mode}`} /><span><strong>{snapshot.integrations.mode === "demo" ? "Fiktionaler Demo-Modus" : "Google Produktionsmodus"}</strong><small>{snapshot.integrations.mode === "demo" ? "Sicher zum Erkunden · nicht persistent" : "Konfiguration serverseitig aktiv"}</small></span></div><p>{snapshot.integrations.mode === "demo" ? "Alle Namen, Kontakte, Dokumente und Bilder dieser Vorschau sind erfunden. Für echte Daten müssen zuerst die Google-Ressourcen, Rollen und Secrets eingerichtet werden." : "Die Live-Verbindungen sind konfiguriert. Prüfe regelmäßig Freigaben, Einwilligungen und den Audit-Trail."}</p></article></section></>;
 }
 
@@ -498,6 +598,32 @@ export function Portal() {
   const login = async (email: string, password: string) => { await readJson(await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) })); await load(); };
   const logout = async () => { await fetch("/api/auth/logout", { method: "POST" }); setSnapshot(null); setView("overview"); };
   const action = async (input: AppAction, message: string) => { try { const next = await readJson<DashboardSnapshot>(await fetch("/api/actions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) })); setSnapshot(next); showToast(message); } catch (caught) { const messageText = caught instanceof Error ? caught.message : "Aktion fehlgeschlagen."; showToast(messageText, true); throw caught; } };
+  const sendCommunication = async (input: CommunicationSend) => {
+    try {
+      const response = await readJson<{
+        result: CommunicationSendResult;
+        snapshot: DashboardSnapshot;
+      }>(await fetch("/api/communications/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input)
+      }));
+      setSnapshot(response.snapshot);
+      showToast(
+        response.result.failureCount
+          ? "Versand abgeschlossen, einzelne Zustellungen sind fehlgeschlagen."
+          : "Versand erfolgreich abgeschlossen.",
+        response.result.failureCount > 0
+      );
+      return response.result;
+    } catch (caught) {
+      const messageText = caught instanceof Error
+        ? caught.message
+        : "Versand fehlgeschlagen.";
+      showToast(messageText, true);
+      throw caught;
+    }
+  };
   const navigate = (next: View, focus?: string) => { setView(next); setFocusId(focus); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   if (loading) return <div className="app-loader"><Brand /><span className="loader-dots"><i /><i /><i /></span><p>Der Familienbereich wird vorbereitet…</p></div>;
@@ -510,6 +636,7 @@ export function Portal() {
       {view === "overview" ? isStaffRole(snapshot.session.role) ? <AdminOverview snapshot={snapshot} onModal={(name) => setModal(name)} onNavigate={navigate} /> : <ParentOverview snapshot={snapshot} onNavigate={navigate} /> : null}
       {view === "children" ? <ChildrenView key={focusId || "children"} snapshot={snapshot} focusId={focusId} onAction={action} onAdd={() => setModal("child")} /> : null}
       {view === "documents" ? <DocumentsView snapshot={snapshot} focusId={focusId} onGenerate={() => setModal("document")} onAction={action} /> : null}
+      {view === "communications" && snapshot.session.role === "admin" ? <CommunicationsView snapshot={snapshot} onSend={sendCommunication} /> : null}
       {view === "calendar" ? <CalendarView snapshot={snapshot} focusId={focusId} onAdd={() => setModal("event")} onEdit={setEditingEvent} /> : null}
       {view === "photos" ? <PhotosView snapshot={snapshot} onSnapshot={setSnapshot} showToast={showToast} /> : null}
       {view === "profile" ? <ProfileView snapshot={snapshot} onAction={action} /> : null}

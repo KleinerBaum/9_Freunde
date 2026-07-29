@@ -49,8 +49,10 @@ Alle Punkte müssen mit einem extern aufbewahrten Nachweis belegt sein.
 - [ ] Incident-Prozess einschließlich 72-Stunden-Bewertung getestet
 - [ ] Auskunft, Berichtigung, Löschung und Zugriffsentzug als
       Datenschutzanfragen getestet
-- [ ] Google Shared Drive und dediziertes verwaltetes Calendar-Konto geprüft
-- [ ] Domain-wide Delegation ist auf `calendar.events` beschränkt
+- [ ] Google Shared Drive, dediziertes verwaltetes Calendar-Konto und separates
+      Portal-Gmail-Postfach geprüft
+- [ ] Domain-wide Delegation ist auf `calendar.events` und `gmail.send`
+      beschränkt
 - [ ] Audit-Tabelle enthält keine Namen, E-Mail-Adressen oder fachlichen Inhalte
 - [ ] Automatisierte Prüfungen, Build und Sicherheitstest sind erfolgreich
 - [ ] Pilotstart, Reviewdatum, Abbruchkriterien und Rückfallversion festgelegt
@@ -69,7 +71,7 @@ veröffentlichten Umgebung ist vor Pilotbeginn gesondert nachzuweisen:
 | Nachvollziehbarkeit | pseudonymisierte Anmelde-, Lese-, Änderungs-, Foto-, Dokument-, Rollen- und Cloud-Ereignisse | Aufbewahrungsfrist, Zugriff auf Audit-Tabelle, Monitoring |
 | Betroffenenrechte | bestätigte, fällige Anfragen; kontrollierter Rollen-/Zugriffsentzug | Identitätsprüfung, Vier-Augen-Ausführung, Löschung in Backups |
 | Web-Sicherheit | SameSite/HttpOnly/Secure, Origin-Prüfung, Login-Sperre, CSP/HSTS/Frame/Permissions-Header | unabhängiger Sicherheitstest und verwaltete MFA |
-| Cloud | private serverseitige Zugriffe; Calendar nur `calendar.events`; persönliche Gmail-Organisatoren werden abgelehnt | AVV, Unterauftragnehmer, Transfer, Shared Drive und Restore |
+| Cloud | private serverseitige Zugriffe; Calendar nur `calendar.events`; Gmail nur `gmail.send`; persönliche Gmail-Konten und ein gemeinsamer Organizer/Absender werden abgelehnt | AVV, Unterauftragnehmer, Transfer, Shared Drive und Restore |
 
 Die Implementierung ersetzt weder DSFA, Vertragsprüfung noch schriftliche
 Träger- und Datenschutzfreigabe. Solange ein Freigabegate offen ist, bleibt der

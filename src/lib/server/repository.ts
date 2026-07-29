@@ -1,10 +1,12 @@
 import {
   AppActionSchema,
+  CommunicationSendSchema,
   CreatePrivacyRequestSchema,
   DashboardSnapshotSchema,
   LoginSchema,
   UpdateUserAccessSchema,
   type AppAction,
+  type CommunicationSendResult,
   type DashboardSnapshot,
   type PrivacyRequest,
   type UserSession
@@ -20,7 +22,9 @@ import {
   authenticateGoogleSitesUser,
   createGooglePrivacyRequest,
   getGoogleSnapshot,
+  gmailIntegrationEnabled,
   listGooglePrivacyRequests,
+  sendGoogleCommunication,
   validateGoogleSession,
   performGoogleAction,
   googleConfigurationStatus,
@@ -51,7 +55,9 @@ export const productionTechnicalGateReady = () => {
     productionBaseUrlConfigured() &&
     google.sheets &&
     google.drive &&
-    google.calendar;
+    google.calendar &&
+    gmailIntegrationEnabled() &&
+    google.gmail;
 };
 
 export const dataMode = () =>
@@ -94,6 +100,21 @@ export async function performAppAction(session: UserSession, rawAction: unknown)
     ? await performGoogleAction(session, action)
     : performDemoAction(session, action);
   return DashboardSnapshotSchema.parse(snapshot);
+}
+
+export async function sendCommunication(
+  session: UserSession,
+  rawInput: unknown
+): Promise<CommunicationSendResult> {
+  if (dataMode() !== "google") {
+    const error = new Error("Communications require Google production mode.");
+    Object.assign(error, { status: 409 });
+    throw error;
+  }
+  return sendGoogleCommunication(
+    session,
+    CommunicationSendSchema.parse(rawInput)
+  );
 }
 
 export async function createPrivacyRequest(

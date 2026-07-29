@@ -2,7 +2,7 @@
 
 This is the recommended application in this repository. It is a responsive staff and parent portal built with Next.js/React, vinext with its Cloudflare worker adapter for ChatGPT Sites, and the ChatGPT Apps SDK over MCP.
 
-The original Streamlit app remains available during migration. The new app intentionally keeps the operating model small: Google Sheets is the database, Google Drive stores private child photos, Google Calendar sends invitations and updates, and invoices/contracts are deterministic PDFs that always require human review. No paid LLM call is needed for normal portal use.
+The original Streamlit app remains available during migration. The new app intentionally keeps the operating model small: Google Sheets is the database, Google Drive stores private child photos, Google Calendar sends invitations and updates, a dedicated Gmail mailbox sends confirmed notices and reviewed PDFs, and invoices/contracts are deterministic PDFs that always require human review. No paid LLM call is needed for normal portal use.
 
 ## What works
 
@@ -18,6 +18,9 @@ The original Streamlit app remains available during migration. The new app inten
 - Private Google Drive galleries with JPG/PNG/WebP signature validation, a 15
   MB limit, no public sharing links, and server-side consent enforcement.
 - Google Calendar event creation and editing with attendee updates and email reminders.
+- Admin-only Gmail delivery for opted-in parent notices and reviewed PDF
+  drafts. Recipients are resolved server-side and every recipient receives an
+  individual message without a visible distribution list.
 - ChatGPT tools for search/fetch, operational overview, document drafting, and confirmed Calendar writes.
 - A compact interactive ChatGPT widget rendered from `ui://9-freunde/dashboard-v1.html`.
 - Pseudonymized audit events, revocable sessions, confirmed privacy-request
@@ -63,22 +66,34 @@ Before enabling real data, complete the
 owner-only until the governance approval, hosted configuration, and production
 health checks have all passed.
 
-1. Create a Google Cloud service account and enable Google Sheets, Drive, and Calendar APIs.
+1. Create a Google Cloud service account and enable Google Sheets, Drive,
+   Calendar, and Gmail APIs.
 2. Create one private spreadsheet with tabs named `children`, `parents`,
    `users`, `documents`, `consents`, `audit`, and `privacy_requests`.
 3. Put the spreadsheet and the child-photo root in a Google Workspace Shared Drive. Add the service account as a Content Manager so newly created folders and photos belong to the organization rather than an individual account.
-4. Create a dedicated Workspace organizer account and facility Calendar.
-5. Enable domain-wide delegation for the service account, then authorize only `https://www.googleapis.com/auth/calendar.events` in Google Admin Console. Set `GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL` to the dedicated organizer. Sheets and Drive continue to use the service account directly.
+4. Create a dedicated Workspace organizer account and facility Calendar, plus
+   a separate managed portal Gmail mailbox.
+5. Enable domain-wide delegation for the service account, then authorize only
+   `https://www.googleapis.com/auth/calendar.events` and
+   `https://www.googleapis.com/auth/gmail.send` in Google Admin Console. Set
+   `GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL` to the dedicated organizer and
+   `GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL` to the separate portal mailbox.
+   Sheets and Drive continue to use the service account directly and are not
+   domain-wide delegated.
 6. Complete and sign the [data-protection release
    record](DATA_PROTECTION_RELEASE.md). Only then set `DATA_MODE=google` and
    `REAL_DATA_APPROVED=true`. Use `AUTH_MODE=sites`,
-   `PARENT_ACCESS_ENABLED=false`, `MCP_ENABLED=false`, and the managed staff
-   domain for the first pilot. The application remains in fictional demo mode
-   unless approval, managed identity, legal notices, HTTPS base URL, and all
-   three Google integrations are configured together.
+   `PARENT_ACCESS_ENABLED=false`, `MCP_ENABLED=false`, `GMAIL_ENABLED=true`,
+   and the managed staff domain for the first pilot. The application remains
+   in fictional demo mode unless approval, managed identity, legal notices,
+   HTTPS base URL, and all four Google integrations are configured together.
 7. Copy `.env.example` to the deployment environment and provide the listed
    server-side values. Keep the private key, session secret, independent audit
    HMAC secret, and any later MCP bearer token in the Sites secret store only.
+   A Google project number, OAuth client secret, and OpenAI API key are not
+   application configuration and must not be added to Sites. Domain-wide
+   delegation needs the service account's numeric client ID only once in Google
+   Admin Console.
 8. Configure Sites custom access with individually approved managed staff
    accounts. The application reads the authenticated Sites identity and maps it
    to the `users` tab; an allowlist entry alone does not grant an application
@@ -142,15 +157,28 @@ Production access rules are enforced server-side:
 - Audit rows contain HMAC-pseudonymized actor/resource references and no
   business payload or names.
 - Calendar writes use `sendUpdates=all` so invitations and edits reach attendees.
+- `POST /api/communications/send` is admin-only, requires a same-origin request
+  plus explicit confirmation, accepts no recipient addresses, and sends no
+  more than 100 individual messages.
+- Parent notices honor `notifications_opt_in`. Reviewed PDFs go only to the
+  assigned primary contact; document status changes to `sent` only after a
+  successful Gmail delivery.
+- Gmail uses a distinct delegated auth context and token cache with only
+  `gmail.send`. Audit rows never contain recipient addresses, subject lines,
+  message bodies, or provider error details.
 - MCP is disabled unless `MCP_ENABLED=true`; writes additionally require
   explicit confirmation and a bearer token in Google mode.
 - `GET /api/health` reports liveness and whether required configuration is present.
-- `GET /api/admin/integrations/health` requires an authenticated admin session and performs sanitized, read-only checks against the Sheet schema, writable Drive root, and delegated Calendar.
+- `GET /api/admin/integrations/health` requires an authenticated admin session
+  and performs sanitized checks against the Sheet schema, writable Drive root,
+  delegated Calendar, and Gmail delegated-token issuance. The health check
+  never sends a message.
 
-The Calendar organizer must be a user in `GOOGLE_WORKSPACE_DOMAIN`. Personal
-Gmail accounts are rejected by configuration validation. The provider must
-also enforce MFA for staff in the managed identity system; the application
-cannot configure that external policy itself.
+The Calendar organizer and Gmail sender must be distinct users in
+`GOOGLE_WORKSPACE_DOMAIN`. Personal Gmail accounts are rejected by
+configuration validation. The provider must also enforce MFA for staff in the
+managed identity system; the application cannot configure that external policy
+itself.
 
 ## ChatGPT App setup
 
@@ -183,4 +211,5 @@ The archive contains the vinext standalone server and the Sites metadata for tha
   [retention/incident procedure](RETENTION_AND_INCIDENT_RUNBOOK.md). They are
   not legal approval and must be completed and signed externally.
 - Face recognition, automatic child tagging, and public photo links are deliberately out of scope.
-- The connected Google Drive and Calendar accounts were inspected only for availability during development; resource IDs and personal data are not committed.
+- Google resource IDs, delegated account addresses, private keys, and personal
+  data are never committed.

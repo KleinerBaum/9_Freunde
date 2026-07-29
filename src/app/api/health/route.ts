@@ -48,7 +48,7 @@ export function GET(): Response {
     },
     integrations: mode === "google"
       ? googleConfigurationStatus()
-      : { sheets: false, drive: false, calendar: false },
+      : { sheets: false, drive: false, calendar: false, gmail: false },
     mcp: MCP_ENDPOINT
   }, {
     headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" }

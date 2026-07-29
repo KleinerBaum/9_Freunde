@@ -47,7 +47,8 @@ describe("protected integration health route", () => {
       mode: "demo",
       sheets: { ok: false, code: "not_configured" },
       drive: { ok: false, code: "not_configured" },
-      calendar: { ok: false, code: "not_configured" }
+      calendar: { ok: false, code: "not_configured" },
+      gmail: { ok: false, code: "not_configured" }
     });
     expect(response.headers.get("cache-control")).toContain("no-store");
   });

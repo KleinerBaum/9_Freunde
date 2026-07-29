@@ -460,7 +460,14 @@ export function getDemoSnapshot(session: UserSession): DashboardSnapshot {
     consents: session.role === "admin"
       ? structuredClone(current.consents.filter((record) => visibleChildIds.has(record.childId)))
       : [],
-    integrations: { mode: "demo", sheets: false, drive: false, calendar: false, mcp: true },
+    integrations: {
+      mode: "demo",
+      sheets: false,
+      drive: false,
+      calendar: false,
+      gmail: false,
+      mcp: true
+    },
     generatedAt: new Date().toISOString()
   };
 }

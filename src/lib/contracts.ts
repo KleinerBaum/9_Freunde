@@ -143,10 +143,25 @@ export const PhotoSchema = z.object({
 });
 export type Photo = z.infer<typeof PhotoSchema>;
 
+export const IntegrationCheckCodeSchema = z.enum([
+  "ok",
+  "not_configured",
+  "unauthorized",
+  "forbidden",
+  "not_found",
+  "quota",
+  "schema",
+  "unsupported_storage",
+  "unavailable",
+  "unknown"
+]);
+export type IntegrationCheckCode = z.infer<typeof IntegrationCheckCodeSchema>;
+
 export const IntegrationStatusSchema = z.object({
   mode: z.enum(["demo", "google"]),
   sheets: z.boolean(),
   drive: z.boolean(),
+  driveStatus: IntegrationCheckCodeSchema.default("not_configured"),
   calendar: z.boolean(),
   gmail: z.boolean(),
   mcp: z.boolean()

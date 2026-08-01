@@ -1,21 +1,33 @@
-name: Photo MVP
+name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   photo-mvp:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install dev requirements
         run: python -m pip install -r requirements-dev.txt
@@ -25,3 +37,30 @@ jobs:
 
       - name: Run photo tests
         run: python -m pytest tests/test_photo_share_service.py tests/test_photo_ui_smoke.py
+
+  sites-quality:
+    name: Sites quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Sites quality gate
+        env:
+          TMPDIR: /tmp
+          WRANGLER_LOG_PATH: /tmp/codex-wrangler
+        run: npm run check
+
+      - name: Run native Next compatibility build
+        run: npm run build:next

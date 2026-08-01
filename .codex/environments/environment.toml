@@ -1,0 +1,154 @@
+# Generated-compatible configuration for the Codex desktop app.
+version = 1
+name = "9_Freunde"
+
+[setup]
+script = '''
+set -euo pipefail
+cd "${CODEX_WORKTREE_PATH:-$PWD}"
+
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+  echo "NVM is required at $NVM_DIR/nvm.sh." >&2
+  exit 2
+fi
+. "$NVM_DIR/nvm.sh"
+nvm install
+nvm use
+
+npm ci
+
+if [ -L .env.local ]; then
+  echo "Refusing to write local secrets through a symbolic link." >&2
+  exit 2
+fi
+
+if [ ! -f .env.local ]; then
+  cp .env.example .env.local
+
+  python3 - <<'PY'
+from pathlib import Path
+import secrets
+
+path = Path(".env.local")
+lines = path.read_text(encoding="utf-8").splitlines()
+generated = {
+    "SESSION_SECRET": secrets.token_urlsafe(48),
+    "AUDIT_HASH_SECRET": secrets.token_urlsafe(48),
+}
+seen = set()
+result = []
+
+for line in lines:
+    if "=" in line and not line.lstrip().startswith("#"):
+        key = line.split("=", 1)[0]
+        if key in generated:
+            result.append(f"{key}={generated[key]}")
+            seen.add(key)
+            continue
+    result.append(line)
+
+for key, value in generated.items():
+    if key not in seen:
+        result.append(f"{key}={value}")
+
+path.write_text("\n".join(result) + "\n", encoding="utf-8")
+PY
+
+  echo "Created ignored .env.local and generated local-only session secrets."
+fi
+
+chmod 600 .env.local
+git check-ignore -q .env.local
+mkdir -p /tmp/codex-wrangler
+'''
+
+[setup.win32]
+script = '''
+$ErrorActionPreference = "Stop"
+Write-Error "Use this repository through the Codex WSL agent and its native /home/gerri checkout."
+exit 2
+'''
+
+[cleanup]
+script = "echo \"No project-specific cleanup required.\""
+
+[cleanup.win32]
+script = "Write-Host \"No project-specific cleanup required.\""
+
+[[actions]]
+name = "Start family portal"
+icon = "tool"
+command = '''
+set -euo pipefail
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+. "$NVM_DIR/nvm.sh"
+nvm use >/dev/null
+export TMPDIR=/tmp
+export WRANGLER_LOG_PATH=/tmp/codex-wrangler
+npm run dev
+'''
+
+[[actions]]
+name = "Quality gate"
+icon = "tool"
+command = '''
+set -euo pipefail
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+. "$NVM_DIR/nvm.sh"
+nvm use >/dev/null
+export TMPDIR=/tmp
+export WRANGLER_LOG_PATH=/tmp/codex-wrangler
+npm run check
+'''
+
+[[actions]]
+name = "Production build"
+icon = "tool"
+command = '''
+set -euo pipefail
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+. "$NVM_DIR/nvm.sh"
+nvm use >/dev/null
+export TMPDIR=/tmp
+export WRANGLER_LOG_PATH=/tmp/codex-wrangler
+npm run build
+'''
+
+[[actions]]
+name = "Next compatibility build"
+icon = "tool"
+command = '''
+set -euo pipefail
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+. "$NVM_DIR/nvm.sh"
+nvm use >/dev/null
+npm run build:next
+'''
+
+[[actions]]
+name = "Sites archive verification"
+icon = "tool"
+command = '''
+set -euo pipefail
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+. "$NVM_DIR/nvm.sh"
+nvm use >/dev/null
+export TMPDIR=/tmp
+export WRANGLER_LOG_PATH=/tmp/codex-wrangler
+npm run sites:archive
+'''
+
+[[actions]]
+name = "Legacy photo tests"
+icon = "tool"
+command = '''
+set -euo pipefail
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is required for the optional legacy Python tests." >&2
+  exit 2
+fi
+uv venv --python /usr/bin/python3 --allow-existing .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+.venv/bin/python -m pytest tests/test_photo_share_service.py tests/test_photo_ui_smoke.py
+'''

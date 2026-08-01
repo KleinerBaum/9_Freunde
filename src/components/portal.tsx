@@ -20,6 +20,7 @@ import {
   type CommunicationSend,
   type CommunicationSendResult,
   type DashboardSnapshot,
+  type IntegrationCheckCode,
   type ManagedDocument,
   type Parent
 } from "../lib/contracts";
@@ -77,6 +78,19 @@ const STATUS_LABELS: Record<string, string> = {
   restricted: "Eingeschränkt",
   withdrawn: "Widerrufen",
   missing: "Fehlt"
+};
+
+const DRIVE_STATUS_MESSAGES: Record<IntegrationCheckCode, string> = {
+  ok: "",
+  not_configured: "Der private Foto-Upload ist noch nicht vollständig für die Workspace Shared Drive eingerichtet.",
+  unauthorized: "Die Google-Drive-Anmeldung konnte nicht bestätigt werden. Der Foto-Upload bleibt gesperrt.",
+  forbidden: "Das Portal besitzt derzeit kein bestätigtes Schreibrecht für alle privaten Fotoordner.",
+  not_found: "Mindestens ein privater Fotoordner fehlt oder ist nicht erreichbar.",
+  quota: "Google Drive ist vorübergehend ausgelastet. Der Foto-Upload bleibt bis zur nächsten erfolgreichen Prüfung gesperrt.",
+  schema: "Die Zuordnung der privaten Fotoordner ist unvollständig oder widersprüchlich.",
+  unsupported_storage: "Der Fotoordner liegt nicht in der freigegebenen Workspace Shared Drive. Uploads nach „Meine Ablage“ sind gesperrt.",
+  unavailable: "Google Drive ist derzeit nicht erreichbar. Der Foto-Upload bleibt gesperrt.",
+  unknown: "Die Schreibbereitschaft von Google Drive konnte nicht sicher bestätigt werden."
 };
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -223,7 +237,7 @@ function Topbar({ snapshot, onMenu, onNavigate }: { snapshot: DashboardSnapshot;
       <div className="search-box"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Kind, Dokument oder Termin suchen…" aria-label="Suchen" />
         {results.length ? <div className="search-results">{results.map((item) => <button type="button" key={`${item.kind}-${item.focus}`} onClick={() => { onNavigate(item.view, item.focus); setQuery(""); }}><span>{item.kind}</span><strong>{item.title}</strong><small>{item.detail}</small></button>)}</div> : null}
       </div>
-      <div className="topbar__right"><span className={`mode-badge mode-badge--${snapshot.integrations.mode}`}><i />{snapshot.integrations.mode === "demo" ? "Demo-Modus" : "Live verbunden"}</span><Avatar name={snapshot.session.name} tone={3} /></div>
+      <div className="topbar__right"><span className={`mode-badge mode-badge--${snapshot.integrations.mode}`}><i />{snapshot.integrations.mode === "demo" ? "Demo-Modus" : "Google-Modus"}</span><Avatar name={snapshot.session.name} tone={3} /></div>
     </header>
   );
 }
@@ -415,18 +429,43 @@ function CalendarView({ snapshot, focusId, onAdd, onEdit }: { snapshot: Dashboar
 function PhotosView({ snapshot, onSnapshot, showToast }: { snapshot: DashboardSnapshot; onSnapshot: (snapshot: DashboardSnapshot) => void; showToast: (message: string, error?: boolean) => void }) {
   const [childId, setChildId] = useState(snapshot.children[0]?.id || "");
   const [uploading, setUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<{ message: string; error: boolean } | null>(null);
   const photos = snapshot.photos.filter((photo) => photo.childId === childId);
   const child = snapshot.children.find((item) => item.id === childId);
+  const canUpload = canWriteRecords(snapshot.session.role);
+  const driveReady =
+    snapshot.integrations.mode === "google" &&
+    snapshot.integrations.drive &&
+    snapshot.integrations.driveStatus === "ok";
+  const folderReady = Boolean(child?.photoFolderId);
+  const consentReady = child?.photoConsent === "granted";
+  const uploadReady = canUpload && driveReady && folderReady && consentReady;
+  const blockingMessage = snapshot.integrations.mode === "demo"
+    ? "Der echte Foto-Upload bleibt im Demo-Modus gesperrt."
+    : !driveReady
+      ? DRIVE_STATUS_MESSAGES[snapshot.integrations.driveStatus]
+      : canUpload && !folderReady
+        ? "Für dieses Kind ist noch kein bestätigter privater Shared-Drive-Ordner hinterlegt."
+        : canUpload && !consentReady
+          ? "Der Upload bleibt gesperrt, bis eine gültige Foto-Einwilligung vorliegt."
+          : "";
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
+    if (!uploadReady) {
+      setUploadNotice({ message: blockingMessage || "Der Foto-Upload ist derzeit gesperrt.", error: true });
+      event.target.value = "";
+      return;
+    }
     setUploading(true);
-    try { const form = new FormData(); form.set("childId", childId); form.set("file", file); const next = await readJson<DashboardSnapshot>(await fetch("/api/photos", { method: "POST", body: form })); onSnapshot(next); showToast("Foto wurde geschützt in Google Drive gespeichert."); }
-    catch (caught) { showToast(caught instanceof Error ? caught.message : "Upload fehlgeschlagen.", true); }
+    setUploadNotice(null);
+    try { const form = new FormData(); form.set("childId", childId); form.set("file", file); const next = await readJson<DashboardSnapshot>(await fetch("/api/photos", { method: "POST", body: form })); onSnapshot(next); setUploadNotice({ message: "Das Foto wurde von Google Drive bestätigt und geschützt gespeichert.", error: false }); showToast("Foto wurde geschützt in Google Drive gespeichert."); }
+    catch (caught) { const message = caught instanceof Error ? caught.message : "Upload fehlgeschlagen."; setUploadNotice({ message, error: true }); showToast(message, true); }
     finally { setUploading(false); event.target.value = ""; }
   };
   return <>
-    <PageIntro view="photos" snapshot={snapshot} action={canWriteRecords(snapshot.session.role) ? <label className={`primary-button upload-button ${uploading ? "disabled" : ""}`}><Icon name="upload" />{uploading ? "Lädt hoch…" : "Foto hochladen"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void upload(event)} disabled={uploading} /></label> : undefined} />
-    <section className="photo-toolbar panel"><div><span className="eyebrow">Galerie für</span><select value={childId} onChange={(event) => setChildId(event.target.value)}>{snapshot.children.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="consent-summary"><Icon name="shield" /><span><strong>{child ? STATUS_LABELS[child.photoConsent] : "—"}</strong><small>Foto-Einwilligung</small></span></div><div className="consent-summary"><Icon name="download" /><span><strong>{child ? STATUS_LABELS[child.downloadConsent] : "—"}</strong><small>Download-Freigabe</small></span></div></section>
+    <PageIntro view="photos" snapshot={snapshot} action={canUpload ? <label className={`primary-button upload-button ${uploading || !uploadReady ? "disabled" : ""}`} aria-disabled={uploading || !uploadReady}><Icon name="upload" />{uploading ? "Lädt hoch…" : uploadReady ? "Foto hochladen" : "Upload gesperrt"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void upload(event)} disabled={uploading || !uploadReady} /></label> : undefined} />
+    <section className="photo-toolbar panel"><div><span className="eyebrow">Galerie für</span><select value={childId} onChange={(event) => { setChildId(event.target.value); setUploadNotice(null); }}>{snapshot.children.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div><div className="consent-summary"><Icon name="shield" /><span><strong>{child ? STATUS_LABELS[child.photoConsent] : "—"}</strong><small>Foto-Einwilligung</small></span></div><div className="consent-summary"><Icon name="download" /><span><strong>{child ? STATUS_LABELS[child.downloadConsent] : "—"}</strong><small>Download-Freigabe</small></span></div></section>
+    {uploadNotice || blockingMessage ? <div className={`photo-upload-status ${uploadNotice?.error === false ? "photo-upload-status--success" : "photo-upload-status--error"}`} role={uploadNotice?.error === false ? "status" : "alert"}><Icon name={uploadNotice?.error === false ? "check" : "shield"} /><span><strong>{uploadNotice?.error === false ? "Upload bestätigt" : "Foto-Upload nicht bereit"}</strong><small>{uploadNotice?.message || blockingMessage}</small></span></div> : null}
     {snapshot.integrations.mode === "demo" ? <div className="demo-banner"><Icon name="spark" /><span><strong>Behutsame Demo-Illustrationen</strong><small>Es werden keine echten Kinderfotos ausgeliefert. Im Google-Modus kommen Bilder ausschließlich aus privaten Kind-Ordnern.</small></span></div> : null}
     <section className="photo-grid">{photos.map((photo, index) => <article className={`photo-card photo-card--${index % 5}`} key={photo.id}><div style={{ backgroundImage: `url(${photo.previewUrl})` }} role="img" aria-label={photo.name} /><footer><span><strong>{photo.name}</strong><small>{fullDate(photo.createdAt)}</small></span><button type="button" aria-label="Mehr Optionen"><Icon name="more" /></button></footer></article>)}</section>
     {!photos.length ? <Empty icon="photo" title="Noch keine Fotomomente" copy="Sobald ein Bild freigegeben ist, erscheint es geschützt in dieser Galerie." /> : null}

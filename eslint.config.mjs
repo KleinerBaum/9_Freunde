@@ -9,6 +9,7 @@ export default defineConfig([
     ".next/**",
     ".open-next/**",
     ".vinext/**",
+    ".venv/**",
     "dist/**",
     "node_modules/**",
     "next-env.d.ts",

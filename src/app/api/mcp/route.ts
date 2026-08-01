@@ -1,1 +1,4 @@
-export { DELETE, OPTIONS, POST, dynamic, runtime } from "../../mcp/route";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export { DELETE, OPTIONS, POST } from "../../mcp/route";

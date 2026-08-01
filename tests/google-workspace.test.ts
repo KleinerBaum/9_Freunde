@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildGoogleJwtClaims,
+  checkGoogleDriveIntegration,
   checkGoogleIntegrations,
   classifyGoogleHttpError,
+  classifyGoogleIntegrationError,
   getGoogleAccessToken,
   googleConfigurationStatus,
-  resetGoogleTokenCacheForTests
+  resetGoogleTokenCacheForTests,
+  validateDriveFolderMetadata
 } from "../src/lib/server/google-workspace";
 
 const originalEnvironment = { ...process.env };
@@ -21,6 +24,7 @@ function configureGoogleEnvironment() {
     format: "pem"
   }).toString();
   process.env.GOOGLE_SHEET_ID = "sheet-id";
+  process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID = "shared-drive-id";
   process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID = "folder-id";
   process.env.GOOGLE_CALENDAR_ID = "facility@example.com";
   process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL = "organizer@example.com";
@@ -97,6 +101,78 @@ describe("Google Workspace authentication", () => {
     expect(googleConfigurationStatus().calendar).toBe(false);
   });
 
+  it("requires an explicit Shared Drive ID before reporting Drive configured", () => {
+    expect(googleConfigurationStatus().drive).toBe(true);
+    delete process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID;
+    expect(googleConfigurationStatus().drive).toBe(false);
+  });
+
+  it.each([
+    [
+      {
+        id: "folder-id",
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false,
+        capabilities: { canAddChildren: true }
+      },
+      "unsupported_storage"
+    ],
+    [
+      {
+        id: "folder-id",
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false,
+        driveId: "different-drive",
+        capabilities: { canAddChildren: true }
+      },
+      "unsupported_storage"
+    ],
+    [
+      {
+        id: "folder-id",
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false,
+        driveId: "shared-drive-id",
+        capabilities: { canAddChildren: false }
+      },
+      "forbidden"
+    ]
+  ] as const)("rejects an invalid or non-writable Drive folder as %s", (metadata, expected) => {
+    let caught: unknown;
+    try {
+      validateDriveFolderMetadata(metadata, "shared-drive-id");
+    } catch (error) {
+      caught = error;
+    }
+    expect(classifyGoogleIntegrationError(caught)).toBe(expected);
+  });
+
+  it("reports My Drive as unsupported storage without exposing folder details", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (
+      input: string | URL | Request
+    ) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ access_token: "token", expires_in: 3600 });
+      }
+      return Response.json({
+        id: "folder-id",
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false,
+        capabilities: { canAddChildren: true }
+      });
+    }));
+
+    expect(await checkGoogleDriveIntegration()).toEqual({
+      ok: false,
+      code: "unsupported_storage"
+    });
+  });
+
   it("requires a distinct managed Gmail sender", () => {
     expect(googleConfigurationStatus().gmail).toBe(true);
     process.env.GOOGLE_GMAIL_IMPERSONATED_USER_EMAIL = "organizer@example.com";
@@ -113,8 +189,9 @@ describe("Google Workspace authentication", () => {
         "child_id", "name", "birthdate", "start_date", "group", "status",
         "primary_parent_id", "parent_email", "allergies", "dietary",
         "languages_at_home", "care_hours_per_week", "care_fee_cents",
-        "meal_fee_cents", "folder_id", "photo_consent", "download_consent",
-        "notes_parent_visible", "notes_internal", "updated_at"
+        "meal_fee_cents", "folder_id", "photo_folder_id", "photo_consent",
+        "download_consent", "notes_parent_visible", "notes_internal",
+        "updated_at"
       ],
       parents: [
         "parent_id", "name", "email", "phone", "phone2", "address",
@@ -170,8 +247,10 @@ describe("Google Workspace authentication", () => {
       }
       if (url.includes("www.googleapis.com/drive")) {
         return Response.json({
+          id: "folder-id",
           mimeType: "application/vnd.google-apps.folder",
           trashed: false,
+          driveId: "shared-drive-id",
           capabilities: { canAddChildren: true }
         });
       }

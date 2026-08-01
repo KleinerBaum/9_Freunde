@@ -1,6 +1,8 @@
 import { createSign, pbkdf2Sync, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
+  ALLOWED_PHOTO_TYPES,
+  MAX_PHOTO_BYTES,
   type AppAction,
   type CalendarEvent,
   type Child,
@@ -11,6 +13,7 @@ import {
   type ManagedDocument,
   type Parent,
   type Photo,
+  type IntegrationCheckCode,
   type PrivacyRequest,
   type Role,
   type UserSession,
@@ -54,16 +57,7 @@ const globalGoogle = globalThis as typeof globalThis & {
   __nineFriendsGoogleTokenRequests?: Record<string, Promise<string>>;
 };
 
-export type GoogleIntegrationCheckCode =
-  | "ok"
-  | "not_configured"
-  | "unauthorized"
-  | "forbidden"
-  | "not_found"
-  | "quota"
-  | "schema"
-  | "unavailable"
-  | "unknown";
+export type GoogleIntegrationCheckCode = IntegrationCheckCode;
 
 export type GoogleIntegrationCheck = {
   ok: boolean;
@@ -83,8 +77,8 @@ const REQUIRED_SHEET_HEADERS: Record<keyof typeof TABS, readonly string[]> = {
     "child_id", "name", "birthdate", "start_date", "group", "status",
     "primary_parent_id", "parent_email", "allergies", "dietary",
     "languages_at_home", "care_hours_per_week", "care_fee_cents",
-    "meal_fee_cents", "folder_id", "photo_consent", "download_consent",
-    "notes_parent_visible", "notes_internal", "updated_at"
+    "meal_fee_cents", "folder_id", "photo_folder_id", "photo_consent",
+    "download_consent", "notes_parent_visible", "notes_internal", "updated_at"
   ],
   parents: [
     "parent_id", "name", "email", "phone", "phone2", "address",
@@ -128,6 +122,24 @@ class GoogleWorkspaceRequestError extends Error {
 
 class GoogleIntegrationSchemaError extends Error {}
 
+class GoogleDriveTargetError extends Error {
+  constructor(public readonly code: GoogleIntegrationCheckCode) {
+    super("The configured Google Drive target is not ready.");
+  }
+}
+
+class GoogleDriveResponseError extends Error {}
+
+export class PhotoUploadError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 const required = (name: string) => {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required server configuration: ${name}`);
@@ -161,7 +173,9 @@ export function googleConfigurationStatus() {
     gmailSender !== organizer;
   return {
     sheets: hasCredentials && Boolean(process.env.GOOGLE_SHEET_ID?.trim()),
-    drive: hasCredentials && Boolean(process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID?.trim()),
+    drive: hasCredentials &&
+      Boolean(process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID?.trim()) &&
+      Boolean(process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID?.trim()),
     calendar: hasCredentials &&
       Boolean(process.env.GOOGLE_CALENDAR_ID?.trim()) &&
       hasManagedOrganizer,
@@ -250,6 +264,7 @@ export function classifyGoogleHttpError(
 }
 
 export function classifyGoogleIntegrationError(error: unknown): GoogleIntegrationCheckCode {
+  if (error instanceof GoogleDriveTargetError) return error.code;
   if (error instanceof GoogleIntegrationSchemaError) return "schema";
   if (!(error instanceof GoogleWorkspaceRequestError)) return "unknown";
   return classifyGoogleHttpError(error.status, error.reason);
@@ -363,24 +378,77 @@ async function checkSheetsIntegration() {
   }
 }
 
-async function checkDriveIntegration() {
-  const folderId = encodeURIComponent(required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID"));
-  const url = new URL(`https://www.googleapis.com/drive/v3/files/${folderId}`);
-  url.searchParams.set("supportsAllDrives", "true");
-  url.searchParams.set("fields", "mimeType,trashed,capabilities(canAddChildren)");
-  const response = await googleFetch(url.toString());
-  const payload = await response.json() as {
-    mimeType?: string;
-    trashed?: boolean;
-    capabilities?: { canAddChildren?: boolean };
-  };
-  if (
-    payload.mimeType !== "application/vnd.google-apps.folder" ||
-    payload.trashed ||
-    payload.capabilities?.canAddChildren !== true
-  ) {
-    throw new GoogleWorkspaceRequestError(403, "insufficientFilePermissions", "Drive root is not writable.");
+export type DriveFolderMetadata = {
+  id?: string;
+  mimeType?: string;
+  trashed?: boolean;
+  driveId?: string;
+  parents?: string[];
+  capabilities?: { canAddChildren?: boolean };
+};
+
+export function validateDriveFolderMetadata(
+  metadata: DriveFolderMetadata,
+  expectedDriveId: string,
+  expectedParentId?: string
+): void {
+  if (!metadata.driveId || metadata.driveId !== expectedDriveId) {
+    throw new GoogleDriveTargetError("unsupported_storage");
   }
+  if (
+    !metadata.id ||
+    metadata.mimeType !== "application/vnd.google-apps.folder"
+  ) {
+    throw new GoogleDriveTargetError("schema");
+  }
+  if (metadata.trashed) {
+    throw new GoogleDriveTargetError("not_found");
+  }
+  if (
+    expectedParentId &&
+    !metadata.parents?.includes(expectedParentId)
+  ) {
+    throw new GoogleDriveTargetError("unsupported_storage");
+  }
+  if (metadata.capabilities?.canAddChildren !== true) {
+    throw new GoogleDriveTargetError("forbidden");
+  }
+}
+
+async function readDriveFolder(
+  folderId: string,
+  expectedDriveId: string,
+  expectedParentId?: string
+): Promise<DriveFolderMetadata> {
+  const encodedFolderId = encodeURIComponent(folderId);
+  const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodedFolderId}`);
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set(
+    "fields",
+    "id,mimeType,trashed,driveId,parents,capabilities(canAddChildren)"
+  );
+  const response = await googleFetch(url.toString());
+  const payload = await response.json() as DriveFolderMetadata;
+  validateDriveFolderMetadata(payload, expectedDriveId, expectedParentId);
+  return payload;
+}
+
+async function checkDriveIntegration(): Promise<void> {
+  await readDriveFolder(
+    required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID"),
+    required("GOOGLE_DRIVE_SHARED_DRIVE_ID")
+  );
+}
+
+async function checkDriveChildFolders(children: Child[]): Promise<void> {
+  const parentId = required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID");
+  const driveId = required("GOOGLE_DRIVE_SHARED_DRIVE_ID");
+  await Promise.all(children.map(async (child) => {
+    if (!child.photoFolderId) {
+      throw new GoogleDriveTargetError("not_found");
+    }
+    await readDriveFolder(child.photoFolderId, driveId, parentId);
+  }));
 }
 
 async function checkCalendarIntegration() {
@@ -409,11 +477,18 @@ async function runIntegrationCheck(
   }
 }
 
+export async function checkGoogleDriveIntegration(): Promise<GoogleIntegrationCheck> {
+  return runIntegrationCheck(
+    googleConfigurationStatus().drive,
+    checkDriveIntegration
+  );
+}
+
 export async function checkGoogleIntegrations(): Promise<GoogleIntegrationHealth> {
   const configuration = googleConfigurationStatus();
   const [sheets, drive, calendar, gmail] = await Promise.all([
     runIntegrationCheck(configuration.sheets, checkSheetsIntegration),
-    runIntegrationCheck(configuration.drive, checkDriveIntegration),
+    checkGoogleDriveIntegration(),
     runIntegrationCheck(configuration.calendar, checkCalendarIntegration),
     runIntegrationCheck(configuration.gmail, checkGmailIntegration)
   ]);
@@ -672,6 +747,13 @@ const parentFromRow = (row: SheetRow): Parent => ({
   updatedAt: row.updated_at || new Date().toISOString()
 });
 
+const photoFolderFromRow = (row: SheetRow): string => {
+  const canonical = row.folder_id?.trim() || "";
+  const compatibility = row.photo_folder_id?.trim() || "";
+  if (!canonical || canonical !== compatibility) return "";
+  return canonical;
+};
+
 const childFromRow = (row: SheetRow, parents: Parent[]): Child => {
   const parent = parents.find((item) => item.email.toLowerCase() === row.parent_email?.toLowerCase());
   return {
@@ -690,7 +772,7 @@ const childFromRow = (row: SheetRow, parents: Parent[]): Child => {
     careHoursPerWeek: int(row.care_hours_per_week || ""),
     careFeeCents: int(row.care_fee_cents || ""),
     mealFeeCents: int(row.meal_fee_cents || ""),
-    photoFolderId: row.folder_id || "",
+    photoFolderId: photoFolderFromRow(row),
     photoConsent: consent(row.photo_consent || ""),
     downloadConsent: consent(row.download_consent || ""),
     notesParentVisible: row.notes_parent_visible || "",
@@ -1198,17 +1280,22 @@ async function updateCalendarEvent(
 
 async function createDriveFolder(childId: string): Promise<string> {
   const parentId = required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID");
+  const driveId = required("GOOGLE_DRIVE_SHARED_DRIVE_ID");
+  await readDriveFolder(parentId, driveId);
   const response = await googleFetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      name: `child_${childId}`,
+      name: `child_${pseudonymousId(childId)}`,
       mimeType: "application/vnd.google-apps.folder",
       parents: [parentId]
     })
   });
   const payload = await response.json() as { id?: string };
-  if (!payload.id) throw new Error("Google Drive did not return the new child folder ID.");
+  if (!payload.id) {
+    throw new GoogleDriveResponseError("Google Drive returned an invalid folder response.");
+  }
+  await readDriveFolder(payload.id, driveId, parentId);
   return payload.id;
 }
 
@@ -1334,8 +1421,13 @@ export async function getGoogleSnapshot(session: UserSession): Promise<Dashboard
   const photoChildren = children.filter((child) =>
     photoAccessPermitted(allConsents, child.id, session.role)
   );
-  const photos = await listPhotosForChildren(photoChildren);
   const configuration = googleConfigurationStatus();
+  let photos: Photo[] = [];
+  const driveCheck = await runIntegrationCheck(configuration.drive, async () => {
+    await checkDriveIntegration();
+    await checkDriveChildFolders(children);
+    photos = await listPhotosForChildren(photoChildren);
+  });
   return {
     session,
     children,
@@ -1349,6 +1441,8 @@ export async function getGoogleSnapshot(session: UserSession): Promise<Dashboard
     integrations: {
       mode: "google",
       ...configuration,
+      drive: driveCheck.ok,
+      driveStatus: driveCheck.code,
       mcp: process.env.MCP_ENABLED?.trim().toLowerCase() === "true" &&
         Boolean(process.env.MCP_BEARER_TOKEN?.trim())
     },
@@ -1433,7 +1527,6 @@ export async function performGoogleAction(session: UserSession, action: AppActio
       name: action.payload.name,
       parent_email: action.payload.parentEmail.toLowerCase(),
       primary_parent_id: parentId,
-      folder_id: folderId,
       birthdate: action.payload.birthDate,
       start_date: action.payload.careStart,
       group: action.payload.group,
@@ -1443,6 +1536,8 @@ export async function performGoogleAction(session: UserSession, action: AppActio
       meal_fee_cents: String(action.payload.mealFeeCents),
       photo_consent: "missing",
       download_consent: "missing",
+      folder_id: folderId,
+      photo_folder_id: folderId,
       updated_at: now
     });
   }
@@ -1532,43 +1627,359 @@ export async function performGoogleAction(session: UserSession, action: AppActio
   return getGoogleSnapshot(session);
 }
 
-function photoSignatureMatches(bytes: Uint8Array, mimeType: string) {
+export function photoSignatureMatches(bytes: Uint8Array, mimeType: string): boolean {
   if (mimeType === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   if (mimeType === "image/png") return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-  if (mimeType === "image/webp") return Buffer.from(bytes.slice(0, 4)).toString() === "RIFF" && Buffer.from(bytes.slice(8, 12)).toString() === "WEBP";
+  if (mimeType === "image/webp") {
+    return bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50;
+  }
   return false;
 }
 
-export async function uploadGooglePhoto(session: UserSession, childId: string, file: File) {
-  if (!canWriteRecords(session.role)) throw new Error("Photo upload requires write access.");
-  const snapshot = await getGoogleSnapshot(session);
-  const child = snapshot.children.find((item) => item.id === childId);
-  if (!child?.photoFolderId) throw new Error("The child has no private Drive folder.");
-  if (child.photoConsent !== "granted") {
-    throw new Error("A current granted photo consent is required before upload.");
+const PHOTO_EXTENSION: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp"
+};
+
+const concatenateBytes = (
+  parts: Array<Uint8Array<ArrayBufferLike>>
+): Uint8Array<ArrayBuffer> => {
+  const result = new Uint8Array(parts.reduce((sum, part) => sum + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!photoSignatureMatches(bytes, file.type)) throw new Error("The image contents do not match the selected file type.");
-  const boundary = `nine-friends-${randomUUID()}`;
+  return result;
+};
+
+export function buildGoogleDrivePhotoMultipart(input: {
+  bytes: Uint8Array;
+  mimeType: string;
+  parentId: string;
+  fileName: string;
+  boundary: string;
+}): Uint8Array<ArrayBuffer> {
+  const encoder = new TextEncoder();
   const metadata = JSON.stringify({
-    name: `photo_${new Date().toISOString().replace(/[-:.TZ]/gu, "")}_${randomUUID().slice(0, 8)}`,
-    parents: [child.photoFolderId]
+    name: input.fileName,
+    mimeType: input.mimeType,
+    parents: [input.parentId]
   });
-  const prefix = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n`);
-  const suffix = Buffer.from(`\r\n--${boundary}--`);
-  const body = Buffer.concat([prefix, Buffer.from(bytes), suffix]);
-  await googleFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id", {
-    method: "POST",
-    headers: { "content-type": `multipart/related; boundary=${boundary}` },
-    body
-  });
+  const prefix = encoder.encode(
+    `--${input.boundary}\r\n` +
+    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+    `${metadata}\r\n` +
+    `--${input.boundary}\r\n` +
+    `Content-Type: ${input.mimeType}\r\n` +
+    "Content-Transfer-Encoding: binary\r\n\r\n"
+  );
+  const suffix = encoder.encode(`\r\n--${input.boundary}--\r\n`);
+  return concatenateBytes([prefix, input.bytes, suffix]);
+}
+
+export function normalizePhotoUploadError(error: unknown): PhotoUploadError {
+  if (error instanceof PhotoUploadError) return error;
+  if (
+    error instanceof Error &&
+    error &&
+    typeof error === "object" &&
+    "status" in error &&
+    "code" in error
+  ) {
+    const status = Number((error as { status?: unknown }).status);
+    const code = String((error as { code?: unknown }).code ?? "");
+    if (
+      Number.isInteger(status) &&
+      status >= 400 &&
+      status <= 599 &&
+      /^[a-z0-9_]{1,64}$/u.test(code)
+    ) {
+      return new PhotoUploadError(status, code, error.message);
+    }
+  }
+  if (error instanceof GoogleDriveTargetError) {
+    if (error.code === "unsupported_storage") {
+      return new PhotoUploadError(
+        409,
+        "unsupported_storage",
+        "Der Fotoordner liegt nicht in der freigegebenen Workspace Shared Drive."
+      );
+    }
+    if (error.code === "forbidden") {
+      return new PhotoUploadError(
+        503,
+        "drive_not_writable",
+        "Google Drive ist für Foto-Uploads derzeit nicht schreibbereit."
+      );
+    }
+    return new PhotoUploadError(
+      409,
+      "drive_target_invalid",
+      "Der private Fotoordner ist nicht korrekt der Shared Drive zugeordnet."
+    );
+  }
+  if (error instanceof GoogleDriveResponseError) {
+    return new PhotoUploadError(
+      502,
+      "drive_upload_unverified",
+      "Google Drive hat den Upload nicht eindeutig bestätigt. Es wurde kein Erfolg gemeldet."
+    );
+  }
+  if (error instanceof GoogleWorkspaceRequestError) {
+    const providerCode = classifyGoogleHttpError(error.status, error.reason);
+    if (["unauthorized", "forbidden", "not_found", "quota", "unavailable"].includes(providerCode)) {
+      return new PhotoUploadError(
+        503,
+        "drive_provider_unavailable",
+        "Google Drive konnte den geschützten Upload derzeit nicht bestätigen."
+      );
+    }
+    return new PhotoUploadError(
+      502,
+      "drive_provider_error",
+      "Google Drive hat eine ungültige Antwort auf den Upload geliefert."
+    );
+  }
+  if (error instanceof TypeError) {
+    return new PhotoUploadError(
+      503,
+      "drive_provider_unavailable",
+      "Google Drive ist für Foto-Uploads derzeit nicht erreichbar."
+    );
+  }
+  return new PhotoUploadError(
+    502,
+    "drive_upload_unverified",
+    "Der Foto-Upload konnte nicht sicher bestätigt werden."
+  );
+}
+
+export function photoUploadFailureAuditFields(
+  error: unknown,
+  requestId?: string
+): {
+  action: string;
+  resourceType: string;
+  outcome: "denied" | "failure";
+  requestId?: string;
+} {
+  const normalized = normalizePhotoUploadError(error);
+  return {
+    action: `photo.upload.error.${normalized.code}.${normalized.status}`,
+    resourceType: "photo",
+    outcome: normalized.status === 403 ? "denied" : "failure",
+    ...(requestId ? { requestId } : {})
+  };
+}
+
+export async function auditGooglePhotoUploadFailure(
+  session: UserSession,
+  error: unknown,
+  requestId?: string
+): Promise<void> {
   await appendGoogleAuditEvent({
     session,
-    action: "photo.upload",
-    resourceType: "child",
-    resourceId: childId,
-    outcome: "success"
+    ...photoUploadFailureAuditFields(error, requestId)
   });
+}
+
+export async function createVerifiedGoogleDrivePhoto(input: {
+  childId: string;
+  folderId: string;
+  bytes: Uint8Array;
+  mimeType: string;
+  now?: Date;
+}): Promise<Photo> {
+  try {
+    if (!googleConfigurationStatus().drive) {
+      throw new GoogleDriveTargetError("unsupported_storage");
+    }
+    if (!ALLOWED_PHOTO_TYPES.has(input.mimeType)) {
+      throw new PhotoUploadError(
+        415,
+        "photo_type_unsupported",
+        "Es sind nur JPG-, PNG- und WebP-Bilder erlaubt."
+      );
+    }
+    if (input.bytes.byteLength > MAX_PHOTO_BYTES) {
+      throw new PhotoUploadError(
+        413,
+        "photo_too_large",
+        "Das Bild überschreitet das Limit von 15 MB."
+      );
+    }
+    if (!photoSignatureMatches(input.bytes, input.mimeType)) {
+      throw new PhotoUploadError(
+        415,
+        "photo_signature_invalid",
+        "Der Bildinhalt passt nicht zum angegebenen Dateityp."
+      );
+    }
+    const parentId = required("GOOGLE_DRIVE_PHOTOS_FOLDER_ID");
+    const driveId = required("GOOGLE_DRIVE_SHARED_DRIVE_ID");
+    await readDriveFolder(parentId, driveId);
+    await readDriveFolder(input.folderId, driveId, parentId);
+
+    const now = input.now ?? new Date();
+    const extension = PHOTO_EXTENSION[input.mimeType];
+    const timestamp = now.toISOString().replace(/\D/gu, "").slice(0, 14);
+    const fileName =
+      `photo_${timestamp}_${randomUUID().replaceAll("-", "").slice(0, 12)}.${extension}`;
+    const boundary = `nine-friends-${randomUUID()}`;
+    const body = buildGoogleDrivePhotoMultipart({
+      bytes: input.bytes,
+      mimeType: input.mimeType,
+      parentId: input.folderId,
+      fileName,
+      boundary
+    });
+    const url = new URL("https://www.googleapis.com/upload/drive/v3/files");
+    url.searchParams.set("uploadType", "multipart");
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set(
+      "fields",
+      "id,name,mimeType,createdTime,parents,driveId"
+    );
+    const response = await googleFetch(url.toString(), {
+      method: "POST",
+      headers: { "content-type": `multipart/related; boundary=${boundary}` },
+      body
+    });
+    const payload = await response.json().catch(() => {
+      throw new GoogleDriveResponseError("Google Drive returned unreadable upload metadata.");
+    }) as {
+      id?: string;
+      name?: string;
+      mimeType?: string;
+      createdTime?: string;
+      parents?: string[];
+      driveId?: string;
+    };
+    if (
+      !payload.id ||
+      payload.name !== fileName ||
+      payload.mimeType !== input.mimeType ||
+      payload.driveId !== driveId ||
+      !payload.parents?.includes(input.folderId)
+    ) {
+      throw new GoogleDriveResponseError("Google Drive returned mismatched upload metadata.");
+    }
+    return {
+      id: payload.id,
+      childId: input.childId,
+      name: fileName,
+      mimeType: input.mimeType,
+      createdAt: payload.createdTime ?? now.toISOString(),
+      previewUrl: `/api/photos/${encodeURIComponent(payload.id)}`,
+      source: "google"
+    };
+  } catch (error) {
+    throw normalizePhotoUploadError(error);
+  }
+}
+
+export function assertGooglePhotoUploadRole(session: UserSession): void {
+  if (!canWriteRecords(session.role)) {
+    throw new PhotoUploadError(
+      403,
+      "photo_role_forbidden",
+      "Für den Foto-Upload fehlt die erforderliche Berechtigung."
+    );
+  }
+}
+
+export function assertGooglePhotoUploadChild(
+  child: Child | undefined
+): asserts child is Child {
+  if (!child) {
+    throw new PhotoUploadError(
+      403,
+      "photo_child_forbidden",
+      "Für dieses Kind besteht kein Upload-Zugriff."
+    );
+  }
+  if (!child.photoFolderId) {
+    throw normalizePhotoUploadError(new GoogleDriveTargetError("not_found"));
+  }
+  if (child.photoConsent !== "granted") {
+    throw new PhotoUploadError(
+      403,
+      "photo_consent_required",
+      "Vor dem Upload ist eine gültige Foto-Einwilligung erforderlich."
+    );
+  }
+}
+
+export async function uploadGooglePhoto(
+  session: UserSession,
+  childId: string,
+  file: File,
+  requestId?: string
+): Promise<DashboardSnapshot> {
+  try {
+    assertGooglePhotoUploadRole(session);
+    if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+      throw new PhotoUploadError(
+        415,
+        "photo_type_unsupported",
+        "Es sind nur JPG-, PNG- und WebP-Bilder erlaubt."
+      );
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      throw new PhotoUploadError(
+        413,
+        "photo_too_large",
+        "Das Bild überschreitet das Limit von 15 MB."
+      );
+    }
+    const snapshot = await getGoogleSnapshot(session);
+    if (!snapshot.integrations.drive) {
+      if (snapshot.integrations.driveStatus === "unsupported_storage") {
+        throw new GoogleDriveTargetError("unsupported_storage");
+      }
+      if (
+        snapshot.integrations.driveStatus === "not_configured" ||
+        snapshot.integrations.driveStatus === "not_found" ||
+        snapshot.integrations.driveStatus === "schema"
+      ) {
+        throw new GoogleDriveTargetError("schema");
+      }
+      throw new GoogleDriveTargetError("forbidden");
+    }
+    const child = snapshot.children.find((item) => item.id === childId);
+    assertGooglePhotoUploadChild(child);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const photo = await createVerifiedGoogleDrivePhoto({
+      childId,
+      folderId: child.photoFolderId,
+      bytes,
+      mimeType: file.type
+    });
+    await appendGoogleAuditEvent({
+      session,
+      action: "photo.upload",
+      resourceType: "photo",
+      resourceId: photo.id,
+      outcome: "success",
+      ...(requestId ? { requestId } : {})
+    });
+    return {
+      ...snapshot,
+      photos: [photo, ...snapshot.photos.filter((item) => item.id !== photo.id)],
+      generatedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    throw normalizePhotoUploadError(error);
+  }
 }
 
 export async function downloadGooglePhoto(session: UserSession, fileId: string): Promise<{ bytes: ArrayBuffer; mimeType: string }> {

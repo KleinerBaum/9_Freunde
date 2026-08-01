@@ -464,6 +464,7 @@ export function getDemoSnapshot(session: UserSession): DashboardSnapshot {
       mode: "demo",
       sheets: false,
       drive: false,
+      driveStatus: "not_configured",
       calendar: false,
       gmail: false,
       mcp: true

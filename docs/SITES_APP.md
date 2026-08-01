@@ -70,7 +70,12 @@ health checks have all passed.
    Calendar, and Gmail APIs.
 2. Create one private spreadsheet with tabs named `children`, `parents`,
    `users`, `documents`, `consents`, `audit`, and `privacy_requests`.
-3. Put the spreadsheet and the child-photo root in a Google Workspace Shared Drive. Add the service account as a Content Manager so newly created folders and photos belong to the organization rather than an individual account.
+3. Put the spreadsheet and the child-photo root in a managed Google Workspace
+   Shared Drive. Add the service account as a Content Manager so newly created
+   folders and photos belong to the organization rather than an individual
+   account. Configure both `GOOGLE_DRIVE_SHARED_DRIVE_ID` and
+   `GOOGLE_DRIVE_PHOTOS_FOLDER_ID`; a folder in “My Drive” is rejected even
+   when it was shared with the service account.
 4. Create a dedicated Workspace organizer account and facility Calendar, plus
    a separate managed portal Gmail mailbox.
 5. Enable domain-wide delegation for the service account, then authorize only
@@ -101,10 +106,25 @@ health checks have all passed.
 9. Deploy a new Sites version after changing hosted environment values; saved
    environment revisions do not alter an already-running release.
 
+For an existing installation, create one pseudonymous `child_<opaque-id>`
+folder per child directly below the photo root. Set `folder_id` and the
+compatibility column `photo_folder_id` to the same new folder ID in one
+reviewed migration. Do not put names, email addresses, or other personal data
+in folder names. Keep prior My Drive folders unchanged for rollback, but do not
+use them as an active upload target.
+
+At runtime, the portal verifies that the photo root and every visible child
+folder report the configured Shared Drive ID, the exact expected parent
+relationship, and `canAddChildren=true`. `integrations.drive` becomes true
+only after these live checks and photo listing succeed; `driveStatus` contains
+the sanitized reason otherwise, including `unsupported_storage` for My Drive
+or a different Shared Drive. The photo view keeps uploads disabled until this
+status is `ok`.
+
 Recommended first-row headers:
 
 ```text
-children: child_id,name,birthdate,start_date,group,status,primary_parent_id,parent_email,allergies,dietary,languages_at_home,care_hours_per_week,care_fee_cents,meal_fee_cents,folder_id,photo_consent,download_consent,notes_parent_visible,notes_internal,updated_at
+children: child_id,name,birthdate,start_date,group,status,primary_parent_id,parent_email,allergies,dietary,languages_at_home,care_hours_per_week,care_fee_cents,meal_fee_cents,folder_id,photo_folder_id,photo_consent,download_consent,notes_parent_visible,notes_internal,updated_at
 parents: parent_id,name,email,phone,phone2,address,preferred_language,emergency_contact_name,emergency_contact_phone,notifications_opt_in,child_ids,updated_at
 users: user_id,email,name,role,parent_id,child_ids,password_salt,password_hash,active,session_version
 documents: document_id,child_id,type,status,title,number,period,care_fee_cents,meal_fee_cents,total_cents,due_date,created_at,drive_file_id
@@ -148,6 +168,9 @@ Production access rules are enforced server-side:
 - Internal notes are never returned to parent sessions.
 - Photo upload, listing, preview, and download are denied unless the latest
   applicable consent record permits the requested operation.
+- Photo uploads use generated pseudonymous filenames with a MIME-safe
+  extension. The portal reports success only after Drive confirms the file ID,
+  MIME type, Shared Drive ID, and exact child-folder parent.
 - Photos are streamed through authenticated application routes; Drive files
   remain private.
 - Every protected request validates the account's current role, active state,
@@ -170,9 +193,9 @@ Production access rules are enforced server-side:
   explicit confirmation and a bearer token in Google mode.
 - `GET /api/health` reports liveness and whether required configuration is present.
 - `GET /api/admin/integrations/health` requires an authenticated admin session
-  and performs sanitized checks against the Sheet schema, writable Drive root,
-  delegated Calendar, and Gmail delegated-token issuance. The health check
-  never sends a message.
+  and performs sanitized checks against the Sheet schema, writable Shared
+  Drive root, delegated Calendar, and Gmail delegated-token issuance. The
+  health check never sends a message.
 
 The Calendar organizer and Gmail sender must be distinct users in
 `GOOGLE_WORKSPACE_DOMAIN`. Personal Gmail accounts are rejected by

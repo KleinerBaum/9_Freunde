@@ -217,7 +217,12 @@ service_account*.json
 .streamlit/secrets*.toml
 
 # TypeScript / Next.js / Sites
-.codex/
+# Track safe Codex project configuration; keep transient state local.
+.codex/*
+!.codex/config.toml
+!.codex/environments/
+.codex/environments/*
+!.codex/environments/environment.toml
 .wrangler/
 node_modules/
 .next/

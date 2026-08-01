@@ -27,6 +27,7 @@ describe("production security gates", () => {
       "portal@example-project.iam.gserviceaccount.com";
     process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = "test-private-key";
     process.env.GOOGLE_SHEET_ID = "sheet-id";
+    process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID = "shared-drive-id";
     process.env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID = "drive-id";
     process.env.GOOGLE_CALENDAR_ID = "calendar-id";
     process.env.GOOGLE_CALENDAR_IMPERSONATED_USER_EMAIL =

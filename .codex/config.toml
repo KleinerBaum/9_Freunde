@@ -1,0 +1,9 @@
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+project_root_markers = [".git", "package.json", ".openai/hosting.json"]
+project_doc_fallback_filenames = ["README.md"]
+project_doc_max_bytes = 32768
+
+[sandbox_workspace_write]
+network_access = true

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { dataMode } from "@/lib/server/repository";
+import {
+  authenticateUser,
+  configuredDataMode,
+  dataMode,
+  runtimeConfigurationStatus
+} from "@/lib/server/repository";
 import { UpdateUserAccessSchema } from "@/lib/contracts";
 import { POST as MCP_POST } from "@/app/mcp/route";
 import {
@@ -8,6 +13,8 @@ import {
   assertManagedStaffIdentity,
   assertSameOrigin,
   browserSecurityHeaders,
+  parentAccessEnabled,
+  productionAuthMode,
   recordLoginFailure,
   resetSecurityStateForTests,
   sitesIdentity
@@ -52,12 +59,40 @@ describe("production security gates", () => {
     resetSecurityStateForTests();
   });
 
-  it("falls back to fictional demo data without signed real-data approval", () => {
-    expect(dataMode()).toBe("demo");
+  it("fails closed instead of serving demo data for incomplete Google mode", () => {
+    expect(() => dataMode()).toThrow(/invalid or incomplete/u);
+    expect(runtimeConfigurationStatus()).toMatchObject({
+      configuredMode: "google",
+      effectiveMode: null,
+      ready: false,
+      failedGates: expect.arrayContaining(["realDataApproval"])
+    });
     process.env.REAL_DATA_APPROVED = "true";
     expect(dataMode()).toBe("google");
     process.env.GMAIL_ENABLED = "false";
+    expect(() => dataMode()).toThrow(/invalid or incomplete/u);
+  });
+
+  it("uses the locked-down demo defaults when optional variables are absent", async () => {
+    delete process.env.DATA_MODE;
+    delete process.env.REAL_DATA_APPROVED;
+    delete process.env.AUTH_MODE;
+    delete process.env.PARENT_ACCESS_ENABLED;
+    delete process.env.MCP_ENABLED;
+    delete process.env.GMAIL_ENABLED;
+
+    expect(configuredDataMode()).toBe("demo");
     expect(dataMode()).toBe("demo");
+    expect(productionAuthMode()).toBe("password");
+    expect(parentAccessEnabled()).toBe(false);
+    await expect(authenticateUser(
+      "eltern@demo.9freunde.de",
+      "familie"
+    )).resolves.toBeNull();
+    await expect(authenticateUser(
+      "leitung@demo.9freunde.de",
+      "willkommen"
+    )).resolves.toMatchObject({ role: "admin", authSource: "demo" });
   });
 
   it("accepts only staff accounts from the managed domain", () => {
@@ -130,5 +165,30 @@ describe("production security gates", () => {
       { method: "POST" }
     ));
     expect(response.status).toBe(404);
+  });
+
+  it("hides the MCP endpoint in demo mode even if its flags are set", async () => {
+    process.env.DATA_MODE = "demo";
+    process.env.MCP_ENABLED = "true";
+    process.env.MCP_BEARER_TOKEN = "synthetic-test-token";
+    const response = await MCP_POST(new Request(
+      "https://portal.example/api/mcp",
+      {
+        method: "POST",
+        headers: { authorization: "Bearer synthetic-test-token" }
+      }
+    ));
+    expect(response.status).toBe(404);
+  });
+
+  it("returns 503 from MCP when explicit Google mode is incomplete", async () => {
+    const response = await MCP_POST(new Request(
+      "https://portal.example/api/mcp",
+      { method: "POST" }
+    ));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      code: "runtime_not_ready"
+    });
   });
 });

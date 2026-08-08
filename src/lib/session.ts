@@ -8,7 +8,7 @@ export const SESSION_TTL_SECONDS = 30 * 60;
 function sessionSecret() {
   const configured = process.env.SESSION_SECRET?.trim();
   if (configured && configured.length >= 32) return configured;
-  if ((process.env.DATA_MODE ?? "demo") === "demo") {
+  if (process.env.DATA_MODE?.trim().toLowerCase() !== "google") {
     return "demo-only-session-secret-never-use-with-real-data";
   }
   throw new Error("SESSION_SECRET must contain at least 32 characters in production mode.");

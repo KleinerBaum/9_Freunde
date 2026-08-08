@@ -467,7 +467,7 @@ export function getDemoSnapshot(session: UserSession): DashboardSnapshot {
       driveStatus: "not_configured",
       calendar: false,
       gmail: false,
-      mcp: true
+      mcp: false
     },
     generatedAt: new Date().toISOString()
   };

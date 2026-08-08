@@ -7,5 +7,8 @@ if (!password || password.length < 12) {
 }
 
 const salt = randomBytes(18).toString("base64url");
-const hash = pbkdf2Sync(password, salt, 210_000, 32, "sha256").toString("base64url");
+const iterations = 210_000;
+const digest = pbkdf2Sync(password, salt, iterations, 32, "sha256")
+  .toString("base64url");
+const hash = `pbkdf2-sha256$${iterations}$${digest}`;
 console.log(JSON.stringify({ password_salt: salt, password_hash: hash }, null, 2));

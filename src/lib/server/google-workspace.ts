@@ -1,4 +1,4 @@
-import { createSign, pbkdf2Sync, randomUUID, timingSafeEqual } from "node:crypto";
+import { createSign, randomUUID } from "node:crypto";
 
 import {
   ALLOWED_PHOTO_TYPES,
@@ -25,6 +25,11 @@ import {
 } from "../contracts";
 import { buildManagedDocumentPdf } from "../pdf";
 import { sessionMetadata } from "../session";
+import {
+  createCurrentPasswordHash,
+  verifyPasswordHash,
+  type PasswordHashVerification
+} from "./password-hash";
 import {
   assertManagedStaffIdentity,
   parentAccessEnabled,
@@ -1327,17 +1332,178 @@ async function listPhotosForChildren(children: Child[]): Promise<Photo[]> {
   return batches.flat();
 }
 
+type VerifiedPasswordHash = Extract<
+  PasswordHashVerification,
+  { valid: true }
+>;
+
+async function upgradeGooglePasswordHash(input: {
+  row: SheetRow;
+  normalizedEmail: string;
+  password: string;
+  verification: VerifiedPasswordHash;
+  originalPasswordSalt: string;
+  originalPasswordHash: string;
+}): Promise<SheetRow> {
+  if (input.verification.upgrade === "none") {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  const nextCredential = input.verification.upgrade === "rehash"
+    ? await createCurrentPasswordHash(input.password)
+    : {
+        passwordSalt: input.originalPasswordSalt,
+        passwordHash: input.verification.replacementHash ?? ""
+      };
+  if (!nextCredential.passwordHash) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+
+  const userId = input.row.user_id?.trim() ?? "";
+  const idField = userId ? "user_id" : "email";
+  const id = userId
+    ? input.row.user_id ?? userId
+    : input.row.email ?? input.normalizedEmail;
+  const response = await googleFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}/values/${encodeRange(TABS.users)}`
+  );
+  const payload = await response.json() as { values?: unknown[][] };
+  const values = payload.values ?? [];
+  const header = (values[0] ?? []).map((value) => String(value).trim());
+  const idIndex = header.indexOf(idField);
+  if (idIndex < 0) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  const rowIndex = values.findIndex((row, index) =>
+    index > 0 && String(row[idIndex] ?? "") === id
+  );
+  if (rowIndex < 1) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  const existing = Object.fromEntries(
+    header.map((key, index) => [key, String(values[rowIndex]?.[index] ?? "")])
+  );
+  const currentEmail = existing.email?.trim().toLowerCase();
+  const currentRole = roleFromRow(existing.role ?? "");
+  if (
+    currentEmail !== input.normalizedEmail ||
+    existing.user_id !== input.row.user_id ||
+    existing.role !== input.row.role ||
+    existing.active !== input.row.active ||
+    existing.active === "false" ||
+    existing.password_salt !== input.originalPasswordSalt ||
+    existing.password_hash !== input.originalPasswordHash ||
+    !currentRole ||
+    (currentRole === "parent" && !parentAccessEnabled())
+  ) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  assertManagedStaffIdentity(currentEmail, currentRole);
+
+  const nextSessionVersion = Math.max(
+    0,
+    int(existing.session_version ?? "")
+  ) + 1;
+  const rowNumber = rowIndex + 1;
+  const cells = [
+    ["password_salt", nextCredential.passwordSalt],
+    ["password_hash", nextCredential.passwordHash],
+    ["session_version", String(nextSessionVersion)]
+  ] as const;
+  const data = cells.map(([field, value]) => {
+    const columnIndex = header.indexOf(field);
+    if (columnIndex < 0) {
+      throw new Error("Credential migration could not be completed safely.");
+    }
+    const tab = TABS.users.replaceAll("'", "''");
+    return {
+      range: `'${tab}'!${columnName(columnIndex)}${rowNumber}`,
+      majorDimension: "ROWS",
+      values: [[value]]
+    };
+  });
+  await googleFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId()}/values:batchUpdate`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ valueInputOption: "RAW", data })
+    }
+  );
+
+  const updatedUsers = await getRows(TABS.users);
+  const updated = updatedUsers.find((row) =>
+    row.email?.trim().toLowerCase() === input.normalizedEmail
+  );
+  if (!updated) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  const updatedEmail = updated.email?.trim().toLowerCase();
+  const updatedRole = roleFromRow(updated.role ?? "");
+  if (
+    updatedEmail !== input.normalizedEmail ||
+    updated.user_id !== existing.user_id ||
+    updated.role !== existing.role ||
+    updated.active !== existing.active ||
+    updated.active === "false" ||
+    updated.password_salt !== nextCredential.passwordSalt ||
+    updated.password_hash !== nextCredential.passwordHash ||
+    int(updated.session_version ?? "") !== nextSessionVersion ||
+    !updatedRole ||
+    (updatedRole === "parent" && !parentAccessEnabled())
+  ) {
+    throw new Error("Credential migration could not be completed safely.");
+  }
+  assertManagedStaffIdentity(updatedEmail, updatedRole);
+
+  await appendGoogleAuditEvent({
+    actorEmail: input.normalizedEmail,
+    actorRole: updatedRole,
+    action: "auth.password_hash_upgraded",
+    resourceType: "user",
+    resourceId: updated.user_id || input.normalizedEmail,
+    outcome: "success"
+  });
+  return updated;
+}
+
 export async function authenticateGoogleUser(email: string, password: string): Promise<UserSession | null> {
   const normalized = email.trim().toLowerCase();
   const users = await getRows(TABS.users);
-  const row = users.find((item) => item.email?.trim().toLowerCase() === normalized && item.active !== "false");
+  let row = users.find((item) =>
+    item.email?.trim().toLowerCase() === normalized &&
+    item.active !== "false"
+  );
   if (!row?.password_hash || !row.password_salt) return null;
-  const actual = pbkdf2Sync(password, row.password_salt, 210_000, 32, "sha256");
-  const expected = Buffer.from(row.password_hash, "base64url");
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
-  const role = roleFromRow(row.role ?? "");
+  const originalPasswordSalt = row.password_salt;
+  const originalPasswordHash = row.password_hash;
+  const verification = await verifyPasswordHash(
+    password,
+    originalPasswordSalt,
+    originalPasswordHash
+  );
+  if (!verification.valid) return null;
+  let role = roleFromRow(row.role ?? "");
   if (!role || (role === "parent" && !parentAccessEnabled())) return null;
   assertManagedStaffIdentity(normalized, role);
+  if (verification.upgrade !== "none") {
+    row = await upgradeGooglePasswordHash({
+      row,
+      normalizedEmail: normalized,
+      password,
+      verification,
+      originalPasswordSalt,
+      originalPasswordHash
+    });
+    role = roleFromRow(row.role ?? "");
+    if (
+      row.active === "false" ||
+      !role ||
+      (role === "parent" && !parentAccessEnabled())
+    ) {
+      return null;
+    }
+    assertManagedStaffIdentity(normalized, role);
+  }
   return {
     ...sessionMetadata("password", int(row.session_version || "")),
     userId: row.user_id || normalized,

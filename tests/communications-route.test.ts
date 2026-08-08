@@ -49,12 +49,16 @@ describe("communications send route", () => {
     expect((await POST(requestFor())).status).toBe(401);
   });
 
-  it.each(["staff_write", "staff_read", "parent"] as const)(
+  it.each(["staff_write", "staff_read"] as const)(
     "rejects the %s role",
     async (role) => {
       expect((await POST(requestFor(role))).status).toBe(403);
     }
   );
+
+  it("rejects a disabled parent session", async () => {
+    expect((await POST(requestFor("parent"))).status).toBe(401);
+  });
 
   it("keeps sending disabled in demo mode", async () => {
     const response = await POST(requestFor("admin"));

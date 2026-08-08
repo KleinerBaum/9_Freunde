@@ -20,6 +20,14 @@ describe("demo data access", () => {
     expect(snapshot.parents.map((parent) => parent.id)).toEqual(["parent-sommer"]);
     expect(snapshot.documents.every((document) => document.childId === "child-lina")).toBe(true);
     expect(snapshot.photos.every((photo) => photo.childId === "child-lina")).toBe(true);
+    expect(snapshot.integrations).toMatchObject({
+      mode: "demo",
+      sheets: false,
+      drive: false,
+      calendar: false,
+      gmail: false,
+      mcp: false
+    });
   });
 
   it("rejects a parent update for another child", () => {

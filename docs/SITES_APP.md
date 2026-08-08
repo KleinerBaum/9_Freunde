@@ -11,7 +11,8 @@ The original Streamlit app remains available during migration. The new app inten
 - Staff dashboard with children, parents, onboarding tasks, documents, events,
   and versioned consent status.
 - Parent access scoped to assigned children, documents, events, and consented
-  Drive photos; parent access is disabled by default for the staff pilot.
+  Drive photos; parent access is disabled in the portfolio demo and by default
+  for the staff pilot.
 - Parent updates for contact, emergency, dietary, allergy, language, and parent-visible care information.
 - Staff CRUD for child records and document status.
 - Deterministic invoice and contract PDF drafts; contract output includes a mandatory review notice.
@@ -21,7 +22,8 @@ The original Streamlit app remains available during migration. The new app inten
 - Admin-only Gmail delivery for opted-in parent notices and reviewed PDF
   drafts. Recipients are resolved server-side and every recipient receives an
   individual message without a visible distribution list.
-- ChatGPT tools for search/fetch, operational overview, document drafting, and confirmed Calendar writes.
+- Optional ChatGPT tools for search/fetch, operational overview, document
+  drafting, and confirmed Calendar writes. MCP is disabled in demo mode.
 - A compact interactive ChatGPT widget rendered from `ui://9-freunde/dashboard-v1.html`.
 - Pseudonymized audit events, revocable sessions, confirmed privacy-request
   workflows, login throttling, same-origin checks, and global security headers.
@@ -46,7 +48,11 @@ To copy the environment template on native Windows, use
 `Copy-Item .env.example .env.local` in PowerShell or
 `copy .env.example .env.local` in Command Prompt.
 
-Open `http://localhost:3000`. The login screen provides fictional staff and parent demo accounts. Never use the demo mode or demo accounts with real child data.
+Open `http://localhost:3000`. The login screen provides a fictional staff
+account. Parent access, MCP, Gmail, and every Google integration remain disabled
+in this portfolio demo. Never use the demo mode or demo accounts with real
+child data. `DATA_MODE` accepts only the exact values `demo` and `google`;
+another explicit value returns HTTP 503 rather than selecting demo mode.
 
 Run all checks:
 
@@ -89,9 +95,10 @@ health checks have all passed.
    record](DATA_PROTECTION_RELEASE.md). Only then set `DATA_MODE=google` and
    `REAL_DATA_APPROVED=true`. Use `AUTH_MODE=sites`,
    `PARENT_ACCESS_ENABLED=false`, `MCP_ENABLED=false`, `GMAIL_ENABLED=true`,
-   and the managed staff domain for the first pilot. The application remains
-   in fictional demo mode unless approval, managed identity, legal notices,
-   HTTPS base URL, and all four Google integrations are configured together.
+   and the managed staff domain for the first pilot. Once `DATA_MODE=google` is
+   set explicitly, the application returns HTTP 503 until approval, managed
+   identity, legal notices, HTTPS base URL, and all four Google integrations
+   are configured together. It never falls back silently to demo data.
 7. Copy `.env.example` to the deployment environment and provide the listed
    server-side values. Keep the private key, session secret, independent audit
    HMAC secret, and any later MCP bearer token in the Sites secret store only.
@@ -160,6 +167,32 @@ resulting salt and hash into the `users` tab:
 node scripts/hash-password.mjs "a-long-unique-password"
 ```
 
+The generator always writes a canonical 18-byte Base64url salt and a
+self-describing `pbkdf2-sha256$210000$<digest>` hash. Runtime verification uses
+Web Crypto PBKDF2 with an explicit allowlist: 210,000 iterations are current;
+100,000 iterations are accepted only for the historical Sites-v9 migration
+path. Arbitrary iteration counts, malformed digests, and non-canonical salts
+are rejected before key derivation.
+
+A successful password login upgrades unversioned 210,000-iteration hashes to
+the versioned representation. A successfully verified 100,000-iteration hash
+is replaced with a new random salt and a versioned 210,000-iteration hash.
+Both migrations write only `password_salt`, `password_hash`, and
+`session_version` through one narrow Google Sheets batch request. They never
+write `email`, `role`, `active`, or another user field. The user row is read
+again after the write; the login continues only when the new credentials and
+session version are present and identity, role, and active state remain valid
+and unchanged. The successful migration appends a pseudonymized audit event.
+The login returns no session if the required Google Sheets write, post-read,
+or audit append fails. New 100,000-iteration hashes are never generated.
+
+Google Sheets provides no row-level compare-and-swap for this values workflow.
+A concurrent `session_version` write and the separate audit append therefore
+cannot be made transactional with the credential batch. The post-read detects
+visible conflicts before a session is returned; importantly, concurrent
+`role` and `active` changes are never part of the credential write and cannot
+be overwritten by password migration.
+
 Production access rules are enforced server-side:
 
 - Admins can manage records and versioned consent decisions.
@@ -189,9 +222,12 @@ Production access rules are enforced server-side:
 - Gmail uses a distinct delegated auth context and token cache with only
   `gmail.send`. Audit rows never contain recipient addresses, subject lines,
   message bodies, or provider error details.
-- MCP is disabled unless `MCP_ENABLED=true`; writes additionally require
-  explicit confirmation and a bearer token in Google mode.
-- `GET /api/health` reports liveness and whether required configuration is present.
+- MCP is always disabled in demo mode. Google mode additionally requires
+  `MCP_ENABLED=true` and a bearer token for every request; writes also require
+  explicit confirmation.
+- `GET /api/health` reports liveness and whether required configuration is
+  present. An explicitly selected but incomplete Google mode returns HTTP 503
+  with sanitized failed-gate names.
 - `GET /api/admin/integrations/health` requires an authenticated admin session
   and performs sanitized checks against the Sheet schema, writable Shared
   Drive root, delegated Calendar, and Gmail delegated-token issuance. The

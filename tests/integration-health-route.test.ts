@@ -37,7 +37,7 @@ describe("protected integration health route", () => {
 
   it("rejects parent sessions", async () => {
     const response = await GET(requestFor("parent"));
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
   });
 
   it("returns sanitized demo-mode checks to administrators", async () => {

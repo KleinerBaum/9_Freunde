@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-import { dataMode } from "../../lib/server/repository";
+import { safeErrorResponse } from "../../lib/server/http";
+import { configuredDataMode, dataMode } from "../../lib/server/repository";
 import { createNineFriendsMcpServer } from "../../mcp/server";
 
 export const runtime = "nodejs";
@@ -15,31 +16,52 @@ const corsHeaders = {
 };
 
 function authorizationStatus(request: Request): "allowed" | "disabled" | "denied" {
-  if (dataMode() === "demo") return "allowed";
+  if (configuredDataMode() !== "google") return "disabled";
+  if (dataMode() !== "google") return "disabled";
   if (process.env.MCP_ENABLED?.trim().toLowerCase() !== "true") return "disabled";
   const expected = process.env.MCP_BEARER_TOKEN?.trim();
-  return expected && request.headers.get("authorization") === `Bearer ${expected}`
+  if (!expected) return "disabled";
+  return request.headers.get("authorization") === `Bearer ${expected}`
     ? "allowed"
     : "denied";
 }
 
-async function handleMcp(request: Request): Promise<Response> {
-  const authorization = authorizationStatus(request);
-  if (authorization === "disabled") {
-    return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
-  }
-  if (authorization === "denied") {
-    return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
-  }
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  const server = createNineFriendsMcpServer();
-  await server.connect(transport);
-  const response = await transport.handleRequest(request);
+function withCors(response: Response): Response {
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(corsHeaders)) headers.set(key, value);
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+async function handleMcp(request: Request): Promise<Response> {
+  try {
+    const authorization = authorizationStatus(request);
+    if (authorization === "disabled") {
+      return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
+    }
+    if (authorization === "denied") {
+      return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    }
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const server = createNineFriendsMcpServer();
+    await server.connect(transport);
+    return withCors(await transport.handleRequest(request));
+  } catch (error) {
+    return withCors(safeErrorResponse(error));
+  }
 }
 
 export const POST = handleMcp;
 export const DELETE = handleMcp;
-export function OPTIONS(): Response { return new Response(null, { status: 204, headers: corsHeaders }); }
+export function OPTIONS(request: Request): Response {
+  try {
+    return authorizationStatus(request) === "disabled"
+      ? Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders })
+      : new Response(null, { status: 204, headers: corsHeaders });
+  } catch (error) {
+    return withCors(safeErrorResponse(error));
+  }
+}

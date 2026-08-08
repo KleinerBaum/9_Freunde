@@ -157,9 +157,9 @@ function Login({
     finally { setPending(false); }
   };
 
-  const chooseDemo = (role: "admin" | "parent") => {
-    if (role === "admin") { setEmail("leitung@demo.9freunde.de"); setPassword("willkommen"); }
-    else { setEmail("eltern@demo.9freunde.de"); setPassword("familie"); }
+  const chooseDemo = () => {
+    setEmail("leitung@demo.9freunde.de");
+    setPassword("willkommen");
   };
 
   return (
@@ -182,8 +182,7 @@ function Login({
         <div className="login-card">
           <div className="login-card__intro"><span className="eyebrow">Familienportal</span><h2>Willkommen zurück</h2><p>Melde dich mit deinem persönlichen Zugang an.</p></div>
           {!managedAccessError ? <div className="demo-switch" aria-label="Demo-Zugang wählen">
-            <button type="button" onClick={() => chooseDemo("admin")} className={email.startsWith("leitung") ? "active" : ""}><Icon name="spark" /> Leitung</button>
-            <button type="button" onClick={() => chooseDemo("parent")} className={email.startsWith("eltern") ? "active" : ""}><Icon name="heart" /> Eltern</button>
+            <button type="button" onClick={chooseDemo} className={email.startsWith("leitung") ? "active" : ""}><Icon name="spark" /> Leitungs-Demo</button>
           </div> : null}
           {managedAccessError ? <p className="form-error"><Icon name="warning" />{managedAccessError}</p> : <form onSubmit={submit} className="form-stack">
             <label><span>E-Mail-Adresse</span><span className="input-wrap"><Icon name="mail" /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></span></label>

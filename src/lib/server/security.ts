@@ -27,6 +27,9 @@ const securitySecret = () =>
   process.env.SESSION_SECRET?.trim() ||
   "demo-only-security-hash-secret";
 
+const googleModeConfigured = () =>
+  process.env.DATA_MODE?.trim().toLowerCase() === "google";
+
 export function pseudonymousId(value: string): string {
   return createHmac("sha256", securitySecret())
     .update(value.trim().toLowerCase())
@@ -37,11 +40,11 @@ export function pseudonymousId(value: string): string {
 export function productionAuthMode(): "sites" | "password" {
   const configured = process.env.AUTH_MODE?.trim().toLowerCase();
   if (configured === "password" || configured === "sites") return configured;
-  return process.env.DATA_MODE === "google" ? "sites" : "password";
+  return "password";
 }
 
 export function parentAccessEnabled(): boolean {
-  return process.env.DATA_MODE !== "google" ||
+  return googleModeConfigured() &&
     process.env.PARENT_ACCESS_ENABLED?.trim().toLowerCase() === "true";
 }
 
@@ -118,13 +121,13 @@ export function assertSameOrigin(request: Request): void {
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return;
   const origin = request.headers.get("origin");
   if (!origin) {
-    if (process.env.NODE_ENV === "test" || process.env.DATA_MODE !== "google") return;
+    if (process.env.NODE_ENV === "test" || !googleModeConfigured()) return;
     const error = new Error("Missing request origin.");
     Object.assign(error, { status: 403 });
     throw error;
   }
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim();
-  if (process.env.DATA_MODE === "google" && !configuredBaseUrl) {
+  if (googleModeConfigured() && !configuredBaseUrl) {
     const error = new Error("Production base URL is not configured.");
     Object.assign(error, { status: 503 });
     throw error;
